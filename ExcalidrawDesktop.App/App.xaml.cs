@@ -1,4 +1,5 @@
 using ExcalidrawDesktop.Core;
+using ExcalidrawDesktop.App.Services;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
@@ -10,6 +11,7 @@ namespace ExcalidrawDesktop.App;
 public partial class App : Application
 {
     private MainWindow? window;
+    private ApplicationWorkspaceCoordinator? workspaceCoordinator;
     private DispatcherQueue? dispatcherQueue;
 
     public App()
@@ -62,6 +64,9 @@ public partial class App : Application
         var titleBarSmokeRequestPath = Path.Combine(
             AppContext.BaseDirectory,
             "titlebar-smoke.request");
+        var multiWindowSmokeRequestPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "multi-window-smoke.request");
         var performanceSmokeRequestPath = Path.Combine(
             AppContext.BaseDirectory,
             "performance-smoke.request");
@@ -71,6 +76,7 @@ public partial class App : Application
         var runRecoverySmoke = File.Exists(recoverySmokeRequestPath);
         var verifyRecoverySmoke = File.Exists(recoveryRestoreRequestPath);
         var runTitleBarSmoke = File.Exists(titleBarSmokeRequestPath);
+        var runMultiWindowSmoke = File.Exists(multiWindowSmokeRequestPath);
         var performanceTabCount = ReadPerformanceTabCount(
             performanceSmokeRequestPath);
         var performanceSuspendInactive = ReadPerformanceSuspendMode(
@@ -88,6 +94,8 @@ public partial class App : Application
                         ? Path.Combine(AppContext.BaseDirectory, "file-activation-smoke-state.json")
                     : runTitleBarSmoke
                         ? Path.Combine(AppContext.BaseDirectory, "titlebar-smoke-state.json")
+                    : runMultiWindowSmoke
+                        ? Path.Combine(AppContext.BaseDirectory, "multi-window-smoke-state.json")
                     : performanceTabCount > 0
                         ? Path.Combine(AppContext.BaseDirectory, "performance-smoke-state.json")
                     : runSuspensionSmoke
@@ -119,6 +127,10 @@ public partial class App : Application
         {
             File.Delete(titleBarSmokeRequestPath);
         }
+        if (File.Exists(multiWindowSmokeRequestPath))
+        {
+            File.Delete(multiWindowSmokeRequestPath);
+        }
         if (File.Exists(performanceSmokeRequestPath))
         {
             File.Delete(performanceSmokeRequestPath);
@@ -133,12 +145,18 @@ public partial class App : Application
         const bool runRecoverySmoke = false;
         const bool verifyRecoverySmoke = false;
         const bool runTitleBarSmoke = false;
+        const bool runMultiWindowSmoke = false;
         const int performanceTabCount = 0;
         const bool performanceSuspendInactive = false;
         const bool performanceUnloadInactive = false;
         const bool runSuspensionSmoke = false;
 #endif
+        workspaceCoordinator = new ApplicationWorkspaceCoordinator(workspaceStatePath);
+        await workspaceCoordinator.InitializeAsync();
+        var restoredWindows = workspaceCoordinator.RestoredWindows;
+        var firstRestoredWindow = restoredWindows.FirstOrDefault();
         window = new MainWindow(
+            workspaceCoordinator,
             runTabSmoke,
             workspaceStatePath,
             runRecoverySmoke,
@@ -147,8 +165,25 @@ public partial class App : Application
             performanceTabCount,
             runSuspensionSmoke,
             performanceSuspendInactive,
-            performanceUnloadInactive);
+            performanceUnloadInactive,
+            restoreWorkspace: true,
+            runMultiWindowSmoke: runMultiWindowSmoke);
+        workspaceCoordinator.RegisterWindow(window, firstRestoredWindow);
         window.Activate();
+        MainWindow? restoredActiveWindow =
+            workspaceCoordinator.IsRestoredLastActiveWindow(window) ? window : null;
+        foreach (var restoredWindow in restoredWindows.Skip(1))
+        {
+            var additionalWindow = workspaceCoordinator.CreateWindow(
+                activate: true,
+                createInitialTab: true,
+                restoreState: restoredWindow);
+            if (workspaceCoordinator.IsRestoredLastActiveWindow(additionalWindow))
+            {
+                restoredActiveWindow = additionalWindow;
+            }
+        }
+        restoredActiveWindow?.Activate();
         QueueActivatedFiles(activation, includeProcessArguments: true);
     }
 
@@ -156,7 +191,7 @@ public partial class App : Application
     {
         dispatcherQueue?.TryEnqueue(() =>
         {
-            window?.Activate();
+            workspaceCoordinator?.ActivateMostRecentWindow();
             QueueActivatedFiles(args, includeProcessArguments: false);
         });
     }
@@ -165,7 +200,7 @@ public partial class App : Application
         AppActivationArguments activation,
         bool includeProcessArguments)
     {
-        if (window is null)
+        if (workspaceCoordinator is null)
         {
             return;
         }
@@ -194,7 +229,7 @@ public partial class App : Application
             .Select(path => path.Trim().Trim('"'))
             .Where(File.Exists)
             .Distinct(StringComparer.OrdinalIgnoreCase);
-        window.QueueActivatedFiles(activatedPaths);
+        workspaceCoordinator.QueueActivatedFiles(activatedPaths);
     }
 
     private static IEnumerable<string> ParseLaunchFile(string arguments)

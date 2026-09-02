@@ -40,10 +40,14 @@
                 AutomationProperties.AutomationId="DocumentTabs"
                 AutomationProperties.Name="Open drawings"
                 CanReorderTabs="True"
+                CanTearOutTabs="True"
                 CloseButtonOverlayMode="Auto"
                 IsAddTabButtonVisible="True"
                 SelectionChanged="OnTabSelectionChanged"
-                TabDragCompleted="OnTabDragCompleted"
+                TabTearOutWindowRequested="OnTabTearOutWindowRequested"
+                TabTearOutRequested="OnTabTearOutRequested"
+                ExternalTornOutTabsDropping="OnExternalTornOutTabsDropping"
+                ExternalTornOutTabsDropped="OnExternalTornOutTabsDropped"
                 TabCloseRequested="OnTabCloseRequested">
                 <TabView.TabStripHeader>
                     <MenuBar
@@ -59,6 +63,10 @@
                                 Text="New tab"
                                 KeyboardAcceleratorTextOverride="Ctrl+N"
                                 Click="OnFileNewTabClick" />
+                            <MenuFlyoutItem
+                                Text="New window"
+                                KeyboardAcceleratorTextOverride="Ctrl+Shift+N"
+                                Click="OnFileNewWindowClick" />
                             <MenuFlyoutItem
                                 Text="Open…"
                                 KeyboardAcceleratorTextOverride="Ctrl+O"
@@ -119,6 +127,10 @@
                         Key="N"
                         Modifiers="Control"
                         Invoked="OnNewTabAcceleratorInvoked" />
+                    <KeyboardAccelerator
+                        Key="N"
+                        Modifiers="Control,Shift"
+                        Invoked="OnNewWindowAcceleratorInvoked" />
                     <KeyboardAccelerator
                         Key="W"
                         Modifiers="Control"

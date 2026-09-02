@@ -114,7 +114,9 @@ try {
         if (-not $workspaceRestored -and
             $startedProcess.MainWindowTitle -eq $expectedTitle) {
             $restoredState = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
-            if ($restoredState.Tabs.Count -eq 2 -and
+            if ($restoredState.Version -eq 3 -and
+                $restoredState.Windows.Count -eq 1 -and
+                $restoredState.Windows[0].Tabs.Count -eq 2 -and
                 $restoredState.RecentFiles.Count -eq 2 -and
                 $restoredState.RecentFiles -notcontains $missingPath) {
                 $workspaceRestored = $true
@@ -147,9 +149,11 @@ finally {
         }
     }
 
-    foreach ($path in $generatedPaths) {
-        if ([System.IO.File]::Exists($path)) {
-            [System.IO.File]::Delete($path)
+    if (-not $KeepRunning) {
+        foreach ($path in $generatedPaths) {
+            if ([System.IO.File]::Exists($path)) {
+                [System.IO.File]::Delete($path)
+            }
         }
     }
 }

@@ -50,8 +50,8 @@ public sealed class DocumentService
 {
     public const ulong MaxDocumentBytes = 50UL * 1024 * 1024;
 
-    private readonly Window window;
-    private readonly FrameworkElement dialogRoot;
+    private Window window;
+    private FrameworkElement dialogRoot;
     private StorageFile? activeFile;
     private StorageFile? pendingOpenFile;
     private DesktopFileStamp? activeFileStamp;
@@ -67,6 +67,12 @@ public sealed class DocumentService
     public bool HasActiveFile => activeFile is not null;
 
     public DocumentService(Window window, FrameworkElement dialogRoot)
+    {
+        this.window = window;
+        this.dialogRoot = dialogRoot;
+    }
+
+    public void AttachHost(Window window, FrameworkElement dialogRoot)
     {
         this.window = window;
         this.dialogRoot = dialogRoot;

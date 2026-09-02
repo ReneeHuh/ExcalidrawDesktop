@@ -1,6 +1,6 @@
 # Multi-window tab workspace plan
 
-Status: Proposed
+Status: Implementation in progress (M1-M4 implemented; M5 validation remains)
 Created: September 2, 2026
 Starts after: the document-safety and lifecycle exit criteria in
 [`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md)
@@ -290,10 +290,10 @@ can own sessions.
 ### Phase M0: Extract ownership without behavior changes
 
 - [ ] Add unit-tested application and per-window workspace abstractions.
-- [ ] Move recent files, persistence, recovery pruning, and path ownership to
+- [x] Move recent files, persistence, recovery pruning, and path ownership to
   the application coordinator.
-- [ ] Track the existing main window by runtime and logical window ID.
-- [ ] Preserve all current single-window behavior and smoke tests.
+- [x] Track the existing main window by runtime and logical window ID.
+- [x] Preserve all current single-window behavior and smoke tests.
 
 Exit criteria:
 
@@ -304,11 +304,11 @@ Exit criteria:
 
 ### Phase M1: Create and manage independent windows
 
-- [ ] Add File > New window and a keyboard-accessible command.
-- [ ] Track activation order and route new file activations.
-- [ ] Give each window its own title bar, settings tab, status, and tab host.
-- [ ] Implement final-window process shutdown.
-- [ ] Add basic two-window packaged automation.
+- [x] Add File > New window and a keyboard-accessible command.
+- [x] Track activation order and route new file activations.
+- [x] Give each window its own title bar, settings tab, status, and tab host.
+- [x] Implement final-window process shutdown.
+- [x] Add basic two-window packaged automation.
 
 Exit criteria:
 
@@ -318,11 +318,11 @@ Exit criteria:
 
 ### Phase M2: Safe command-driven tab moves
 
-- [ ] Implement the atomic detach/attach transaction.
-- [ ] Add Move tab to new window to the drawing-tab context menu.
-- [ ] Rebind every window-capturing service and handler.
-- [ ] Preserve the live WebView, origin, undo stack, viewport, and dirty state.
-- [ ] Roll back to the source window when destination attachment fails.
+- [x] Implement the atomic detach/attach transaction.
+- [x] Add Move tab to new window to the drawing-tab context menu.
+- [x] Rebind every window-capturing service and handler.
+- [x] Preserve the live WebView, origin, undo stack, viewport, and dirty state.
+- [x] Roll back to the source window when destination attachment fails.
 
 Exit criteria:
 
@@ -333,13 +333,13 @@ Exit criteria:
 
 ### Phase M3: Native tear-out and cross-window drag
 
-- [ ] Enable `CanTearOutTabs` for drawing tabs.
-- [ ] Create a destination window in `TabTearOutWindowRequested`.
-- [ ] Transfer the session in `TabTearOutRequested`.
-- [ ] Accept and place application-owned tabs through the external tear-out
+- [x] Enable `CanTearOutTabs` for drawing tabs.
+- [x] Create a destination window in `TabTearOutWindowRequested`.
+- [x] Transfer the session in `TabTearOutRequested`.
+- [x] Accept and place application-owned tabs through the external tear-out
   events.
-- [ ] Replace `TabDragCompleted`-dependent ordering logic.
-- [ ] Reject settings tabs and invalid or concurrent transfers.
+- [x] Replace `TabDragCompleted`-dependent ordering logic.
+- [x] Reject settings tabs and invalid or concurrent transfers.
 
 Exit criteria:
 
@@ -350,11 +350,11 @@ Exit criteria:
 
 ### Phase M4: Multi-window restore and placement
 
-- [ ] Add version-3 workspace models and version-2 migration tests.
-- [ ] Persist logical windows, tab membership/order, active tabs, and bounds.
-- [ ] Restore bounds safely across disconnected and mixed-DPI monitors.
-- [ ] Debounce aggregate workspace writes.
-- [ ] Restore all dirty sessions before pruning recovery snapshots.
+- [x] Add version-3 workspace models and version-2 migration tests.
+- [x] Persist logical windows, tab membership/order, active tabs, and bounds.
+- [x] Restore bounds safely across disconnected and mixed-DPI monitors.
+- [x] Debounce aggregate workspace writes.
+- [x] Restore all dirty sessions before pruning recovery snapshots.
 
 Exit criteria:
 
@@ -461,4 +461,3 @@ Multi-window tabs are complete when:
 - No window owns global persistence or globally prunes recovery state.
 - The packaged multi-window automation and manual accessibility/input/DPI
   matrix pass on the supported Windows configuration.
-

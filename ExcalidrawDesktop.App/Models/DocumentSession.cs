@@ -66,6 +66,10 @@ internal sealed class DocumentSession : IDisposable
 
     public bool IsRestoringFromHibernation { get; set; }
 
+    public bool IsMoving { get; set; }
+
+    public bool IsBridgeDispatching { get; set; }
+
     public string? HibernatedContent { get; set; }
 
     public string? LastLifecycleFailure { get; set; }
@@ -91,6 +95,8 @@ internal sealed class DocumentSession : IDisposable
     public Action? DetachWebViewHandlers { get; set; }
 
     public Action? DetachEditorHandlers { get; set; }
+
+    public Action? DetachWindowHandlers { get; set; }
 
     public PendingEditorLoad? PendingDocumentLoad { get; set; }
 
@@ -138,6 +144,18 @@ internal sealed class DocumentSession : IDisposable
         {
             LastLifecycleFailure = exception.Message;
             Debug.WriteLine($"Editor input cleanup failed: {exception}");
+        }
+
+        var detachWindowHandlers = DetachWindowHandlers;
+        DetachWindowHandlers = null;
+        try
+        {
+            detachWindowHandlers?.Invoke();
+        }
+        catch (Exception exception)
+        {
+            LastLifecycleFailure = exception.Message;
+            Debug.WriteLine($"Window session-host cleanup failed: {exception}");
         }
 
         Content.CloseEditor();
