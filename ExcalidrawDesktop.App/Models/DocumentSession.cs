@@ -4,6 +4,7 @@ using ExcalidrawDesktop.App.Services;
 using System.Diagnostics;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
+using Windows.Storage;
 
 namespace ExcalidrawDesktop.App.Models;
 
@@ -73,6 +74,12 @@ internal sealed class DocumentSession : IDisposable
 
     public bool IsBridgeDispatching { get; set; }
 
+    public bool IsExporting { get; set; }
+
+    public PendingImageExport? PendingImageExport { get; set; }
+
+    public string? ExportStatusMessage { get; set; }
+
     public string? HibernatedContent { get; set; }
 
     public string? LastLifecycleFailure { get; set; }
@@ -114,6 +121,11 @@ internal sealed class DocumentSession : IDisposable
 
     public void Dispose()
     {
+        PendingImageExport?.Cancellation.Cancel();
+        PendingImageExport?.Cancellation.Dispose();
+        PendingImageExport = null;
+        IsExporting = false;
+
         try
         {
             DetachExternalFileWatcher();
@@ -201,3 +213,8 @@ internal sealed record PendingEditorLoad(
     string FileName,
     string Content,
     bool IsRecovery);
+
+internal sealed record PendingImageExport(
+    Guid ExportId,
+    StorageFile Destination,
+    CancellationTokenSource Cancellation);

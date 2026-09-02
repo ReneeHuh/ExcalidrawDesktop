@@ -117,6 +117,9 @@ try {
                 "ApplicationMenu",
                 "FileMenu",
                 "SettingsButton",
+                "DocumentStatusBar",
+                "StatusDocumentText",
+                "StatusStateText",
                 "ExcalidrawEditorWebView",
                 "Minimize",
                 "Maximize",
@@ -158,6 +161,7 @@ try {
                 KeyboardAccelerators = "Passed"
                 LightAndDarkThemes = "Passed"
                 AutomationNames = "Passed"
+                NativeStatusBar = "Passed"
                 CaptionButtonAutomation = "Passed"
                 FailureActions = "Passed"
                 FailureRetry = "Passed"

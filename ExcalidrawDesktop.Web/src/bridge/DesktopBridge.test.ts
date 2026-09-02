@@ -181,35 +181,6 @@ describe("DesktopBridge", () => {
     },
   );
 
-  it("receives status updates and requests conflict resolution", () => {
-    const { bridge, transport } = createBridge();
-    const listener = vi.fn();
-    bridge.onDocumentStatusChanged(listener);
-
-    transport.respond({
-      version: 1,
-      kind: "event",
-      requestId: crypto.randomUUID(),
-      method: "document.statusChanged",
-      payload: {
-        document: "drawing.excalidraw",
-        status: "Changed on disk — Resolve",
-        actionable: true,
-      },
-    });
-    bridge.requestResolveExternalConflict();
-
-    expect(listener).toHaveBeenCalledWith({
-      document: "drawing.excalidraw",
-      status: "Changed on disk — Resolve",
-      actionable: true,
-    });
-    expect(transport.posted.at(-1)).toMatchObject({
-      kind: "event",
-      method: "document.resolveExternalConflict",
-    });
-  });
-
   it("delivers the native theme even when it arrives before subscription", () => {
     const { bridge, transport } = createBridge();
     const listener = vi.fn();
@@ -224,6 +195,39 @@ describe("DesktopBridge", () => {
 
     bridge.onThemeChanged(listener);
     expect(listener).toHaveBeenCalledWith({ theme: "dark" });
+  });
+
+  it("delivers and validates a pending native image export request", () => {
+    const { bridge, transport } = createBridge();
+    const listener = vi.fn();
+    const exportId = "720e34f1-a3ea-4af3-93ed-a950b2357c42";
+
+    transport.respond({
+      version: 1,
+      kind: "event",
+      requestId: crypto.randomUUID(),
+      method: "image.exportRequested",
+      payload: {
+        exportId,
+        uploadPath: `/_desktop/export/${exportId}`,
+        maxDimension: 16384,
+        maxBytes: 104857600,
+        scale: 2,
+        padding: 10,
+      },
+    });
+
+    bridge.onImageExportRequested(listener);
+    bridge.notifyImageExportFailed(exportId, "render failed");
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ exportId, scale: 2, padding: 10 }),
+    );
+    expect(transport.posted.at(-1)).toMatchObject({
+      kind: "event",
+      method: "image.exportFailed",
+      payload: { exportId, message: "render failed" },
+    });
   });
 
   it("sends typed workspace tab events", () => {

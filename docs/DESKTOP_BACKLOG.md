@@ -10,6 +10,8 @@ The detailed designs remain in:
 - [`WINUI_DESKTOP_PLAN.md`](WINUI_DESKTOP_PLAN.md)
 - [`EDGE_STYLE_TITLEBAR_TABS_PLAN.md`](EDGE_STYLE_TITLEBAR_TABS_PLAN.md)
 - [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md)
+- [`MULTI_LANGUAGE_SUPPORT_PLAN.md`](MULTI_LANGUAGE_SUPPORT_PLAN.md)
+- [`WHOLE_MAP_IMAGE_EXPORT_PLAN.md`](WHOLE_MAP_IMAGE_EXPORT_PLAN.md)
 - [`FUTURE_DESKTOP_ROADMAP.md`](FUTURE_DESKTOP_ROADMAP.md)
 
 When an item is completed, update this checklist and the relevant detailed
@@ -36,7 +38,9 @@ plan in the same change.
 
 - [ ] Confirm Visual Studio F5 upgrades the installed development package from
   `0.1.3.0` to source version `0.1.4.0` without DEP0700.
-- [ ] Record the title-bar manual validation results under `docs/validation`.
+- [ ] Complete and record the remaining hardware-dependent title-bar checks.
+  Automated results and the open manual matrix are already recorded under
+  `docs/validation`.
 
 ## Tabbed desktop MVP completion
 
@@ -130,13 +134,17 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
 
 ## Windows desktop and release completion
 
-- [ ] Restore window size, position, maximized state, tab order, and active tab
+- [x] Restore window size, position, maximized state, tab order, and active tab
   safely across launches.
 - [ ] Register the `.excalidrawlib` file association.
 - [ ] Add pinned drawings to the native Recent menu and taskbar jump list.
 - [ ] Add New Drawing and pinned-drawing taskbar jump-list actions.
-- [ ] Decide whether image and PDF export remain editor-owned or use a native
-  desktop export workflow.
+- [x] Implement native whole-drawing PNG export according to
+  [`WHOLE_MAP_IMAGE_EXPORT_PLAN.md`](WHOLE_MAP_IMAGE_EXPORT_PLAN.md), including
+  bounded binary transfer, transactional writing, and per-session lifecycle
+  isolation.
+- [ ] Complete the packaged and visual PNG export matrix, then decide ownership
+  of the richer editor export dialog and remaining formats.
 - [ ] Define Release x64 performance and reliability budgets.
 - [ ] Produce and validate a signed MSIX package.
 - [ ] Choose Microsoft Store distribution, direct MSIX/App Installer
@@ -153,9 +161,10 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
 
 ### Power-user workflow
 
-- [ ] Add multiple tabbed windows, command-driven tab moves, native tab
+- [x] Add multiple tabbed windows, command-driven tab moves, native tab
   tear-out, and cross-window restoration according to
-  [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md).
+  [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md). Release hardening
+  and the manual cross-window matrix remain tracked in that plan.
 - [ ] Add a native command palette for tabs, files, export, view, and app
   commands.
 - [ ] Add configurable shortcuts with documented native/editor precedence.
@@ -214,9 +223,12 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
 
 ## Recommended implementation order
 
-1. Inactive-tab suspension and before/after performance evidence.
-2. Packaged document-safety, close, recovery, and external-conflict tests.
-3. Title-bar, accessibility, input, DPI, and theme validation.
-4. Failure experience, diagnostics, and lifecycle hardening.
-5. File compatibility, release budgets, signing, CI, and distribution.
-6. Optional post-release features in roadmap order.
+1. Packaged document-safety, close, recovery, and external-conflict tests.
+2. Title-bar, accessibility, input, DPI, theme, and multi-window validation.
+3. Large-document compatibility, multi-window performance, and supported
+   resource budgets.
+4. Failure experience, diagnostics, payload limits, and remaining lifecycle
+   hardening.
+5. File compatibility, signing, CI, distribution, and update validation.
+6. Multi-language support and optional post-release features in agreed roadmap
+   order.

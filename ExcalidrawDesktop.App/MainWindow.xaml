@@ -15,6 +15,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid
@@ -90,6 +91,11 @@
                                 Text="Save all"
                                 KeyboardAcceleratorTextOverride="Ctrl+Alt+S"
                                 Click="OnFileSaveAllClick" />
+                            <MenuFlyoutItem
+                                x:Name="ExportPngMenuItem"
+                                Text="Export whole drawing as PNG…"
+                                AutomationProperties.AutomationId="ExportPngMenuItem"
+                                Click="OnFileExportPngClick" />
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem
                                 x:Name="CloseTabMenuItem"
@@ -196,5 +202,53 @@
             x:Name="AppSettingsPage"
             Grid.Row="1"
             Visibility="Collapsed" />
+
+        <Border
+            x:Name="StatusBar"
+            Grid.Row="2"
+            Height="32"
+            Padding="10,0"
+            Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0"
+            AutomationProperties.AutomationId="DocumentStatusBar"
+            AutomationProperties.Name="Drawing status">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock
+                    x:Name="StatusDocumentText"
+                    VerticalAlignment="Center"
+                    FontSize="12"
+                    Text="Untitled"
+                    TextTrimming="CharacterEllipsis"
+                    AutomationProperties.AutomationId="StatusDocumentText" />
+
+                <TextBlock
+                    x:Name="StatusStateText"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    FontSize="12"
+                    Text="New drawing"
+                    AutomationProperties.AutomationId="StatusStateText"
+                    AutomationProperties.LiveSetting="Polite" />
+
+                <Button
+                    x:Name="StatusActionButton"
+                    Grid.Column="1"
+                    MinHeight="24"
+                    Padding="8,2"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                    BorderThickness="0"
+                    FontSize="12"
+                    Visibility="Collapsed"
+                    AutomationProperties.AutomationId="StatusActionButton"
+                    Click="OnStatusActionClick" />
+            </Grid>
+        </Border>
     </Grid>
 </Window>

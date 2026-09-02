@@ -21,6 +21,7 @@ public sealed class BridgeDispatcher
     private readonly Func<Task> openTabRequested;
     private readonly Action closeTabRequested;
     private readonly Action<bool> selectAdjacentTabRequested;
+    private readonly Action<Guid, string> imageExportFailed;
 
     public BridgeDispatcher(
         DocumentService documentService,
@@ -36,7 +37,8 @@ public sealed class BridgeDispatcher
         Action newTabRequested,
         Func<Task> openTabRequested,
         Action closeTabRequested,
-        Action<bool> selectAdjacentTabRequested)
+        Action<bool> selectAdjacentTabRequested,
+        Action<Guid, string> imageExportFailed)
     {
         this.documentService = documentService;
         this.appReady = appReady;
@@ -52,6 +54,7 @@ public sealed class BridgeDispatcher
         this.openTabRequested = openTabRequested;
         this.closeTabRequested = closeTabRequested;
         this.selectAdjacentTabRequested = selectAdjacentTabRequested;
+        this.imageExportFailed = imageExportFailed;
     }
 
     public async Task DispatchAsync(CoreWebView2 webView, BridgeMessage message)
@@ -168,12 +171,6 @@ public sealed class BridgeDispatcher
             return;
         }
 
-        if (message.Method == "document.resolveExternalConflict")
-        {
-            externalConflictDetected();
-            return;
-        }
-
         if (message.Method == "document.recoverySnapshot" &&
             message.Payload is { ValueKind: JsonValueKind.Object } recoveryPayload &&
             recoveryPayload.TryGetProperty("content", out var recoveryContentElement) &&
@@ -184,6 +181,19 @@ public sealed class BridgeDispatcher
                 recoveryContent,
                 DocumentService.MaxDocumentBytes);
             await recoverySnapshotReceived(recoveryContent);
+            return;
+        }
+
+        if (message.Method == "image.exportFailed" &&
+            message.Payload is { ValueKind: JsonValueKind.Object } exportPayload &&
+            exportPayload.TryGetProperty("exportId", out var exportIdElement) &&
+            exportIdElement.ValueKind == JsonValueKind.String &&
+            Guid.TryParseExact(exportIdElement.GetString(), "D", out var exportId) &&
+            exportPayload.TryGetProperty("message", out var exportMessageElement) &&
+            exportMessageElement.ValueKind == JsonValueKind.String &&
+            exportMessageElement.GetString() is { Length: > 0 and <= 500 } exportMessage)
+        {
+            imageExportFailed(exportId, exportMessage);
             return;
         }
 

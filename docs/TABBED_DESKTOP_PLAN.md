@@ -1,10 +1,10 @@
 # Excalidraw Desktop Tabbed Workspace Plan
 
-Status: In progress — core tabbed workspace implemented; T3 completion gaps,
-Windows integration, title-bar integration, and validation remain
+Status: Core implementation complete; document-safety, compatibility,
+performance, and manual Windows validation remain
 Created: September 1, 2026
 Related plan: [`WINUI_DESKTOP_PLAN.md`](WINUI_DESKTOP_PLAN.md)
-Post-MVP plan: [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md)
+Related implemented plan: [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md)
 
 ## Current delivery snapshot
 
@@ -14,15 +14,15 @@ Post-MVP plan: [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md)
 | Unique exact per-tab origins | Implemented | Unit-tested exact matching and packaged `localStorage` isolation |
 | Per-tab open, save, Save As, dirty state, and close protection | Implemented | Unit/web coverage is partial; packaged cross-tab save-isolation coverage remains |
 | Reorder, adjacent navigation, and close/close-others/close-right commands | Implemented | Core ordering helpers are unit tested |
-| Middle-click close, Copy Path, and Reveal in Explorer | Not implemented | Remaining T3/T4 work |
+| Middle-click close, Copy Path, and Reveal in Explorer | Implemented | Packaged and manual interaction coverage remains |
 | Recent files and clean workspace restoration | Implemented | Packaged restore smoke coverage |
 | Per-tab recovery after forced termination | Implemented | Synthetic packaged snapshot/restore coverage; real-edit debounce validation remains |
 | External modification, move, and deletion protection | Implemented | File-stamp logic is unit tested; packaged conflict-flow coverage remains |
 | Consolidated window close | Save All, Discard All, Review Individually, or Cancel implemented | Per-document selection in one dialog is not implemented |
-| File association and existing-instance file activation | Implemented | Packaged activation automation remains |
-| Multi-file drag/drop and jump lists | Not implemented | Remaining T4 work |
-| Tabs in the native title bar | Planned | See [`EDGE_STYLE_TITLEBAR_TABS_PLAN.md`](EDGE_STYLE_TITLEBAR_TABS_PLAN.md) |
-| Multiple windows and tab tear-out | Post-MVP plan | See [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md) |
+| File association and existing-instance file activation | Implemented | Packaged cold-start and existing-instance automation passes |
+| Multi-file drag/drop and jump lists | Implemented | Jump-list selection still needs recorded validation |
+| Tabs in the native title bar | Implemented | Hardware-dependent manual matrix remains; see [`EDGE_STYLE_TITLEBAR_TABS_PLAN.md`](EDGE_STYLE_TITLEBAR_TABS_PLAN.md) |
+| Multiple windows and tab tear-out | Implemented | M5 hardening remains; see [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md) |
 | Performance target and hibernation decision | Measured and implemented | Five-minute suspension and fifteen-minute safe clean-editor unloading |
 
 “Implemented” describes code present in the repository. It does not imply that
@@ -44,10 +44,11 @@ The native WinUI shell owns tabs, files, application lifecycle, recovery, and Wi
 5. Keep the canvas familiar and place desktop workspace features in the native shell.
 6. Maintain a narrow integration layer so the exact-version Excalidraw npm package can be updated independently.
 
-## Non-goals for the first release
+## Historical non-goals for the first tabbed milestone
 
 - Cloud synchronization or real-time collaboration.
-- Multiple application windows.
+- Multiple application windows. *(Implemented later under the dedicated
+  multi-window plan.)*
 - A native rewrite of the Excalidraw canvas.
 - Unlimited simultaneously active WebView2 controls.
 - Treating `localStorage` or IndexedDB as the authoritative saved document.
@@ -441,9 +442,10 @@ Exit criteria:
 
 ### Phase T4: Windows desktop integration
 
-Status: In progress — `.excalidraw` registration, single-instance routing,
-multi-file activation and drag/drop, duplicate-tab focusing, and native
-Recent-menu activation implemented September 2, 2026.
+Status: Feature implementation complete — `.excalidraw` registration,
+single-instance routing, multi-file activation and drag/drop, duplicate-tab
+focusing, native Recent-menu activation, jump lists, and title-bar integration
+are implemented. Manual accessibility and input validation remains.
 
 The title-bar portion of this phase is specified in
 [`EDGE_STYLE_TITLEBAR_TABS_PLAN.md`](EDGE_STYLE_TITLEBAR_TABS_PLAN.md).
@@ -605,19 +607,21 @@ validation provides evidence.
 
 ## Next implementation slices
 
-1. Finish the small T3 interaction gaps: middle-click close and Copy Path.
-2. Add packaged save-isolation, close-decision, external-conflict, and real-edit
-   recovery validation so existing behavior satisfies its exit criteria with
-   evidence.
-3. Finish T4 activation validation, multi-file drag/drop, Reveal in Explorer,
-   and jump lists.
-4. Implement and validate
-   [`EDGE_STYLE_TITLEBAR_TABS_PLAN.md`](EDGE_STYLE_TITLEBAR_TABS_PLAN.md).
-5. Validate full hibernation with realistic large drawings and define the
-   supported tab-count and memory budgets.
+1. Add packaged save-isolation, close-decision, external-conflict, and
+   real-edit recovery validation so existing behavior satisfies its exit
+   criteria with evidence.
+2. Record the remaining title-bar, accessibility, input, DPI, and jump-list
+   manual validation.
+3. Validate full unloading with realistic large drawings and embedded images,
+   then define the supported tab-count and memory budgets.
+4. Round-trip representative drawings with excalidraw.com and complete the
+   remaining release gates in [`DESKTOP_BACKLOG.md`](DESKTOP_BACKLOG.md).
 
 Do not extract a `DocumentWorkspace` solely to match the original proposal.
 Perform that refactor when tests, multi-window support, or measured maintenance
 cost justify it.
 
-After the tabbed workspace reaches its definition of done, continue with the desktop product phases in [`FUTURE_DESKTOP_ROADMAP.md`](FUTURE_DESKTOP_ROADMAP.md).
+Multi-window support was implemented before all tabbed-MVP evidence was
+closed. Keep the remaining safety gates blocking release, then continue with
+the desktop product phases in
+[`FUTURE_DESKTOP_ROADMAP.md`](FUTURE_DESKTOP_ROADMAP.md).

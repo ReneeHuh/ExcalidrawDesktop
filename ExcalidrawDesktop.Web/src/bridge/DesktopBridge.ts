@@ -52,14 +52,15 @@ export class DesktopBridge {
   private readonly loadRequestedListeners = new Set<
     (payload: HostEventMap["document.loadRequested"]) => void
   >();
-  private readonly statusChangedListeners = new Set<
-    (payload: HostEventMap["document.statusChanged"]) => void
-  >();
   private readonly themeChangedListeners = new Set<
     (payload: HostEventMap["app.themeChanged"]) => void
   >();
+  private readonly imageExportRequestedListeners = new Set<
+    (payload: HostEventMap["image.exportRequested"]) => void
+  >();
   private pendingTheme?: HostEventMap["app.themeChanged"];
   private pendingDocumentLoad?: HostEventMap["document.loadRequested"];
+  private pendingImageExport?: HostEventMap["image.exportRequested"];
 
   public constructor(private readonly ownerWindow: Window) {
     this.transport = ownerWindow.chrome?.webview;
@@ -116,17 +117,8 @@ export class DesktopBridge {
     this.notify("document.recoverySnapshot", { content });
   }
 
-  public requestResolveExternalConflict() {
-    this.notify("document.resolveExternalConflict", undefined);
-  }
-
-  public onDocumentStatusChanged(
-    listener: (payload: HostEventMap["document.statusChanged"]) => void,
-  ) {
-    this.statusChangedListeners.add(listener);
-    return () => {
-      this.statusChangedListeners.delete(listener);
-    };
+  public notifyImageExportFailed(exportId: string, message: string) {
+    this.notify("image.exportFailed", { exportId, message });
   }
 
   public onThemeChanged(
@@ -140,6 +132,20 @@ export class DesktopBridge {
     }
     return () => {
       this.themeChangedListeners.delete(listener);
+    };
+  }
+
+  public onImageExportRequested(
+    listener: (payload: HostEventMap["image.exportRequested"]) => void,
+  ) {
+    this.imageExportRequestedListeners.add(listener);
+    if (this.pendingImageExport) {
+      const pending = this.pendingImageExport;
+      this.pendingImageExport = undefined;
+      listener(pending);
+    }
+    return () => {
+      this.imageExportRequestedListeners.delete(listener);
     };
   }
 
@@ -300,28 +306,6 @@ export class DesktopBridge {
       }
 
       if (
-        message.method === "document.statusChanged" &&
-        typeof eventPayload === "object" &&
-        eventPayload !== null &&
-        "document" in eventPayload &&
-        typeof eventPayload.document === "string" &&
-        "status" in eventPayload &&
-        typeof eventPayload.status === "string" &&
-        "actionable" in eventPayload &&
-        typeof eventPayload.actionable === "boolean"
-      ) {
-        const statusUpdate: HostEventMap["document.statusChanged"] = {
-          document: eventPayload.document as string,
-          status: eventPayload.status as string,
-          actionable: eventPayload.actionable as boolean,
-        };
-        this.statusChangedListeners.forEach((listener) =>
-          listener(statusUpdate),
-        );
-        return;
-      }
-
-      if (
         message.method === "document.loadRequested" &&
         typeof message.payload === "object" &&
         message.payload !== null &&
@@ -360,6 +344,54 @@ export class DesktopBridge {
         this.saveRequestedListeners.forEach((listener) =>
           listener({ reason }),
         );
+        return;
+      }
+
+      if (
+        message.method === "image.exportRequested" &&
+        typeof eventPayload === "object" &&
+        eventPayload !== null &&
+        "exportId" in eventPayload &&
+        typeof eventPayload.exportId === "string" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          eventPayload.exportId,
+        ) &&
+        "uploadPath" in eventPayload &&
+        typeof eventPayload.uploadPath === "string" &&
+        eventPayload.uploadPath ===
+          `/_desktop/export/${eventPayload.exportId}` &&
+        "maxDimension" in eventPayload &&
+        typeof eventPayload.maxDimension === "number" &&
+        Number.isSafeInteger(eventPayload.maxDimension) &&
+        eventPayload.maxDimension > 0 &&
+        "maxBytes" in eventPayload &&
+        typeof eventPayload.maxBytes === "number" &&
+        Number.isSafeInteger(eventPayload.maxBytes) &&
+        eventPayload.maxBytes > 0 &&
+        "scale" in eventPayload &&
+        typeof eventPayload.scale === "number" &&
+        Number.isFinite(eventPayload.scale) &&
+        eventPayload.scale > 0 &&
+        "padding" in eventPayload &&
+        typeof eventPayload.padding === "number" &&
+        Number.isFinite(eventPayload.padding) &&
+        eventPayload.padding >= 0
+      ) {
+        const exportRequest: HostEventMap["image.exportRequested"] = {
+          exportId: eventPayload.exportId,
+          uploadPath: eventPayload.uploadPath,
+          maxDimension: eventPayload.maxDimension,
+          maxBytes: eventPayload.maxBytes,
+          scale: eventPayload.scale,
+          padding: eventPayload.padding,
+        };
+        if (this.imageExportRequestedListeners.size === 0) {
+          this.pendingImageExport = exportRequest;
+        } else {
+          this.imageExportRequestedListeners.forEach((listener) =>
+            listener(exportRequest),
+          );
+        }
       }
       return;
     }

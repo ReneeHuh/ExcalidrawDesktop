@@ -8,7 +8,8 @@ public sealed record SessionMoveState(
     bool HasOpenDialog,
     bool IsSuspensionChanging,
     bool IsResuming,
-    bool IsUnloading);
+    bool IsUnloading,
+    bool IsExporting);
 
 public static class SessionMoveRules
 {
@@ -20,5 +21,6 @@ public static class SessionMoveRules
         !state.HasOpenDialog &&
         !state.IsSuspensionChanging &&
         !state.IsResuming &&
-        !state.IsUnloading;
+        !state.IsUnloading &&
+        !state.IsExporting;
 }

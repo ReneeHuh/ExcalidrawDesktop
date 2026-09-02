@@ -65,7 +65,10 @@ export type BridgeEventMap = {
   "document.opened": { fileName: string };
   "document.recovered": undefined;
   "document.recoverySnapshot": { content: string };
-  "document.resolveExternalConflict": undefined;
+  "image.exportFailed": {
+    exportId: string;
+    message: string;
+  };
   "workspace.newTabRequested": undefined;
   "workspace.openRequested": undefined;
   "workspace.closeTabRequested": undefined;
@@ -80,11 +83,6 @@ export type HostEventMap = {
   "app.themeChanged": {
     theme: "light" | "dark";
   };
-  "document.statusChanged": {
-    document: string;
-    status: string;
-    actionable: boolean;
-  };
   "document.saveRequested": {
     reason: "save" | "saveAs" | "close" | "externalConflict";
   };
@@ -92,6 +90,14 @@ export type HostEventMap = {
     fileName: string;
     content: string;
     isRecovery: boolean;
+  };
+  "image.exportRequested": {
+    exportId: string;
+    uploadPath: string;
+    maxDimension: number;
+    maxBytes: number;
+    scale: number;
+    padding: number;
   };
 };
 

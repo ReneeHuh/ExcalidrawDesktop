@@ -8,7 +8,7 @@ public sealed class SessionMoveRulesTests
     public void AllowsStableSession()
     {
         Assert.True(SessionMoveRules.CanMove(new SessionMoveState(
-            false, false, false, false, false, false, false, false)));
+            false, false, false, false, false, false, false, false, false)));
     }
 
     [Theory]
@@ -20,9 +20,10 @@ public sealed class SessionMoveRulesTests
     [InlineData(5)]
     [InlineData(6)]
     [InlineData(7)]
+    [InlineData(8)]
     public void RejectsEveryBusyState(int busyIndex)
     {
-        var states = new bool[8];
+        var states = new bool[9];
         states[busyIndex] = true;
         Assert.False(SessionMoveRules.CanMove(new SessionMoveState(
             states[0],
@@ -32,6 +33,7 @@ public sealed class SessionMoveRulesTests
             states[4],
             states[5],
             states[6],
-            states[7])));
+            states[7],
+            states[8])));
     }
 }

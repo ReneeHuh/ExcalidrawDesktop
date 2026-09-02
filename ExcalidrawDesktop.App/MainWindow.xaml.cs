@@ -16,6 +16,7 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Graphics;
 using Windows.Storage;
+using Windows.Storage.Streams;
 using Windows.System;
 using Windows.UI.StartScreen;
 
@@ -37,6 +38,7 @@ public sealed partial class MainWindow : Window
     private readonly Queue<string> pendingActivatedFiles = [];
     private readonly DispatcherTimer suspensionTimer = new();
     private readonly DesktopSettingsStore desktopSettingsStore = new();
+    private readonly ImageExportService imageExportService = new();
     private readonly RecoverySnapshotStore recoverySnapshotStore;
     private readonly bool runTabSmoke;
     private readonly bool runRecoverySmoke;
@@ -482,7 +484,9 @@ public sealed partial class MainWindow : Window
             () => CreateTab(),
             () => RequestOpenDocumentAsync(session),
             () => _ = RequestCloseSessionAsync(session),
-            next => SelectAdjacentTab(session, next));
+            next => SelectAdjacentTab(session, next),
+            (exportId, message) =>
+                _ = FailImageExportAsync(session, exportId, message));
         EventHandler retryRequested = (_, _) => _ = RetrySessionAsync(session);
         EventHandler closeRequested = (_, _) => _ = RequestCloseSessionAsync(session);
         EventHandler webView2HelpRequested = (_, _) =>
@@ -627,6 +631,7 @@ public sealed partial class MainWindow : Window
         session.IsReady &&
         !session.IsDirty &&
         !session.IsInitializing &&
+        !session.IsExporting &&
         !session.IsUnloading &&
         !session.IsSuspended &&
         !session.IsSuspensionChanging &&
@@ -645,6 +650,7 @@ public sealed partial class MainWindow : Window
         session.IsReady &&
         !session.IsDirty &&
         !session.IsInitializing &&
+        !session.IsExporting &&
         !session.IsUnloaded &&
         !session.IsUnloading &&
         !session.IsSuspensionChanging &&
@@ -751,6 +757,7 @@ public sealed partial class MainWindow : Window
         !ReferenceEquals(session, ActiveSession) &&
         session.IsReady &&
         !session.IsDirty &&
+        !session.IsExporting &&
         !session.IsInitializing &&
         !session.IsUnloaded &&
         !session.IsResuming &&
@@ -860,6 +867,7 @@ public sealed partial class MainWindow : Window
         session.Content.Visibility != Visibility.Visible &&
         session.IsReady &&
         !session.IsDirty &&
+        !session.IsExporting &&
         !session.IsUnloading &&
         session.CoreWebView is not null &&
         session.ExternalFileState is ExternalFileState.None &&
@@ -955,6 +963,11 @@ public sealed partial class MainWindow : Window
             session.TabOrigin.Host,
             webAssetPath,
             CoreWebView2HostResourceAccessKind.DenyCors);
+        var exportFilter = $"{session.TabOrigin.Origin}/_desktop/export/*";
+        coreWebView.AddWebResourceRequestedFilter(
+            exportFilter,
+            CoreWebView2WebResourceContext.All,
+            CoreWebView2WebResourceRequestSourceKinds.Document);
 
         coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = true;
         coreWebView.Settings.AreDefaultContextMenusEnabled = true;
@@ -977,6 +990,8 @@ public sealed partial class MainWindow : Window
             (_, args) => OnWebMessageReceived(session, coreWebView, args);
         TypedEventHandler<CoreWebView2, CoreWebView2ProcessFailedEventArgs> processFailed =
             (_, args) => OnWebViewProcessFailed(session, coreWebView, args);
+        TypedEventHandler<CoreWebView2, CoreWebView2WebResourceRequestedEventArgs> webResourceRequested =
+            (_, args) => OnImageExportWebResourceRequested(session, coreWebView, args);
 
         coreWebView.NavigationStarting += navigationStarting;
         coreWebView.NavigationCompleted += navigationCompleted;
@@ -984,6 +999,7 @@ public sealed partial class MainWindow : Window
         coreWebView.PermissionRequested += permissionRequested;
         coreWebView.WebMessageReceived += webMessageReceived;
         coreWebView.ProcessFailed += processFailed;
+        coreWebView.WebResourceRequested += webResourceRequested;
         session.DetachWebViewHandlers = () =>
         {
             coreWebView.NavigationStarting -= navigationStarting;
@@ -992,6 +1008,11 @@ public sealed partial class MainWindow : Window
             coreWebView.PermissionRequested -= permissionRequested;
             coreWebView.WebMessageReceived -= webMessageReceived;
             coreWebView.ProcessFailed -= processFailed;
+            coreWebView.WebResourceRequested -= webResourceRequested;
+            coreWebView.RemoveWebResourceRequestedFilter(
+                exportFilter,
+                CoreWebView2WebResourceContext.All,
+                CoreWebView2WebResourceRequestSourceKinds.Document);
             coreWebView.ClearVirtualHostNameToFolderMapping(
                 session.TabOrigin.Host);
         };
@@ -1113,6 +1134,13 @@ public sealed partial class MainWindow : Window
         session.IsReady = false;
         session.IsSuspended = false;
         session.LastLifecycleFailure = args.ProcessFailedKind.ToString();
+        if (session.PendingImageExport is { } pendingExport)
+        {
+            _ = FailImageExportAsync(
+                session,
+                pendingExport.ExportId,
+                "The editor stopped while creating the PNG.");
+        }
         session.Content.ShowFailure(
             "The editor process stopped unexpectedly.",
             $"WebView2 reported {args.ProcessFailedKind}. Retry the editor. If failures continue, repair the WebView2 Runtime.",
@@ -1164,6 +1192,102 @@ public sealed partial class MainWindow : Window
         finally
         {
             session.IsBridgeDispatching = false;
+        }
+    }
+
+    private async void OnImageExportWebResourceRequested(
+        DocumentSession session,
+        CoreWebView2 coreWebView,
+        CoreWebView2WebResourceRequestedEventArgs args)
+    {
+        if (session.PendingImageExport is not { } pending ||
+            !sessions.Contains(session) ||
+            !ReferenceEquals(session.CoreWebView, coreWebView) ||
+            !string.Equals(args.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) ||
+            !ImageExportPolicy.IsMatchingUpload(
+                args.Request.Uri,
+                session.TabOrigin,
+                pending.ExportId) ||
+            args.Request.Content is null)
+        {
+            return;
+        }
+
+        string? requestExportId;
+        string? contentType;
+        try
+        {
+            requestExportId = args.Request.Headers.GetHeader(
+                "X-Excalidraw-Export-Id");
+            contentType = args.Request.Headers.GetHeader("Content-Type");
+        }
+        catch
+        {
+            requestExportId = null;
+            contentType = null;
+        }
+
+        if (!string.Equals(
+                requestExportId,
+                pending.ExportId.ToString("D"),
+                StringComparison.OrdinalIgnoreCase) ||
+            contentType?.StartsWith("image/png", StringComparison.OrdinalIgnoreCase) != true)
+        {
+            args.Response = coreWebView.Environment.CreateWebResourceResponse(
+                new InMemoryRandomAccessStream(),
+                400,
+                "Bad Request",
+                "Content-Type: text/plain");
+            _ = FailImageExportAsync(
+                session,
+                pending.ExportId,
+                "The editor sent invalid PNG export data.");
+            return;
+        }
+
+        var deferral = args.GetDeferral();
+        try
+        {
+            await ImageExportService.WritePngAsync(
+                pending.Destination,
+                args.Request.Content,
+                pending.Cancellation.Token);
+            if (session.PendingImageExport?.ExportId != pending.ExportId)
+            {
+                throw new OperationCanceledException();
+            }
+
+            CompleteImageExport(session, pending, pending.Destination.Name);
+            args.Response = coreWebView.Environment.CreateWebResourceResponse(
+                new InMemoryRandomAccessStream(),
+                204,
+                "No Content",
+                string.Empty);
+        }
+        catch (OperationCanceledException)
+        {
+            args.Response = coreWebView.Environment.CreateWebResourceResponse(
+                new InMemoryRandomAccessStream(),
+                409,
+                "Cancelled",
+                "Content-Type: text/plain");
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"PNG export failed: {exception}");
+            await FailImageExportAsync(
+                session,
+                pending.ExportId,
+                GetImageExportFailureMessage(exception));
+            args.Response = coreWebView.Environment.CreateWebResourceResponse(
+                new InMemoryRandomAccessStream(),
+                500,
+                "Export Failed",
+                "Content-Type: text/plain");
+        }
+        finally
+        {
+            deferral.Complete();
         }
     }
 
@@ -2083,6 +2207,10 @@ public sealed partial class MainWindow : Window
                 RecentFilesMenu.Items.Count == 0 ||
                 !string.Equals(SaveMenuItem.Text, "Save", StringComparison.Ordinal) ||
                 !string.Equals(SaveAsMenuItem.Text, "Save as…", StringComparison.Ordinal) ||
+                !string.Equals(
+                    ExportPngMenuItem.Text,
+                    "Export whole drawing as PNG…",
+                    StringComparison.Ordinal) ||
                 SettingsButton.ActualWidth <= 0 ||
                 sessions.Count != 2)
             {
@@ -2133,6 +2261,42 @@ public sealed partial class MainWindow : Window
 
             var first = sessions[0];
             var second = sessions[1];
+            DocumentTabs.SelectedItem = first.TabItem;
+            await Task.Yield();
+            UpdateStatusBar(first);
+            var expectedStatusDocument =
+                first.DocumentService.DocumentPath ?? first.DisplayName;
+            if (StatusBar.Visibility != Visibility.Visible ||
+                Math.Abs(StatusBar.Height - 32) > 0.75 ||
+                !string.Equals(
+                    StatusDocumentText.Text,
+                    expectedStatusDocument,
+                    StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(StatusStateText.Text) ||
+                StatusStateText.Visibility != Visibility.Visible ||
+                StatusActionButton.Visibility != Visibility.Collapsed ||
+                string.IsNullOrWhiteSpace(AutomationProperties.GetName(StatusDocumentText)))
+            {
+                throw new InvalidOperationException(
+                    "The native drawing status bar was not initialized correctly.");
+            }
+
+            first.ExternalFileState = ExternalFileState.Modified;
+            UpdateStatusBar(first);
+            if (StatusStateText.Visibility != Visibility.Collapsed ||
+                StatusActionButton.Visibility != Visibility.Visible ||
+                !string.Equals(
+                    StatusActionButton.Content?.ToString(),
+                    "Changed on disk — Resolve",
+                    StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(AutomationProperties.GetName(StatusActionButton)))
+            {
+                throw new InvalidOperationException(
+                    "The native status action was not exposed for a file conflict.");
+            }
+            first.ExternalFileState = ExternalFileState.None;
+            UpdateStatusBar(first);
+
             first.IsDirty = true;
             UpdateTabHeader(first);
             if (!AutomationProperties.GetName(first.TabItem).Contains(
@@ -2190,6 +2354,7 @@ public sealed partial class MainWindow : Window
                 FindSession(settingsTabItem) is not null ||
                 AppSettingsPage.Visibility != Visibility.Visible ||
                 EditorHost.Visibility != Visibility.Collapsed ||
+                StatusBar.Visibility != Visibility.Collapsed ||
                 Title != "Settings — Excalidraw Desktop")
             {
                 throw new InvalidOperationException(
@@ -2199,7 +2364,8 @@ public sealed partial class MainWindow : Window
             if (settingsPageVisible ||
                 settingsTabItem is not null ||
                 AppSettingsPage.Visibility != Visibility.Collapsed ||
-                EditorHost.Visibility != Visibility.Visible)
+                EditorHost.Visibility != Visibility.Visible ||
+                StatusBar.Visibility != Visibility.Visible)
             {
                 throw new InvalidOperationException(
                     "The native Settings tab was not hidden correctly.");
@@ -2807,6 +2973,186 @@ public sealed partial class MainWindow : Window
         RequestSaveFromFileMenu(saveAs: true);
     }
 
+    private async void OnFileExportPngClick(object sender, RoutedEventArgs args)
+    {
+        await ExportActiveSessionAsPngAsync();
+    }
+
+    private async Task ExportActiveSessionAsPngAsync()
+    {
+        if (openPickerActive ||
+            ActiveSession is not
+            {
+                IsReady: true,
+                IsExporting: false,
+                IsResuming: false,
+                IsRestoringFromHibernation: false,
+                CoreWebView: { } coreWebView,
+            } session)
+        {
+            return;
+        }
+
+        openPickerActive = true;
+        UpdateFileMenuState(session);
+        try
+        {
+            var destination = await imageExportService.PickDestinationAsync(
+                this,
+                session.DisplayName);
+            if (destination is null ||
+                !sessions.Contains(session) ||
+                !ReferenceEquals(session.CoreWebView, coreWebView))
+            {
+                return;
+            }
+
+            var exportId = Guid.NewGuid();
+            session.PendingImageExport = new PendingImageExport(
+                exportId,
+                destination,
+                new CancellationTokenSource());
+            session.IsExporting = true;
+            session.ExportStatusMessage = null;
+            UpdateFileMenuState(session);
+            UpdateStatusBar(session);
+            coreWebView.PostWebMessageAsJson(
+                BridgeEventJson.Create(
+                    "image.exportRequested",
+                    new
+                    {
+                        exportId = exportId.ToString("D"),
+                        uploadPath = $"/_desktop/export/{exportId:D}",
+                        maxDimension = ImageExportPolicy.MaxDimension,
+                        maxBytes = ImageExportPolicy.MaxPngBytes,
+                        scale = ImageExportPolicy.Scale,
+                        padding = ImageExportPolicy.Padding,
+                    }));
+            _ = WatchImageExportTimeoutAsync(session, exportId);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not start PNG export: {exception}");
+            if (session.PendingImageExport is { } pending)
+            {
+                await FailImageExportAsync(
+                    session,
+                    pending.ExportId,
+                    "The PNG export could not be started.");
+            }
+            else
+            {
+                await ShowImageExportErrorAsync(
+                    "The PNG export could not be started.");
+            }
+        }
+        finally
+        {
+            openPickerActive = false;
+            UpdateFileMenuState(ActiveSession);
+        }
+    }
+
+    private void CompleteImageExport(
+        DocumentSession session,
+        PendingImageExport pending,
+        string fileName)
+    {
+        if (session.PendingImageExport?.ExportId != pending.ExportId)
+        {
+            return;
+        }
+
+        pending.Cancellation.Dispose();
+        session.PendingImageExport = null;
+        session.IsExporting = false;
+        session.ExportStatusMessage = $"Exported {fileName}";
+        UpdateFileMenuState(ActiveSession);
+        UpdateStatusBar(session);
+        _ = ClearImageExportStatusAsync(session, session.ExportStatusMessage);
+    }
+
+    private async Task WatchImageExportTimeoutAsync(
+        DocumentSession session,
+        Guid exportId)
+    {
+        await Task.Delay(TimeSpan.FromMinutes(2));
+        if (sessions.Contains(session) &&
+            session.PendingImageExport?.ExportId == exportId)
+        {
+            await FailImageExportAsync(
+                session,
+                exportId,
+                "The PNG export took too long and was cancelled.");
+        }
+    }
+
+    private async Task ClearImageExportStatusAsync(
+        DocumentSession session,
+        string expectedMessage)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        if (sessions.Contains(session) &&
+            string.Equals(
+                session.ExportStatusMessage,
+                expectedMessage,
+                StringComparison.Ordinal))
+        {
+            session.ExportStatusMessage = null;
+            UpdateStatusBar(session);
+        }
+    }
+
+    private async Task FailImageExportAsync(
+        DocumentSession session,
+        Guid exportId,
+        string message)
+    {
+        if (session.PendingImageExport is not { } pending ||
+            pending.ExportId != exportId)
+        {
+            return;
+        }
+
+        pending.Cancellation.Cancel();
+        pending.Cancellation.Dispose();
+        session.PendingImageExport = null;
+        session.IsExporting = false;
+        session.ExportStatusMessage = null;
+        UpdateFileMenuState(ActiveSession);
+        UpdateStatusBar(session);
+        await ShowImageExportErrorAsync(message);
+    }
+
+    private async Task ShowImageExportErrorAsync(string message)
+    {
+        if (resourcesDisposed || DocumentTabs.XamlRoot is null)
+        {
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = DocumentTabs.XamlRoot,
+            Title = "Could not export PNG",
+            Content = message,
+            CloseButtonText = "OK",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        await dialog.ShowAsync();
+    }
+
+    private static string GetImageExportFailureMessage(Exception exception) =>
+        exception switch
+        {
+            BridgeProtocolException => exception.Message,
+            UnauthorizedAccessException =>
+                "Excalidraw Desktop does not have permission to write the selected location.",
+            IOException =>
+                "The PNG could not be written. Check the destination and available disk space.",
+            _ => "The PNG could not be written to the selected location.",
+        };
+
     private void RequestSaveFromFileMenu(bool saveAs)
     {
         if (ActiveSession is not { IsReady: true, CoreWebView: { } coreWebView } session ||
@@ -3245,6 +3591,13 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
+        if (session.IsExporting)
+        {
+            await ShowImageExportErrorAsync(
+                "Wait for the current PNG export to finish before closing this drawing.");
+            return false;
+        }
+
         if (!session.IsDirty)
         {
             CloseSession(session);
@@ -3395,7 +3748,8 @@ public sealed partial class MainWindow : Window
                 openPickerActive,
             session.IsSuspensionChanging,
             session.IsResuming,
-            session.IsUnloading));
+            session.IsUnloading,
+            session.IsExporting));
 
     private void CloseSession(DocumentSession session)
     {
@@ -3643,6 +3997,13 @@ public sealed partial class MainWindow : Window
 
     private async Task<bool> ResolveWindowCloseAsync()
     {
+        if (sessions.Any(session => session.IsExporting))
+        {
+            await ShowImageExportErrorAsync(
+                "Wait for PNG exports to finish before closing this window.");
+            return false;
+        }
+
         var dirtySessions = sessions.Where(session => session.IsDirty).ToList();
         if (dirtySessions.Count == 0)
         {
@@ -3940,12 +4301,12 @@ public sealed partial class MainWindow : Window
     {
         var active = ActiveSession;
         UpdateFileMenuState(active);
+        UpdateStatusBar(active);
         if (settingsPageVisible)
         {
             Title = "Settings — Excalidraw Desktop";
             return;
         }
-        UpdateStatusBar(active);
         if (active is null || !active.IsReady)
         {
             Title = "Excalidraw Desktop — Starting…";
@@ -3973,6 +4334,7 @@ public sealed partial class MainWindow : Window
         };
         SaveMenuItem.IsEnabled = canUseEditor;
         SaveAsMenuItem.IsEnabled = canUseEditor;
+        ExportPngMenuItem.IsEnabled = canUseEditor && active?.IsExporting != true;
         SaveAllMenuItem.IsEnabled = !settingsPageVisible && sessions.Any(session =>
             session.IsDirty &&
             session.IsReady &&
@@ -3983,15 +4345,37 @@ public sealed partial class MainWindow : Window
 
     private void UpdateStatusBar(DocumentSession? session)
     {
+        if (settingsPageVisible)
+        {
+            StatusBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         if (session is null)
+        {
+            StatusBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (!ReferenceEquals(session, ActiveSession))
         {
             return;
         }
 
+        StatusBar.Visibility = Visibility.Visible;
+
         var path = session.DocumentService.DocumentPath;
         string status;
         var actionable = false;
-        if (session.IsResuming)
+        if (session.IsExporting)
+        {
+            status = "Exporting PNG…";
+        }
+        else if (session.ExportStatusMessage is { } exportStatus)
+        {
+            status = exportStatus;
+        }
+        else if (session.IsResuming)
         {
             status = "Resuming";
         }
@@ -4026,15 +4410,32 @@ public sealed partial class MainWindow : Window
             status = path is null ? "New drawing" : "Saved";
         }
 
-        session.CoreWebView?.PostWebMessageAsJson(
-            BridgeEventJson.Create(
-                "document.statusChanged",
-                new
-                {
-                    document = path ?? session.DisplayName,
-                    status,
-                    actionable,
-                }));
+        var document = path ?? session.DisplayName;
+        StatusDocumentText.Text = document;
+        ToolTipService.SetToolTip(StatusDocumentText, document);
+        AutomationProperties.SetName(StatusDocumentText, $"Drawing: {document}");
+
+        StatusStateText.Text = status;
+        StatusStateText.Visibility = actionable
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        StatusActionButton.Content = status;
+        StatusActionButton.Visibility = actionable
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        AutomationProperties.SetName(StatusActionButton, status);
+        AutomationProperties.SetHelpText(
+            StatusActionButton,
+            actionable ? "Open options for resolving the file conflict." : string.Empty);
+    }
+
+    private async void OnStatusActionClick(object sender, RoutedEventArgs args)
+    {
+        if (!settingsPageVisible &&
+            ActiveSession is { ExternalFileState: not ExternalFileState.None } session)
+        {
+            await ShowExternalFileConflictAsync(session);
+        }
     }
 
     private static async Task OpenExternalUriAsync(string value)

@@ -1,8 +1,8 @@
 # Excalidraw Desktop Future Product Roadmap
 
-Status: Proposed
+Status: Active; F0 is partially implemented and later phases remain proposed
 Created: September 1, 2026
-Starts after: [`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md)
+Originally sequenced after: [`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md)
 
 ## Outcome
 
@@ -12,7 +12,8 @@ The product should retain Excalidraw's fast, approachable canvas while adding ca
 
 ## Starting gate
 
-Work in this roadmap begins after the tabbed desktop MVP meets its definition of done. In particular:
+F0 implementation began before every tabbed desktop validation gate was
+closed. Those gates still block a stable release. In particular:
 
 - Multiple documents open, save, close, restore, and recover reliably.
 - Each tab has isolated browser storage and session-bound bridge routing.
@@ -60,18 +61,23 @@ Make the tabbed application feel dependable and native enough to use every day.
 
 ### Features
 
-- Register `.excalidraw` and `.excalidrawlib` file associations.
-- Route Explorer activation into a new or existing tab.
-- Add recent and pinned drawings.
-- Add Windows jump-list actions for New Drawing, recent files, and pinned files.
-- Support multi-file drag and drop.
-- Reveal the active file in Explorer and copy its path.
-- Detect files changed, renamed, moved, or deleted outside the application.
-- Restore window size, position, tab order, and active tab safely.
-- Add clear WebView2 runtime failure and repair guidance.
-- Add signed MSIX packaging and the selected update channel.
-- Add structured diagnostic logs that exclude drawing content.
-- Complete keyboard, screen-reader, high-contrast, touch, pen, and mixed-DPI validation.
+- [ ] Complete file associations: `.excalidraw` is implemented;
+  `.excalidrawlib` remains.
+- [x] Route Explorer activation into a new or existing tab across all windows.
+- [ ] Complete recent and pinned drawings: recent files are implemented;
+  pinning remains.
+- [ ] Complete Windows jump-list actions: recent-file integration is
+  implemented; New Drawing and pinned-file actions remain.
+- [x] Support multi-file drag and drop.
+- [x] Reveal the active file in Explorer and copy its path.
+- [x] Detect files changed, renamed, moved, or deleted outside the application.
+- [x] Restore window size, position, tab order, active tab, and multi-window
+  membership safely.
+- [x] Add clear WebView2 runtime failure and repair guidance.
+- [ ] Add signed MSIX packaging and the selected update channel.
+- [ ] Add structured diagnostic logs that exclude drawing content.
+- [ ] Complete keyboard, screen-reader, high-contrast, touch, pen, and
+  mixed-DPI validation.
 
 ### Exit criteria
 

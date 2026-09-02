@@ -26,6 +26,8 @@ saving a drawing does not require an internet connection or an account.
 
 - Open several drawings in native, reorderable title-bar tabs.
 - Create, open, save, and save-as through native Windows file dialogs.
+- Export the complete drawing—including off-screen content—as a PNG through a
+  native Windows save dialog.
 - Open `.excalidraw` files from Explorer, drag files into the window, or return
   to a recent drawing from the File menu.
 - Restore clean drawing tabs when the app starts again.
@@ -40,8 +42,12 @@ saving a drawing does not require an internet connection or an account.
 
 Use the **File** menu to create and manage drawings, the **+** button to open a
 new tab, and the gear button to open Settings. The status bar at the bottom of
-each editor reports the file path, save state, recovery state, and any external
-file conflict.
+the native window reports the active drawing's file path, save state, recovery
+state, and any external file conflict.
+
+Use **File > Export whole drawing as PNG…** to create a 2× PNG containing the
+entire scene. Exporting does not change the drawing's `.excalidraw` file,
+recent-file entry, recovery snapshot, or unsaved status.
 
 The main document shortcuts are:
 

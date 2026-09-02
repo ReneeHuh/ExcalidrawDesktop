@@ -1,6 +1,7 @@
 # Excalidraw Desktop WinUI Implementation and Test Plan
 
-Status: Implementation in progress; repository structure decision updated September 2, 2026
+Status: Core desktop implementation complete; release validation and
+distribution work remain
 Created: August 31, 2026
 Repository baseline: `master` at `e1bb9ff8`
 
@@ -205,17 +206,26 @@ The desktop entry point must therefore:
 
 Dirty state is tracked with the editor's scene versioning (`getSceneVersion`), not raw `onChange` invocations, because `onChange` fires on many non-mutating events and would over-trigger unsaved-changes prompts.
 
-### Initial window model
+### Window model
 
-The original single-document window assumption is superseded by the dedicated [`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md). The product direction is now one native WinUI window containing multiple document tabs. Each live tab owns a document session, WebView2 editor, unique private origin, file identity, dirty state, and recovery state.
-
-Multiple application windows remain deferred until the single-window tabbed workspace is reliable. Document and bridge state must be session-bound rather than global so additional windows remain possible later.
+The original single-document window assumption was superseded first by
+[`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md) and then by
+[`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md). The implemented model
+is one application process with multiple native windows, each containing a
+native tab strip. Every drawing tab owns a transferable document session,
+WebView2 editor, unique private origin, file identity, dirty state, and
+recovery state.
 
 ## Delivery phases
 
 ### Phase 0: Compatibility spike
 
 Estimated effort: 2–3 development days.
+
+Implementation status: complete. The packaged editor starts offline, uses a
+private virtual HTTPS origin, and has automated startup and bridge coverage.
+Hardware-dependent input and compatibility cases remain part of the release
+validation matrix.
 
 Tasks:
 
@@ -284,6 +294,12 @@ Exit criteria:
 
 Estimated effort: approximately 1 week.
 
+Implementation status: substantially complete. `.excalidraw` association,
+single-instance activation, multi-file drag/drop, native title-bar tabs,
+recent files, jump lists, theme integration, and external navigation handling
+are implemented. `.excalidrawlib`, pinned-item actions, and remaining manual
+Windows validation are still open.
+
 Tasks:
 
 - Register `.excalidraw` and `.excalidrawlib` associations in MSIX.
@@ -307,6 +323,12 @@ Exit criteria:
 ### Phase 3: Reliability and polish
 
 Estimated effort: 1–3 weeks.
+
+Implementation status: substantially complete. Recovery, external-file
+monitoring, multi-window placement restoration, clean-tab suspension and
+unloading, editor retry UI, WebView2 repair guidance, and lifecycle cleanup are
+implemented. Large-document validation, structured diagnostics, payload
+limits, and the remaining manual accessibility/input/DPI matrix are open.
 
 Tasks:
 
@@ -347,6 +369,10 @@ Potential tasks:
 - Confirm end-to-end encryption compatibility with the web application.
 
 ### Phase 5: Packaging and release
+
+Implementation status: in progress. A packaged Debug x64 build and smoke suite
+exist; signing, CI, distribution/update decisions, release budgets, and stable
+install/update/repair/removal validation remain.
 
 Tasks:
 
@@ -454,33 +480,30 @@ For one experienced developer:
 
 These are engineering estimates, not fixed delivery commitments. Signing, Store enrollment, branding, backend work, and product feedback can extend the schedule.
 
-## Product decisions and defaults pending confirmation
+## Confirmed decisions and remaining release decisions
 
-The plan defines:
+Confirmed:
 
 - Product name: `Excalidraw Desktop`.
+- Technology: C# WinUI 3, WebView2, and the React editor.
+- Packaging model: MSIX.
+- Architecture: one process with multiple tabbed native windows.
+- Product scope: local and offline editing, with collaboration deferred.
+- Repository structure: root-level `ExcalidrawDesktop.App`, `.Core`, `.Web`, and
+  `.Core.Tests` project folders; no wrapping `src/` or `app/` directory.
+- Upstream strategy: consume an exact published
+  `@excalidraw/excalidraw` version without storing upstream source here.
 
-The remaining defaults pending confirmation are:
+Still to decide or complete:
 
-- Technology: C# WinUI 3, WebView2, and the current React editor.
-- Packaging: MSIX.
-- First architecture: one document in one window.
-- First platform: x64 Windows 11, followed by the agreed Windows 10 baseline and ARM64. The Windows 10 baseline must be confirmed before Phase 0 because it sets the Windows App SDK floor and the test matrix.
-- First product scope: local and offline editing, with collaboration deferred.
-- Repository structure: root-level `ExcalidrawDesktop.App`, `.Core`, `.Web`, and `.Core.Tests` project folders; no wrapping `src/` or `app/` directory.
-- Upstream strategy: consume an exact published `@excalidraw/excalidraw` version without storing upstream source in this repository.
+- The supported Windows baseline and minimum-machine performance budgets.
+- Store, direct MSIX/App Installer distribution, or both.
+- The update channel and rollback procedure.
+- Whether image and PDF export stay editor-owned or move into a native export
+  workflow.
 
-Changing these assumptions may alter the architecture or estimates.
+## Current implementation sequence
 
-## First implementation slice
-
-The first implementation task should be the Phase 0 spike, delivered as one small reviewable change:
-
-1. Scaffold `ExcalidrawDesktop.App` as a packaged WinUI 3 project.
-2. Scaffold `ExcalidrawDesktop.Web` as a minimal Vite entry point using the published editor package.
-3. Build web assets into the WinUI package.
-4. Load them through a private virtual HTTPS host.
-5. Add `app.ready` and ping/pong bridge messages.
-6. Add a PowerShell build script that uses Corepack Yarn and `dotnet`/MSBuild.
-7. Run and record the Phase 0 input, clipboard, asset, export, and offline checks.
-8. Stop and revise the architecture if the spike reveals a blocking editor incompatibility.
+The original Phase 0 slice is complete. The canonical remaining order is now
+maintained in [`DESKTOP_BACKLOG.md`](DESKTOP_BACKLOG.md), beginning with
+document-safety evidence and the remaining Windows validation matrix.

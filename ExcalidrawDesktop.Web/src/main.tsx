@@ -16,6 +16,7 @@ import {
   loadDocumentContentIntoEditor,
   saveDocumentFromEditor,
 } from "./document/DocumentController";
+import { exportWholeDrawingAsPng } from "./export/ImageExportController";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -46,16 +47,12 @@ const DesktopApp = () => {
       ? THEME.DARK
       : THEME.LIGHT,
   );
-  const [documentStatus, setDocumentStatus] = React.useState({
-    document: "Untitled",
-    status: "New drawing",
-    actionable: false,
-  });
   const [excalidrawAPI, setExcalidrawAPI] =
     React.useState<ExcalidrawImperativeAPI | null>(null);
   const savedSceneVersion = React.useRef(0);
   const isDirty = React.useRef(false);
   const isDocumentOperationInProgress = React.useRef(false);
+  const isImageExportInProgress = React.useRef(false);
   const recoveryTimer = React.useRef<number | undefined>(undefined);
 
   const updateDirty = React.useCallback((nextIsDirty: boolean) => {
@@ -113,11 +110,6 @@ const DesktopApp = () => {
         console.error("The Excalidraw Desktop host did not respond.", error);
       });
   }, []);
-
-  React.useEffect(
-    () => desktopBridge.onDocumentStatusChanged(setDocumentStatus),
-    [],
-  );
 
   React.useEffect(
     () =>
@@ -243,6 +235,40 @@ const DesktopApp = () => {
   );
 
   React.useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+
+    return desktopBridge.onImageExportRequested((request) => {
+      if (isImageExportInProgress.current) {
+        desktopBridge.notifyImageExportFailed(
+          request.exportId,
+          "An image export is already running for this drawing.",
+        );
+        return;
+      }
+
+      isImageExportInProgress.current = true;
+      void exportWholeDrawingAsPng(excalidrawAPI, request, ownerWindow)
+        .catch((error: unknown) => {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "The drawing could not be exported as a PNG.";
+          desktopBridge.notifyImageExportFailed(request.exportId, message);
+          excalidrawAPI.setToast({
+            message,
+            closable: true,
+            duration: 5000,
+          });
+        })
+        .finally(() => {
+          isImageExportInProgress.current = false;
+        });
+    });
+  }, [excalidrawAPI]);
+
+  React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         (event.key.toLowerCase() === "n" ||
@@ -346,8 +372,6 @@ const DesktopApp = () => {
             Save As…
           </MainMenu.Item>
           <MainMenu.Separator />
-          <MainMenu.DefaultItems.Export />
-          <MainMenu.DefaultItems.SaveAsImage />
           <MainMenu.DefaultItems.SearchMenu />
           <MainMenu.DefaultItems.Help />
           <MainMenu.DefaultItems.ClearCanvas />
@@ -356,19 +380,6 @@ const DesktopApp = () => {
         </MainMenu>
         </Excalidraw>
       </div>
-      <footer className="desktop-status-bar" aria-label="Drawing status">
-        <span className="desktop-status-document" title={documentStatus.document}>
-          {documentStatus.document}
-        </span>
-        <button
-          className="desktop-status-state"
-          disabled={!documentStatus.actionable}
-          onClick={() => desktopBridge.requestResolveExternalConflict()}
-          type="button"
-        >
-          {documentStatus.status}
-        </button>
-      </footer>
     </main>
   );
 };

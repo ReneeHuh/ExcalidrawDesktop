@@ -1,8 +1,8 @@
 # Multi-window tab workspace plan
 
-Status: Implementation in progress (M1-M4 implemented; M5 validation remains)
+Status: Feature implementation complete (M0-M4); M5 release validation remains
 Created: September 2, 2026
-Starts after: the document-safety and lifecycle exit criteria in
+Originally sequenced after: the document-safety and lifecycle exit criteria in
 [`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md)
 Related plans:
 [`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md) and
@@ -289,7 +289,10 @@ can own sessions.
 
 ### Phase M0: Extract ownership without behavior changes
 
-- [ ] Add unit-tested application and per-window workspace abstractions.
+- [x] Add an application coordinator and explicit per-window ownership
+  boundaries, covered by core and packaged workspace tests. `MainWindow`
+  remains the concrete per-window host rather than adding a second wrapper
+  abstraction solely to match the original proposal.
 - [x] Move recent files, persistence, recovery pruning, and path ownership to
   the application coordinator.
 - [x] Track the existing main window by runtime and logical window ID.

@@ -242,6 +242,9 @@ manual pass or UI automation capable of non-client input.
 
 ### Phase E0: Layout and input spike
 
+Status: Implemented; physical non-client pointer gestures remain in the manual
+matrix.
+
 - Create the inset-aware title-strip container and footer drag region.
 - Enable title-bar extension and register the footer with `SetTitleBar`.
 - Compare standard and Tall title-bar height on the pinned Windows App SDK
@@ -257,6 +260,8 @@ Exit criteria:
 - The window can always be dragged when enough tabs exist to overflow.
 
 ### Phase E1: Responsive and visual polish
+
+Status: Implemented; mixed-DPI, contrast, and RTL hardware validation remains.
 
 - Apply caption insets with DPI conversion.
 - Tune tab width constraints only if the default `TabView` behavior fails the
@@ -276,6 +281,9 @@ Exit criteria:
 - Light, dark, contrast, active, and inactive states remain legible.
 
 ### Phase E2: Regression and accessibility validation
+
+Status: Automated regression coverage passes; the assistive-technology and
+hardware input matrix remains open.
 
 - Add the packaged title-bar smoke test.
 - Run all existing native, web, startup, tab-isolation, workspace-restore, and
