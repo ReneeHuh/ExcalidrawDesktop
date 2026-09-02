@@ -1,0 +1,259 @@
+using System.Diagnostics;
+using System.Text.Json;
+using ExcalidrawDesktop.Core;
+using Microsoft.Web.WebView2.Core;
+
+namespace ExcalidrawDesktop.App.Services;
+
+public sealed class BridgeDispatcher
+{
+    private readonly DocumentService documentService;
+    private readonly Action appReady;
+    private readonly Action closeReady;
+    private readonly Action<bool> dirtyChanged;
+    private readonly Action documentCreated;
+    private readonly Action<string> documentOpened;
+    private readonly Action documentRecovered;
+    private readonly Func<string, Task> recoverySnapshotReceived;
+    private readonly Action externalConflictDetected;
+    private readonly Action closeCancelled;
+    private readonly Action newTabRequested;
+    private readonly Func<Task> openTabRequested;
+    private readonly Action closeTabRequested;
+    private readonly Action<bool> selectAdjacentTabRequested;
+
+    public BridgeDispatcher(
+        DocumentService documentService,
+        Action appReady,
+        Action closeReady,
+        Action<bool> dirtyChanged,
+        Action documentCreated,
+        Action<string> documentOpened,
+        Action documentRecovered,
+        Func<string, Task> recoverySnapshotReceived,
+        Action externalConflictDetected,
+        Action closeCancelled,
+        Action newTabRequested,
+        Func<Task> openTabRequested,
+        Action closeTabRequested,
+        Action<bool> selectAdjacentTabRequested)
+    {
+        this.documentService = documentService;
+        this.appReady = appReady;
+        this.closeReady = closeReady;
+        this.dirtyChanged = dirtyChanged;
+        this.documentCreated = documentCreated;
+        this.documentOpened = documentOpened;
+        this.documentRecovered = documentRecovered;
+        this.recoverySnapshotReceived = recoverySnapshotReceived;
+        this.externalConflictDetected = externalConflictDetected;
+        this.closeCancelled = closeCancelled;
+        this.newTabRequested = newTabRequested;
+        this.openTabRequested = openTabRequested;
+        this.closeTabRequested = closeTabRequested;
+        this.selectAdjacentTabRequested = selectAdjacentTabRequested;
+    }
+
+    public async Task DispatchAsync(CoreWebView2 webView, BridgeMessage message)
+    {
+        if (message.Kind == "event")
+        {
+            await DispatchEventAsync(message);
+            return;
+        }
+
+        if (message.Kind != "request")
+        {
+            return;
+        }
+
+        try
+        {
+            object? response = message.Method switch
+            {
+                "app.ping" => new { host = "winui", ready = true },
+                "document.new" => await NewDocumentAsync(message.Payload),
+                "document.open" => await OpenDocumentAsync(message.Payload),
+                "document.save" => await SaveDocumentAsync(message.Payload, saveAs: false),
+                "document.saveAs" => await SaveDocumentAsync(message.Payload, saveAs: true),
+                _ => throw new BridgeProtocolException(
+                    "BridgeMethodNotFound",
+                    "The requested desktop bridge method is not available."),
+            };
+            webView.PostWebMessageAsJson(BridgeResponseJson.Success(message, response));
+        }
+        catch (BridgeProtocolException exception)
+        {
+            webView.PostWebMessageAsJson(
+                BridgeResponseJson.Error(message, exception.Code, exception.Message));
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            webView.PostWebMessageAsJson(
+                BridgeResponseJson.Error(
+                    message,
+                    "InternalError",
+                    "Excalidraw Desktop could not complete the request."));
+        }
+    }
+
+    private async Task DispatchEventAsync(BridgeMessage message)
+    {
+        if (message.Method == "app.ready")
+        {
+            appReady();
+            return;
+        }
+
+        if (message.Method == "app.closeReady")
+        {
+            closeReady();
+            return;
+        }
+
+        if (message.Method == "app.closeCancelled")
+        {
+            closeCancelled();
+            return;
+        }
+
+        if (message.Method == "workspace.newTabRequested")
+        {
+            newTabRequested();
+            return;
+        }
+
+        if (message.Method == "workspace.openRequested")
+        {
+            await openTabRequested();
+            return;
+        }
+
+        if (message.Method == "workspace.closeTabRequested")
+        {
+            closeTabRequested();
+            return;
+        }
+
+        if (message.Method == "workspace.selectAdjacentTabRequested" &&
+            message.Payload is { ValueKind: JsonValueKind.Object } adjacentPayload &&
+            adjacentPayload.TryGetProperty("direction", out var directionElement) &&
+            directionElement.ValueKind == JsonValueKind.String &&
+            directionElement.GetString() is { } direction &&
+            direction is "next" or "previous")
+        {
+            selectAdjacentTabRequested(direction == "next");
+            return;
+        }
+
+        if (message.Method == "document.created" && documentService.ConfirmCreated())
+        {
+            documentCreated();
+            return;
+        }
+
+        if (message.Method == "document.dirtyChanged" &&
+            message.Payload is { ValueKind: JsonValueKind.Object } dirtyPayload &&
+            dirtyPayload.TryGetProperty("isDirty", out var dirtyElement) &&
+            dirtyElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
+        {
+            dirtyChanged(dirtyElement.GetBoolean());
+            return;
+        }
+
+        if (message.Method == "document.recovered")
+        {
+            documentRecovered();
+            return;
+        }
+
+        if (message.Method == "document.resolveExternalConflict")
+        {
+            externalConflictDetected();
+            return;
+        }
+
+        if (message.Method == "document.recoverySnapshot" &&
+            message.Payload is { ValueKind: JsonValueKind.Object } recoveryPayload &&
+            recoveryPayload.TryGetProperty("content", out var recoveryContentElement) &&
+            recoveryContentElement.ValueKind == JsonValueKind.String &&
+            recoveryContentElement.GetString() is { } recoveryContent)
+        {
+            ExcalidrawDocumentValidator.ValidateForSave(
+                recoveryContent,
+                DocumentService.MaxDocumentBytes);
+            await recoverySnapshotReceived(recoveryContent);
+            return;
+        }
+
+        if (message.Method == "document.opened" &&
+            message.Payload is { ValueKind: JsonValueKind.Object } payload &&
+            payload.TryGetProperty("fileName", out var fileNameElement) &&
+            fileNameElement.ValueKind == JsonValueKind.String &&
+            fileNameElement.GetString() is { Length: > 0 and <= 260 } fileName &&
+            documentService.ConfirmOpened(fileName))
+        {
+            documentOpened(fileName);
+        }
+    }
+
+    private async Task<DocumentNewResult> NewDocumentAsync(JsonElement? payload)
+    {
+        var hasUnsavedChanges = ReadDirtyFlag(payload, "document.new");
+        return await documentService.NewAsync(hasUnsavedChanges);
+    }
+
+    private async Task<DocumentSaveResult> SaveDocumentAsync(
+        JsonElement? payload,
+        bool saveAs)
+    {
+        if (payload is not { ValueKind: JsonValueKind.Object } value ||
+            !value.TryGetProperty("content", out var contentElement) ||
+            contentElement.ValueKind != JsonValueKind.String ||
+            contentElement.GetString() is not { } content)
+        {
+            throw new BridgeProtocolException(
+                "BridgePayloadInvalid",
+                $"The document.{(saveAs ? "saveAs" : "save")} payload is invalid.");
+        }
+
+        DocumentSaveResult result;
+        try
+        {
+            result = await documentService.SaveAsync(content, saveAs);
+        }
+        catch (BridgeProtocolException exception) when (
+            exception.Code == "DocumentChangedExternally")
+        {
+            externalConflictDetected();
+            throw;
+        }
+        if (result.Status == "saved" && result.FileName is { } fileName)
+        {
+            documentOpened(fileName);
+        }
+
+        return result;
+    }
+
+    private async Task<DocumentOpenResult> OpenDocumentAsync(JsonElement? payload)
+    {
+        var hasUnsavedChanges = ReadDirtyFlag(payload, "document.open");
+        return await documentService.OpenAsync(hasUnsavedChanges);
+    }
+
+    private static bool ReadDirtyFlag(JsonElement? payload, string method)
+    {
+        if (payload is not { ValueKind: JsonValueKind.Object } value ||
+            !value.TryGetProperty("hasUnsavedChanges", out var dirtyElement) ||
+            dirtyElement.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            throw new BridgeProtocolException(
+                "BridgePayloadInvalid",
+                $"The {method} payload is invalid.");
+        }
+
+        return dirtyElement.GetBoolean();
+    }
+}

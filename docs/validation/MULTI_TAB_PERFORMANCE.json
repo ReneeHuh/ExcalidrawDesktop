@@ -1,0 +1,69 @@
+{
+  "recordedAtUtc": "2026-09-02T13:28:49.1519059+00:00",
+  "machine": "KENOBI",
+  "osVersion": "Microsoft Windows NT 10.0.26200.0",
+  "packageVersion": "0.1.3.0",
+  "configuration": "Debug x64 packaged; all tabs live",
+  "measurements": [
+    {
+      "tabCount": 1,
+      "startupMilliseconds": 1733.8408,
+      "averageSwitchMilliseconds": 1.0655666666666666,
+      "maximumSwitchMilliseconds": 3.0101,
+      "workingSetBytes": 148443136,
+      "privateMemoryBytes": 52211712,
+      "uniqueOrigins": 1,
+      "suspendInactive": false,
+      "suspendedTabCount": 0,
+      "launchToResultMilliseconds": 2835.3559,
+      "processTreeProcessCount": 7,
+      "processTreeWorkingSetBytes": 557645824,
+      "processTreePrivateMemoryBytes": 313331712
+    },
+    {
+      "tabCount": 5,
+      "startupMilliseconds": 3289.929,
+      "averageSwitchMilliseconds": 8.24268,
+      "maximumSwitchMilliseconds": 9.6214,
+      "workingSetBytes": 154775552,
+      "privateMemoryBytes": 55988224,
+      "uniqueOrigins": 5,
+      "suspendInactive": false,
+      "suspendedTabCount": 0,
+      "launchToResultMilliseconds": 3992.9331,
+      "processTreeProcessCount": 11,
+      "processTreeWorkingSetBytes": 960503808,
+      "processTreePrivateMemoryBytes": 658718720
+    },
+    {
+      "tabCount": 10,
+      "startupMilliseconds": 4751.6884,
+      "averageSwitchMilliseconds": 7.860876666666669,
+      "maximumSwitchMilliseconds": 9.3441,
+      "workingSetBytes": 161505280,
+      "privateMemoryBytes": 61566976,
+      "uniqueOrigins": 10,
+      "suspendInactive": false,
+      "suspendedTabCount": 0,
+      "launchToResultMilliseconds": 5562.0428,
+      "processTreeProcessCount": 16,
+      "processTreeWorkingSetBytes": 1468686336,
+      "processTreePrivateMemoryBytes": 1044910080
+    },
+    {
+      "tabCount": 20,
+      "startupMilliseconds": 8510.2192,
+      "averageSwitchMilliseconds": 9.374,
+      "maximumSwitchMilliseconds": 11.9983,
+      "workingSetBytes": 171610112,
+      "privateMemoryBytes": 66863104,
+      "uniqueOrigins": 20,
+      "suspendInactive": false,
+      "suspendedTabCount": 0,
+      "launchToResultMilliseconds": 9828.3416,
+      "processTreeProcessCount": 26,
+      "processTreeWorkingSetBytes": 2460131328,
+      "processTreePrivateMemoryBytes": 1809952768
+    }
+  ]
+}

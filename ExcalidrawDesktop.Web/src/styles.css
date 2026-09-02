@@ -1,0 +1,77 @@
+html,
+body,
+#root,
+.desktop-app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.desktop-app {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 32px;
+}
+
+.editor-surface {
+  min-height: 0;
+}
+
+.desktop-status-bar {
+  align-items: center;
+  background: #f7f7f8;
+  border-top: 1px solid #dedee3;
+  box-sizing: border-box;
+  color: #3d3d45;
+  display: flex;
+  font: 12px system-ui, sans-serif;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 3px 10px;
+}
+
+.desktop-status-document {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-status-state {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  font: inherit;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+.desktop-status-state:not(:disabled) {
+  background: #e5e5ff;
+  color: #4030a8;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+body {
+  background: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="dark"] body {
+  background: #121212;
+}
+
+:root[data-theme="dark"] .desktop-status-bar {
+  background: #202024;
+  border-top-color: #39393f;
+  color: #e7e7eb;
+}
+
+:root[data-theme="dark"] .desktop-status-state:not(:disabled) {
+  background: #37315f;
+  color: #ded8ff;
+}

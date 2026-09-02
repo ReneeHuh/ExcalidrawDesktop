@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ExcalidrawDesktop.App.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <ScrollViewer
+        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+        HorizontalScrollBarVisibility="Disabled"
+        HorizontalScrollMode="Disabled">
+        <Grid
+            MaxWidth="760"
+            Margin="32,24,32,24"
+            HorizontalAlignment="Stretch"
+            RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                Style="{ThemeResource BodyStrongTextBlockStyle}"
+                Text="Appearance" />
+            <controls:SettingsCard
+                Grid.Row="1"
+                Header="App frame theme"
+                Description="Choose the appearance of the native title bar, menus, and settings page.">
+                <ComboBox
+                    x:Name="ThemePicker"
+                    MinWidth="140"
+                    SelectionChanged="OnPreferenceChanged">
+                    <ComboBoxItem Content="Use system setting" Tag="System" />
+                    <ComboBoxItem Content="Light" Tag="Light" />
+                    <ComboBoxItem Content="Dark" Tag="Dark" />
+                </ComboBox>
+            </controls:SettingsCard>
+
+            <TextBlock
+                Grid.Row="2"
+                Margin="0,16,0,0"
+                Style="{ThemeResource BodyStrongTextBlockStyle}"
+                Text="Startup" />
+            <controls:SettingsCard
+                Grid.Row="3"
+                Header="Reopen saved drawing tabs"
+                Description="Restore clean file-backed tabs from the previous session. Unsaved recovery is always preserved.">
+                <ToggleSwitch
+                    x:Name="ReopenSavedTabsToggle"
+                    Toggled="OnPreferenceChanged" />
+            </controls:SettingsCard>
+
+            <TextBlock
+                Grid.Row="4"
+                Margin="0,16,0,0"
+                Style="{ThemeResource BodyStrongTextBlockStyle}"
+                Text="Performance" />
+            <controls:SettingsCard
+                Grid.Row="5"
+                Header="Sleep inactive tabs"
+                Description="Suspend safe clean tabs after five inactive minutes to reduce background activity.">
+                <ToggleSwitch
+                    x:Name="SuspendInactiveTabsToggle"
+                    Toggled="OnPreferenceChanged" />
+            </controls:SettingsCard>
+            <controls:SettingsCard
+                Grid.Row="6"
+                Header="Unload inactive editors"
+                Description="Close safe clean WebViews after fifteen inactive minutes. Selecting the tab recreates its editor and resets undo history.">
+                <ToggleSwitch
+                    x:Name="UnloadInactiveTabsToggle"
+                    Toggled="OnPreferenceChanged" />
+            </controls:SettingsCard>
+
+            <TextBlock
+                Grid.Row="7"
+                Margin="0,16,0,0"
+                Style="{ThemeResource BodyStrongTextBlockStyle}"
+                Text="About" />
+            <controls:SettingsCard
+                Grid.Row="8"
+                Header="Excalidraw Desktop"
+                Description="A local-first WinUI desktop host for Excalidraw.">
+                <TextBlock
+                    x:Name="VersionText"
+                    VerticalAlignment="Center" />
+            </controls:SettingsCard>
+        </Grid>
+    </ScrollViewer>
+</Page>
