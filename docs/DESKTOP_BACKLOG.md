@@ -9,6 +9,7 @@ The detailed designs remain in:
 - [`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md)
 - [`WINUI_DESKTOP_PLAN.md`](WINUI_DESKTOP_PLAN.md)
 - [`EDGE_STYLE_TITLEBAR_TABS_PLAN.md`](EDGE_STYLE_TITLEBAR_TABS_PLAN.md)
+- [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md)
 - [`FUTURE_DESKTOP_ROADMAP.md`](FUTURE_DESKTOP_ROADMAP.md)
 
 When an item is completed, update this checklist and the relevant detailed
@@ -20,7 +21,7 @@ plan in the same change.
   `@excalidraw/excalidraw` npm dependency.
 - [x] Keep web-asset build and Excalidraw-update tooling in the desktop
   repository.
-- [ ] Create a desktop-owned Git repository and remote without using the
+- [x] Create a desktop-owned Git repository and remote without using the
   upstream Excalidraw repository as its history or origin.
 - [x] Move the implementation into the root-level project layout documented in
   `WINUI_DESKTOP_PLAN.md`; do not add a wrapping `src/` or `app/` directory.
@@ -114,17 +115,18 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
 
 - [x] Add a native Settings page using Windows Community Toolkit SettingsCard
   controls for theme, startup restoration, and tab-lifetime preferences.
-- [ ] Add retry and close actions for a tab whose editor fails to initialize.
-- [ ] Add clear WebView2 Runtime missing, damaged, and repair guidance.
+- [x] Add retry and close actions for a tab whose editor fails to initialize.
+- [x] Add clear WebView2 Runtime missing, damaged, and repair guidance.
 - [ ] Improve loading, empty-workspace, recovery, conflict, sleeping-tab, and
   failure visuals.
 - [ ] Add structured startup, bridge, file, recovery, and WebView diagnostics
   that never include drawing contents or embedded images.
 - [ ] Limit bridge and document payload sizes.
-- [ ] Explicitly detach WebView event handlers and remove virtual-host mappings
+- [x] Explicitly detach WebView event handlers and remove virtual-host mappings
   when tabs close.
-- [ ] Verify file watchers, WebViews, and recovery resources are released when
-  tabs close.
+- [x] Verify file watchers, WebViews, routed input, and event subscriptions are
+  released when tabs close.
+- [ ] Verify recovery snapshot resources are released when tabs close.
 
 ## Windows desktop and release completion
 
@@ -151,6 +153,9 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
 
 ### Power-user workflow
 
+- [ ] Add multiple tabbed windows, command-driven tab moves, native tab
+  tear-out, and cross-window restoration according to
+  [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md).
 - [ ] Add a native command palette for tabs, files, export, view, and app
   commands.
 - [ ] Add configurable shortcuts with documented native/editor precedence.

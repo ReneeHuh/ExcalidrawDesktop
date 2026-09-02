@@ -356,7 +356,8 @@ Tasks:
 - Implement the app-update mechanism for the chosen channel: Store auto-update, or a hosted `.appinstaller` feed for direct distribution. Direct distribution makes this a real work item, not a checkbox.
 - Add CI for web tests, TypeScript checks, .NET tests, packaged builds, and smoke tests.
 - Generate third-party notices and preserve the Excalidraw MIT license.
-- Document WebView2 Runtime requirements and recovery behavior.
+- Document WebView2 Runtime requirements and recovery behavior, and provide
+  Retry, Close tab, and Microsoft repair-help actions in the editor failure UI.
 - Establish an upstream update and regression-testing process.
 
 ## Testing strategy

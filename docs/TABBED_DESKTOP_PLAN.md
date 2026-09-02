@@ -4,6 +4,7 @@ Status: In progress — core tabbed workspace implemented; T3 completion gaps,
 Windows integration, title-bar integration, and validation remain
 Created: September 1, 2026
 Related plan: [`WINUI_DESKTOP_PLAN.md`](WINUI_DESKTOP_PLAN.md)
+Post-MVP plan: [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md)
 
 ## Current delivery snapshot
 
@@ -21,6 +22,7 @@ Related plan: [`WINUI_DESKTOP_PLAN.md`](WINUI_DESKTOP_PLAN.md)
 | File association and existing-instance file activation | Implemented | Packaged activation automation remains |
 | Multi-file drag/drop and jump lists | Not implemented | Remaining T4 work |
 | Tabs in the native title bar | Planned | See [`EDGE_STYLE_TITLEBAR_TABS_PLAN.md`](EDGE_STYLE_TITLEBAR_TABS_PLAN.md) |
+| Multiple windows and tab tear-out | Post-MVP plan | See [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md) |
 | Performance target and hibernation decision | Measured and implemented | Five-minute suspension and fifteen-minute safe clean-editor unloading |
 
 “Implemented” describes code present in the repository. It does not imply that
@@ -263,9 +265,9 @@ by testability or the needs of multi-window/tab-tear-out work.
 5. Native sends pending initial content for that session. Shared native preferences remain future work.
 6. Editor changes update only the owning session's dirty and recovery state.
 7. Save requests serialize only the owning editor and write only its `StorageFile`.
-8. Closing a tab removes the session UI, disposes file watchers, closes the
-   WebView, and deletes recovery data when safe. Explicit WebView event-handler
-   detachment and virtual-host mapping cleanup remain hardening work.
+8. Closing a tab removes the session UI, explicitly detaches file-watcher,
+   routed-input, and CoreWebView2 handlers, clears its virtual-host mapping,
+   closes the WebView, and deletes recovery data when safe.
 
 The native host derives the owning session from the WebView/dispatcher association. It must not trust a web-provided document identifier to select an arbitrary native session. If `documentId` is added for diagnostics, it must match the session already bound to that WebView.
 
@@ -570,8 +572,9 @@ validation provides evidence.
 - Do not expose arbitrary filesystem paths through bridge messages.
 - Continue using native pickers and validated `StorageFile` references.
 - Limit document and bridge payload sizes.
-- Dispose controls when tabs close. Add explicit WebView event-handler
-  detachment and virtual-host mapping cleanup as lifecycle hardening.
+- Dispose controls when tabs close, explicitly detach WebView event handlers,
+  and clear the per-tab virtual-host mapping. Packaged title-bar automation
+  verifies this cleanup for a closed tab.
 - Never log scene contents, embedded images, or recovery data.
 
 ## Major risks and mitigations

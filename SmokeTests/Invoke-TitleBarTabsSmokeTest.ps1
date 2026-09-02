@@ -16,6 +16,8 @@ $startedProcess = $null
 $requestPath = $null
 $statePath = $null
 
+Add-Type -AssemblyName UIAutomationClient
+
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -40,6 +42,9 @@ internal interface IApplicationActivationManager
 
 public static class TitleBarPackagedAppActivator
 {
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForWindow(IntPtr window);
+
     public static uint Activate(string appUserModelId)
     {
         var manager = (IApplicationActivationManager)new ApplicationActivationManager();
@@ -49,6 +54,20 @@ public static class TitleBarPackagedAppActivator
     }
 }
 "@
+
+function Get-AutomationElementById {
+    param(
+        [System.Windows.Automation.AutomationElement] $Root,
+        [string] $AutomationId
+    )
+
+    $condition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        $AutomationId)
+    return $Root.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        $condition)
+}
 
 try {
     if (-not $SkipBuild) {
@@ -91,13 +110,58 @@ try {
         }
 
         if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Title bar smoke passed") {
+            $root = [System.Windows.Automation.AutomationElement]::FromHandle(
+                $startedProcess.MainWindowHandle)
+            $requiredAutomationIds = @(
+                "DocumentTabs",
+                "ApplicationMenu",
+                "FileMenu",
+                "SettingsButton",
+                "ExcalidrawEditorWebView",
+                "Minimize",
+                "Maximize",
+                "Close")
+            $missingIds = @($requiredAutomationIds | Where-Object {
+                -not (Get-AutomationElementById -Root $root -AutomationId $_)
+            })
+            if ($missingIds.Count -gt 0) {
+                throw "Required automation controls were missing: $($missingIds -join ', ')"
+            }
+
+            $tabItems = $root.FindAll(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::TabItem))
+            $namedDrawingTab = $false
+            foreach ($tabItem in $tabItems) {
+                if ($tabItem.Current.Name -match "(saved|unsaved changes|new drawing)") {
+                    $namedDrawingTab = $true
+                    break
+                }
+            }
+            if (-not $namedDrawingTab) {
+                throw "No drawing tab exposed its document state in its accessible name."
+            }
+
+            $dpi = [TitleBarPackagedAppActivator]::GetDpiForWindow(
+                $startedProcess.MainWindowHandle)
             [pscustomobject]@{
                 Result = "Passed"
                 ProcessId = $startedProcess.Id
                 ContentExtended = $true
                 InsetsDpiAdjusted = $true
+                CurrentDpi = $dpi
+                CurrentScalePercent = [Math]::Round($dpi / 96 * 100)
                 DragRegionPresent = $true
                 TabInteractions = "Passed"
+                KeyboardAccelerators = "Passed"
+                LightAndDarkThemes = "Passed"
+                AutomationNames = "Passed"
+                CaptionButtonAutomation = "Passed"
+                FailureActions = "Passed"
+                FailureRetry = "Passed"
+                ClosedTabResourceCleanup = "Passed"
             }
             return
         }

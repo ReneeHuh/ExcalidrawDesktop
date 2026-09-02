@@ -8,6 +8,12 @@ public sealed partial class DocumentTabContent : UserControl
 {
     private WebView2? editor;
 
+    public event EventHandler? RetryRequested;
+
+    public event EventHandler? CloseRequested;
+
+    public event EventHandler? WebView2HelpRequested;
+
     public DocumentTabContent()
     {
         InitializeComponent();
@@ -16,6 +22,15 @@ public sealed partial class DocumentTabContent : UserControl
 
     public WebView2 Editor => editor ?? throw new InvalidOperationException(
         "The editor is hibernated and must be recreated before use.");
+
+    internal bool HasEditor => editor is not null;
+
+    internal bool IsFailureVisible =>
+        StartupOverlay.Visibility == Visibility.Visible &&
+        FailureActions.Visibility == Visibility.Visible;
+
+    internal bool IsWebView2HelpVisible =>
+        WebView2HelpButton.Visibility == Visibility.Visible;
 
     public WebView2 RecreateEditor(string message)
     {
@@ -26,6 +41,10 @@ public sealed partial class DocumentTabContent : UserControl
         EditorContainer.Content = editor;
         StartupProgress.IsActive = true;
         StartupStatus.Text = message;
+        StartupGuidance.Text = string.Empty;
+        StartupGuidance.Visibility = Visibility.Collapsed;
+        FailureActions.Visibility = Visibility.Collapsed;
+        WebView2HelpButton.Visibility = Visibility.Collapsed;
         StartupOverlay.Visibility = Visibility.Visible;
         return editor;
     }
@@ -35,6 +54,10 @@ public sealed partial class DocumentTabContent : UserControl
         CloseEditor();
         StartupProgress.IsActive = false;
         StartupStatus.Text = "Sleeping — select this tab to resume";
+        StartupGuidance.Text = string.Empty;
+        StartupGuidance.Visibility = Visibility.Collapsed;
+        FailureActions.Visibility = Visibility.Collapsed;
+        WebView2HelpButton.Visibility = Visibility.Collapsed;
         StartupOverlay.Visibility = Visibility.Visible;
     }
 
@@ -57,10 +80,42 @@ public sealed partial class DocumentTabContent : UserControl
         Editor.Focus(FocusState.Programmatic);
     }
 
-    public void ShowFailure(string message)
+    public void ShowFailure(
+        string message,
+        string guidance = "Retry the editor or close this tab. Your saved drawing is not changed.",
+        bool showWebView2Help = false)
     {
         StartupProgress.IsActive = false;
         StartupStatus.Text = message;
+        StartupGuidance.Text = guidance;
+        StartupGuidance.Visibility = Visibility.Visible;
+        FailureActions.Visibility = Visibility.Visible;
+        WebView2HelpButton.Visibility = showWebView2Help
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         StartupOverlay.Visibility = Visibility.Visible;
+        RetryEditorButton.Focus(FocusState.Programmatic);
+    }
+
+    public void ClearActionHandlers()
+    {
+        RetryRequested = null;
+        CloseRequested = null;
+        WebView2HelpRequested = null;
+    }
+
+    private void OnRetryClick(object sender, RoutedEventArgs args)
+    {
+        RetryRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnCloseTabClick(object sender, RoutedEventArgs args)
+    {
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnWebView2HelpClick(object sender, RoutedEventArgs args)
+    {
+        WebView2HelpRequested?.Invoke(this, EventArgs.Empty);
     }
 }

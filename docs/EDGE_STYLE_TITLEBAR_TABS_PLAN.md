@@ -1,7 +1,8 @@
 # Edge-style WinUI title-bar tabs plan
 
-Status: Implemented September 2, 2026; packaged automation is complete and the
-manual input, DPI, theme, RTL, and accessibility matrix remains to be recorded.
+Status: Implemented September 2, 2026; expanded packaged automation passes and
+the hardware-dependent manual input, mixed-DPI, contrast, RTL, and
+assistive-technology matrix remains open.
 Created: September 2, 2026
 Related plan: [`TABBED_DESKTOP_PLAN.md`](TABBED_DESKTOP_PLAN.md)
 
@@ -279,7 +280,9 @@ Exit criteria:
 - Add the packaged title-bar smoke test.
 - Run all existing native, web, startup, tab-isolation, workspace-restore, and
   recovery tests.
-- Complete the manual matrix below and record results under `docs/validation/`.
+- Complete the manual matrix below. Automated results and the remaining manual
+  cases are recorded in
+  [`validation/TITLE_BAR_ACCESSIBILITY_VALIDATION.md`](validation/TITLE_BAR_ACCESSIBILITY_VALIDATION.md).
 
 Exit criteria:
 

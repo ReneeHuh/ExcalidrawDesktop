@@ -1,6 +1,7 @@
 using ExcalidrawDesktop.Core;
 using ExcalidrawDesktop.App.Controls;
 using ExcalidrawDesktop.App.Services;
+using System.Diagnostics;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 
@@ -38,7 +39,12 @@ internal sealed class DocumentSession : IDisposable
     public ExternalFileState ExternalFileState { get; set; }
 
     public bool ExternalConflictPromptOpen { get; set; }
+
     public FileSystemWatcher? ExternalFileWatcher { get; set; }
+
+    public FileSystemEventHandler? ExternalFileChangedHandler { get; set; }
+
+    public RenamedEventHandler? ExternalFileRenamedHandler { get; set; }
 
     public string DisplayName { get; set; }
 
@@ -82,6 +88,10 @@ internal sealed class DocumentSession : IDisposable
 
     public CoreWebView2? CoreWebView { get; set; }
 
+    public Action? DetachWebViewHandlers { get; set; }
+
+    public Action? DetachEditorHandlers { get; set; }
+
     public PendingEditorLoad? PendingDocumentLoad { get; set; }
 
     public string HeaderText
@@ -95,7 +105,74 @@ internal sealed class DocumentSession : IDisposable
 
     public void Dispose()
     {
+        try
+        {
+            DetachExternalFileWatcher();
+        }
+        catch (Exception exception)
+        {
+            LastLifecycleFailure = exception.Message;
+            Debug.WriteLine($"File-watcher cleanup failed: {exception}");
+        }
+
+        var detachWebViewHandlers = DetachWebViewHandlers;
+        DetachWebViewHandlers = null;
+        CoreWebView = null;
+        try
+        {
+            detachWebViewHandlers?.Invoke();
+        }
+        catch (Exception exception)
+        {
+            LastLifecycleFailure = exception.Message;
+            Debug.WriteLine($"WebView event cleanup failed: {exception}");
+        }
+
+        var detachEditorHandlers = DetachEditorHandlers;
+        DetachEditorHandlers = null;
+        try
+        {
+            detachEditorHandlers?.Invoke();
+        }
+        catch (Exception exception)
+        {
+            LastLifecycleFailure = exception.Message;
+            Debug.WriteLine($"Editor input cleanup failed: {exception}");
+        }
+
         Content.CloseEditor();
+        Content.ClearActionHandlers();
+    }
+
+    public void DetachExternalFileWatcher()
+    {
+        if (ExternalFileWatcher is not { } watcher)
+        {
+            return;
+        }
+
+        var changed = ExternalFileChangedHandler;
+        var renamed = ExternalFileRenamedHandler;
+        ExternalFileWatcher = null;
+        ExternalFileChangedHandler = null;
+        ExternalFileRenamedHandler = null;
+        try
+        {
+            watcher.EnableRaisingEvents = false;
+            if (changed is not null)
+            {
+                watcher.Changed -= changed;
+                watcher.Deleted -= changed;
+            }
+            if (renamed is not null)
+            {
+                watcher.Renamed -= renamed;
+            }
+        }
+        finally
+        {
+            watcher.Dispose();
+        }
     }
 }
 

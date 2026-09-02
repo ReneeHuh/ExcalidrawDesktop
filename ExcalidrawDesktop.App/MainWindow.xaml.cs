@@ -3,6 +3,7 @@ using System.Text.Json;
 using ExcalidrawDesktop.Core;
 using ExcalidrawDesktop.App.Controls;
 using ExcalidrawDesktop.App.Models;
+using ExcalidrawDesktop.App.Pages;
 using ExcalidrawDesktop.App.Services;
 using Microsoft.UI.Windowing;
 using Microsoft.UI;
@@ -12,6 +13,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.Web.WebView2.Core;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
 using Windows.Storage;
 using Windows.System;
 using Windows.UI.StartScreen;
@@ -20,6 +22,9 @@ namespace ExcalidrawDesktop.App;
 
 public sealed partial class MainWindow : Window
 {
+    private const string WebView2HelpUri =
+        "https://developer.microsoft.com/en-us/microsoft-edge/webview2/";
+
     private readonly string webAssetPath = Path.Combine(
         AppContext.BaseDirectory,
         "Assets",
@@ -60,9 +65,11 @@ public sealed partial class MainWindow : Window
     private bool jumpListUpdateRunning;
     private bool restoringWorkspace = true;
     private bool recoverySmokeStarted;
+    private bool resourcesDisposed;
     private int recoverySnapshotsSaved;
     private int recoveryTabsRestored;
     private int untitledSequence;
+    private XamlRoot? titleBarXamlRoot;
 
     public MainWindow(
         bool runTabSmoke = false,
@@ -78,9 +85,8 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         desktopPreferences = desktopSettingsStore.Load();
         AppSettingsPage.LoadPreferences(desktopPreferences);
-        AppSettingsPage.PreferencesChanged += (_, args) =>
-            ApplyDesktopPreferences(args.Preferences);
-        MainLayout.ActualThemeChanged += (_, _) => OnActualThemeChanged();
+        AppSettingsPage.PreferencesChanged += OnPreferencesChanged;
+        MainLayout.ActualThemeChanged += OnActualThemeChanged;
         ApplyDesktopTheme();
         InitializeTitleBar();
         var effectiveWorkspaceStatePath = workspaceStatePath ?? Path.Combine(
@@ -100,7 +106,7 @@ public sealed partial class MainWindow : Window
         this.performanceUnloadInactive = performanceUnloadInactive;
         PopulateRecentFilesMenu();
         Activated += OnWindowActivated;
-        Closed += (_, _) => suspensionTimer.Stop();
+        Closed += OnWindowClosed;
         AppWindow.Closing += OnAppWindowClosing;
         suspensionTimer.Interval = TimeSpan.FromSeconds(30);
         suspensionTimer.Tick += OnSuspensionTimerTick;
@@ -127,6 +133,13 @@ public sealed partial class MainWindow : Window
         {
             CreateTab();
         }
+    }
+
+    private void OnPreferencesChanged(
+        object? sender,
+        PreferencesChangedEventArgs args)
+    {
+        ApplyDesktopPreferences(args.Preferences);
     }
 
     private void InitializeTitleBar()
@@ -169,7 +182,7 @@ public sealed partial class MainWindow : Window
         MainLayout.RequestedTheme = requestedTheme;
     }
 
-    private void OnActualThemeChanged()
+    private void OnActualThemeChanged(FrameworkElement sender, object args)
     {
         ApplyTitleBarTheme();
         SendEditorThemeToAllSessions();
@@ -208,8 +221,16 @@ public sealed partial class MainWindow : Window
         if (!titleBarRootSubscribed && MainLayout.XamlRoot is { } xamlRoot)
         {
             titleBarRootSubscribed = true;
-            xamlRoot.Changed += (_, _) => UpdateTitleBarInsets();
+            titleBarXamlRoot = xamlRoot;
+            xamlRoot.Changed += OnTitleBarXamlRootChanged;
         }
+        UpdateTitleBarInsets();
+    }
+
+    private void OnTitleBarXamlRootChanged(
+        XamlRoot sender,
+        XamlRootChangedEventArgs args)
+    {
         UpdateTitleBarInsets();
     }
 
@@ -362,13 +383,13 @@ public sealed partial class MainWindow : Window
     {
         var displayName = NextUntitledName();
         var content = new DocumentTabContent();
-        ConfigureEditorDropTarget(content.Editor);
         var documentService = new DocumentService(this, content);
         var session = new DocumentSession(
             DesktopTabOrigin.Create(),
             displayName,
             content,
             documentService);
+        ConfigureEditorDropTarget(session, content.Editor);
         documentService.IsPathOwnedByAnotherSession = path =>
             sessions.Any(openSession =>
                 !ReferenceEquals(openSession, session) &&
@@ -390,6 +411,12 @@ public sealed partial class MainWindow : Window
             () => RequestOpenDocumentAsync(session),
             () => _ = RequestCloseSessionAsync(session),
             next => SelectAdjacentTab(session, next));
+        session.Content.RetryRequested += (_, _) =>
+            _ = RetrySessionAsync(session);
+        session.Content.CloseRequested += (_, _) =>
+            _ = RequestCloseSessionAsync(session);
+        session.Content.WebView2HelpRequested += (_, _) =>
+            _ = OpenExternalUriAsync(WebView2HelpUri);
         session.TabItem.PointerPressed += (_, args) =>
             OnTabPointerPressed(session, args);
         session.TabItem.ContextFlyout = CreateTabContextFlyout(session);
@@ -416,17 +443,27 @@ public sealed partial class MainWindow : Window
         return session;
     }
 
-    private void ConfigureEditorDropTarget(WebView2 editor)
+    private void ConfigureEditorDropTarget(
+        DocumentSession session,
+        WebView2 editor)
     {
+        session.DetachEditorHandlers?.Invoke();
+        DragEventHandler dragOver = OnFileDragOver;
+        DragEventHandler drop = OnFileDrop;
         editor.AllowDrop = true;
         editor.AddHandler(
             UIElement.DragOverEvent,
-            new DragEventHandler(OnFileDragOver),
+            dragOver,
             handledEventsToo: true);
         editor.AddHandler(
             UIElement.DropEvent,
-            new DragEventHandler(OnFileDrop),
+            drop,
             handledEventsToo: true);
+        session.DetachEditorHandlers = () =>
+        {
+            editor.RemoveHandler(UIElement.DragOverEvent, dragOver);
+            editor.RemoveHandler(UIElement.DropEvent, drop);
+        };
     }
 
 
@@ -453,6 +490,34 @@ public sealed partial class MainWindow : Window
             }
             _ = CheckExternalFileStateAsync(session, showPrompt: true);
         }
+    }
+
+    private void OnWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (resourcesDisposed)
+        {
+            return;
+        }
+
+        resourcesDisposed = true;
+        suspensionTimer.Stop();
+        suspensionTimer.Tick -= OnSuspensionTimerTick;
+        Activated -= OnWindowActivated;
+        Closed -= OnWindowClosed;
+        AppWindow.Closing -= OnAppWindowClosing;
+        AppSettingsPage.PreferencesChanged -= OnPreferencesChanged;
+        MainLayout.ActualThemeChanged -= OnActualThemeChanged;
+        if (titleBarXamlRoot is { } xamlRoot)
+        {
+            xamlRoot.Changed -= OnTitleBarXamlRootChanged;
+            titleBarXamlRoot = null;
+        }
+
+        foreach (var session in sessions.ToArray())
+        {
+            session.Dispose();
+        }
+        sessions.Clear();
     }
 
     private void OnSuspensionTimerTick(object? sender, object args)
@@ -578,8 +643,10 @@ public sealed partial class MainWindow : Window
             }
 
             session.HibernatedContent = cachedContent;
+            session.DetachEditorHandlers?.Invoke();
+            session.DetachEditorHandlers = null;
+            DetachWebView(session);
             session.Content.HibernateEditor();
-            session.CoreWebView = null;
             session.IsReady = false;
             session.IsSuspended = false;
             session.IsUnloaded = true;
@@ -631,7 +698,7 @@ public sealed partial class MainWindow : Window
         session.IsSuspended = false;
         session.CoreWebView = null;
         var editor = session.Content.RecreateEditor("Resuming drawing…");
-        ConfigureEditorDropTarget(editor);
+        ConfigureEditorDropTarget(session, editor);
 
         if (session.HibernatedContent is { } content)
         {
@@ -781,8 +848,16 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception exception)
         {
+            var runtimeMissing = IsWebView2RuntimeUnavailable(exception);
+            session.LastLifecycleFailure = exception.Message;
             session.Content.ShowFailure(
-                "This drawing could not start. Rebuild the desktop app and try again.");
+                runtimeMissing
+                    ? "Microsoft Edge WebView2 Runtime is required."
+                    : "This drawing could not start.",
+                runtimeMissing
+                    ? "Install or repair the Evergreen WebView2 Runtime, then choose Retry. Your saved drawing is not changed."
+                    : "Retry the editor. If the problem continues, repair WebView2 or rebuild the desktop app. Your saved drawing is not changed.",
+                showWebView2Help: true);
             Title = "Excalidraw Desktop — Editor startup failed";
             Debug.WriteLine(exception);
         }
@@ -794,6 +869,7 @@ public sealed partial class MainWindow : Window
 
     private void ConfigureWebView(DocumentSession session, CoreWebView2 coreWebView)
     {
+        DetachWebView(session);
         coreWebView.SetVirtualHostNameToFolderMapping(
             session.TabOrigin.Host,
             webAssetPath,
@@ -808,16 +884,79 @@ public sealed partial class MainWindow : Window
 #endif
 
         session.CoreWebView = coreWebView;
-        coreWebView.NavigationStarting += (_, args) =>
-            OnNavigationStarting(session, args);
-        coreWebView.NavigationCompleted += (_, args) =>
-            OnNavigationCompleted(session, args);
-        coreWebView.NewWindowRequested += (_, args) =>
-            OnNewWindowRequested(args);
-        coreWebView.PermissionRequested += (_, args) =>
-            OnPermissionRequested(session, args);
-        coreWebView.WebMessageReceived += (_, args) =>
-            OnWebMessageReceived(session, args);
+        TypedEventHandler<CoreWebView2, CoreWebView2NavigationStartingEventArgs> navigationStarting =
+            (_, args) => OnNavigationStarting(session, args);
+        TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navigationCompleted =
+            (_, args) => OnNavigationCompleted(session, coreWebView, args);
+        TypedEventHandler<CoreWebView2, CoreWebView2NewWindowRequestedEventArgs> newWindowRequested =
+            (_, args) => OnNewWindowRequested(args);
+        TypedEventHandler<CoreWebView2, CoreWebView2PermissionRequestedEventArgs> permissionRequested =
+            (_, args) => OnPermissionRequested(session, args);
+        TypedEventHandler<CoreWebView2, CoreWebView2WebMessageReceivedEventArgs> webMessageReceived =
+            (_, args) => OnWebMessageReceived(session, coreWebView, args);
+        TypedEventHandler<CoreWebView2, CoreWebView2ProcessFailedEventArgs> processFailed =
+            (_, args) => OnWebViewProcessFailed(session, coreWebView, args);
+
+        coreWebView.NavigationStarting += navigationStarting;
+        coreWebView.NavigationCompleted += navigationCompleted;
+        coreWebView.NewWindowRequested += newWindowRequested;
+        coreWebView.PermissionRequested += permissionRequested;
+        coreWebView.WebMessageReceived += webMessageReceived;
+        coreWebView.ProcessFailed += processFailed;
+        session.DetachWebViewHandlers = () =>
+        {
+            coreWebView.NavigationStarting -= navigationStarting;
+            coreWebView.NavigationCompleted -= navigationCompleted;
+            coreWebView.NewWindowRequested -= newWindowRequested;
+            coreWebView.PermissionRequested -= permissionRequested;
+            coreWebView.WebMessageReceived -= webMessageReceived;
+            coreWebView.ProcessFailed -= processFailed;
+            coreWebView.ClearVirtualHostNameToFolderMapping(
+                session.TabOrigin.Host);
+        };
+    }
+
+    private static void DetachWebView(DocumentSession session)
+    {
+        var detachHandlers = session.DetachWebViewHandlers;
+        session.DetachWebViewHandlers = null;
+        session.CoreWebView = null;
+        try
+        {
+            detachHandlers?.Invoke();
+        }
+        catch (Exception exception)
+        {
+            session.LastLifecycleFailure = exception.Message;
+            Debug.WriteLine($"WebView cleanup failed: {exception}");
+        }
+    }
+
+    private static bool IsWebView2RuntimeUnavailable(Exception exception) =>
+        exception.HResult == unchecked((int)0x80070002) ||
+        exception.Message.Contains(
+            "WebView2 Runtime",
+            StringComparison.OrdinalIgnoreCase);
+
+    private async Task RetrySessionAsync(DocumentSession session)
+    {
+        if (!sessions.Contains(session) || session.IsInitializing)
+        {
+            return;
+        }
+
+        session.IsReady = false;
+        session.IsSuspended = false;
+        session.IsUnloaded = false;
+        session.LastLifecycleFailure = null;
+        session.DetachEditorHandlers?.Invoke();
+        session.DetachEditorHandlers = null;
+        DetachWebView(session);
+        var editor = session.Content.RecreateEditor("Retrying editor…");
+        ConfigureEditorDropTarget(session, editor);
+        UpdateTabHeader(session);
+        UpdateStatusBar(session);
+        await InitializeSessionAsync(session);
     }
 
     private async void OnNavigationStarting(
@@ -835,33 +974,71 @@ public sealed partial class MainWindow : Window
 
     private async void OnNavigationCompleted(
         DocumentSession session,
+        CoreWebView2 coreWebView,
         CoreWebView2NavigationCompletedEventArgs args)
     {
+        if (!sessions.Contains(session) ||
+            !ReferenceEquals(session.CoreWebView, coreWebView))
+        {
+            return;
+        }
+
         if (!args.IsSuccess)
         {
+            session.IsReady = false;
+            session.LastLifecycleFailure = args.WebErrorStatus.ToString();
             session.Content.ShowFailure(
-                $"This drawing could not load ({args.WebErrorStatus}).");
+                $"This drawing could not load ({args.WebErrorStatus}).",
+                "Check the local app installation and retry. If other WebView2 apps also fail, use WebView2 help to repair the runtime.",
+                showWebView2Help: true);
             Title = "Excalidraw Desktop — Editor startup failed";
             return;
         }
 
         await Task.Delay(TimeSpan.FromSeconds(5));
-        if (session.IsReady || !sessions.Contains(session))
+        if (session.IsReady ||
+            !sessions.Contains(session) ||
+            !ReferenceEquals(session.CoreWebView, coreWebView))
         {
             return;
         }
 
 #if DEBUG
-        var diagnostics = await session.CoreWebView!.ExecuteScriptAsync(
+        var diagnostics = await coreWebView.ExecuteScriptAsync(
             "JSON.stringify({readyState:document.readyState,rootChildren:document.getElementById('root')?.childElementCount??-1,origin:location.origin,transport:!!window.chrome?.webview})");
         Debug.WriteLine($"Editor bridge startup diagnostics: {diagnostics}");
         session.Content.ShowFailure(
             $"The editor loaded but its desktop bridge did not become ready. {diagnostics}");
 #else
         session.Content.ShowFailure(
-            "The editor loaded but its desktop bridge did not become ready.");
+            "The editor loaded but its desktop bridge did not become ready.",
+            "Retry the editor. If the problem continues, rebuild the local web assets and desktop app.");
 #endif
+        session.LastLifecycleFailure = "The desktop bridge did not become ready.";
         Title = "Excalidraw Desktop — Editor startup failed";
+    }
+
+    private void OnWebViewProcessFailed(
+        DocumentSession session,
+        CoreWebView2 coreWebView,
+        CoreWebView2ProcessFailedEventArgs args)
+    {
+        if (!sessions.Contains(session) ||
+            !ReferenceEquals(session.CoreWebView, coreWebView))
+        {
+            return;
+        }
+
+        session.IsReady = false;
+        session.IsSuspended = false;
+        session.LastLifecycleFailure = args.ProcessFailedKind.ToString();
+        session.Content.ShowFailure(
+            "The editor process stopped unexpectedly.",
+            $"WebView2 reported {args.ProcessFailedKind}. Retry the editor. If failures continue, repair the WebView2 Runtime.",
+            showWebView2Help: true);
+        UpdateTabHeader(session);
+        UpdateStatusBar(session);
+        Title = "Excalidraw Desktop — Editor process failed";
     }
 
     private async void OnNewWindowRequested(
@@ -883,9 +1060,12 @@ public sealed partial class MainWindow : Window
 
     private async void OnWebMessageReceived(
         DocumentSession session,
+        CoreWebView2 coreWebView,
         CoreWebView2WebMessageReceivedEventArgs args)
     {
-        if (!sessions.Contains(session) || !session.TabOrigin.Matches(args.Source))
+        if (!sessions.Contains(session) ||
+            !ReferenceEquals(session.CoreWebView, coreWebView) ||
+            !session.TabOrigin.Matches(args.Source))
         {
             return;
         }
@@ -893,7 +1073,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var message = BridgeMessageParser.Parse(args.WebMessageAsJson);
-            await session.Dispatcher.DispatchAsync(session.CoreWebView!, message);
+            await session.Dispatcher.DispatchAsync(coreWebView, message);
         }
         catch (BridgeProtocolException exception)
         {
@@ -909,6 +1089,7 @@ public sealed partial class MainWindow : Window
         }
 
         session.IsReady = true;
+        session.LastLifecycleFailure = null;
         session.Content.ShowReady();
         SendEditorTheme(session);
         UpdateWindowTitle();
@@ -1006,7 +1187,7 @@ public sealed partial class MainWindow : Window
 
     private void WatchExternalFile(DocumentSession session, string path)
     {
-        session.ExternalFileWatcher?.Dispose();
+        session.DetachExternalFileWatcher();
         var directory = Path.GetDirectoryName(path);
         var fileName = Path.GetFileName(path);
         if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName))
@@ -1033,6 +1214,8 @@ public sealed partial class MainWindow : Window
         watcher.Deleted += changed;
         watcher.Renamed += renamed;
         session.ExternalFileWatcher = watcher;
+        session.ExternalFileChangedHandler = changed;
+        session.ExternalFileRenamedHandler = renamed;
     }
 
     private void SendPendingDocumentLoad(DocumentSession session)
@@ -1561,6 +1744,7 @@ public sealed partial class MainWindow : Window
 
     private async Task RunTitleBarSmokeAsync()
     {
+        string? cleanupProbePath = null;
         try
         {
             UpdateTitleBarInsets();
@@ -1590,6 +1774,96 @@ public sealed partial class MainWindow : Window
                     "The title-bar layout was not initialized correctly.");
             }
 
+            var requiredAccelerators = new[]
+            {
+                (VirtualKey.T, VirtualKeyModifiers.Control),
+                (VirtualKey.N, VirtualKeyModifiers.Control),
+                (VirtualKey.W, VirtualKeyModifiers.Control),
+                (VirtualKey.O, VirtualKeyModifiers.Control),
+                (VirtualKey.S, VirtualKeyModifiers.Control),
+                (VirtualKey.S, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift),
+                (VirtualKey.W, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift),
+                (VirtualKey.S, VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu),
+                (VirtualKey.Tab, VirtualKeyModifiers.Control),
+                (VirtualKey.Tab, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift),
+            };
+            if (requiredAccelerators.Any(required =>
+                !DocumentTabs.KeyboardAccelerators.Any(accelerator =>
+                    accelerator.Key == required.Item1 &&
+                    accelerator.Modifiers == required.Item2)))
+            {
+                throw new InvalidOperationException(
+                    "A required keyboard accelerator is missing from the title-bar tab strip.");
+            }
+
+            var originalTheme = MainLayout.RequestedTheme;
+            foreach (var theme in new[] { ElementTheme.Light, ElementTheme.Dark })
+            {
+                MainLayout.RequestedTheme = theme;
+                await Task.Delay(100);
+                var expectedTitleBarTheme = theme == ElementTheme.Dark
+                    ? TitleBarTheme.Dark
+                    : TitleBarTheme.Light;
+                if (MainLayout.ActualTheme != theme ||
+                    AppWindow.TitleBar.PreferredTheme != expectedTitleBarTheme)
+                {
+                    throw new InvalidOperationException(
+                        $"The {theme} app-frame theme did not reach the title bar.");
+                }
+            }
+            MainLayout.RequestedTheme = originalTheme;
+            await Task.Delay(100);
+
+            var first = sessions[0];
+            var second = sessions[1];
+            first.IsDirty = true;
+            UpdateTabHeader(first);
+            if (!AutomationProperties.GetName(first.TabItem).Contains(
+                "unsaved changes",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "The accessible tab name did not announce its dirty state.");
+            }
+            first.IsDirty = false;
+            UpdateTabHeader(first);
+            if (string.IsNullOrWhiteSpace(AutomationProperties.GetName(DocumentTabs)) ||
+                string.IsNullOrWhiteSpace(AutomationProperties.GetName(WindowDragRegion)) ||
+                string.IsNullOrWhiteSpace(AutomationProperties.GetName(SettingsButton)) ||
+                string.IsNullOrWhiteSpace(AutomationProperties.GetName(first.Content.Editor)))
+            {
+                throw new InvalidOperationException(
+                    "A title-bar or editor control is missing its accessible name.");
+            }
+
+            first.Content.ShowFailure(
+                "Editor startup validation failure",
+                "Retry, open WebView2 help, or close this tab.",
+                showWebView2Help: true);
+            if (!first.Content.IsFailureVisible ||
+                !first.Content.IsWebView2HelpVisible)
+            {
+                throw new InvalidOperationException(
+                    "The editor failure actions were not displayed.");
+            }
+            var previousCoreWebView = first.CoreWebView;
+            await RetrySessionAsync(first);
+            var retryDeadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
+            while (!first.IsReady && DateTimeOffset.UtcNow < retryDeadline)
+            {
+                await Task.Delay(100);
+            }
+            if (!first.IsReady ||
+                first.CoreWebView is null ||
+                ReferenceEquals(first.CoreWebView, previousCoreWebView) ||
+                first.DetachWebViewHandlers is null ||
+                first.DetachEditorHandlers is null ||
+                first.Content.IsFailureVisible)
+            {
+                throw new InvalidOperationException(
+                    "The failed editor did not retry with a fresh WebView.");
+            }
+
             ShowSettingsPage();
             await Task.Yield();
             if (!settingsPageVisible ||
@@ -1613,20 +1887,39 @@ public sealed partial class MainWindow : Window
                     "The native Settings tab was not hidden correctly.");
             }
 
-            var first = sessions[0];
-            var second = sessions[1];
             DocumentTabs.TabItems.Remove(first.TabItem);
             DocumentTabs.TabItems.Insert(1, first.TabItem);
             SynchronizeSessionOrder();
             DocumentTabs.SelectedItem = first.TabItem;
+            cleanupProbePath = Path.Combine(
+                AppContext.BaseDirectory,
+                "titlebar-resource-cleanup.tmp");
+            await File.WriteAllTextAsync(cleanupProbePath, "cleanup");
+            WatchExternalFile(second, cleanupProbePath);
+            if (second.ExternalFileWatcher is null ||
+                second.ExternalFileChangedHandler is null ||
+                second.ExternalFileRenamedHandler is null)
+            {
+                throw new InvalidOperationException(
+                    "The file-watcher cleanup probe was not attached.");
+            }
+
             if (sessions.Count != 2 ||
                 !ReferenceEquals(sessions[1], first) ||
                 !ReferenceEquals(ActiveSession, first) ||
                 !await RequestCloseSessionAsync(second) ||
-                sessions.Count != 1)
+                sessions.Count != 1 ||
+                second.CoreWebView is not null ||
+                second.DetachWebViewHandlers is not null ||
+                second.DetachEditorHandlers is not null ||
+                second.ExternalFileWatcher is not null ||
+                second.ExternalFileChangedHandler is not null ||
+                second.ExternalFileRenamedHandler is not null ||
+                second.Content.HasEditor ||
+                second.LastLifecycleFailure is not null)
             {
                 throw new InvalidOperationException(
-                    "Tab interactions regressed in the custom title bar.");
+                    "Tab interactions or resource cleanup regressed in the custom title bar.");
             }
 
             Title = "Excalidraw Desktop — Title bar smoke passed";
@@ -1635,6 +1928,13 @@ public sealed partial class MainWindow : Window
         {
             Debug.WriteLine(exception);
             Title = "Excalidraw Desktop — Title bar smoke failed";
+        }
+        finally
+        {
+            if (cleanupProbePath is not null && File.Exists(cleanupProbePath))
+            {
+                File.Delete(cleanupProbePath);
+            }
         }
     }
 
@@ -1800,7 +2100,11 @@ public sealed partial class MainWindow : Window
                 !unloading.IsSuspended ||
                 !await UnloadSessionAsync(unloading, requireIdle: true) ||
                 !unloading.IsUnloaded ||
-                unloading.CoreWebView is not null)
+                unloading.CoreWebView is not null ||
+                unloading.DetachWebViewHandlers is not null ||
+                unloading.DetachEditorHandlers is not null ||
+                unloading.Content.HasEditor ||
+                unloading.LastLifecycleFailure is not null)
             {
                 throw new InvalidOperationException(
                     $"The inactive clean tab did not fully unload. {unloading.LastLifecycleFailure}");
@@ -1819,6 +2123,9 @@ public sealed partial class MainWindow : Window
                 unloading.IsRestoringFromHibernation ||
                 !ReferenceEquals(ActiveSession, unloading) ||
                 unloading.CoreWebView is null ||
+                unloading.DetachWebViewHandlers is null ||
+                unloading.DetachEditorHandlers is null ||
+                !unloading.Content.HasEditor ||
                 !unloading.TabOrigin.Matches(unloading.CoreWebView.Source))
             {
                 throw new InvalidOperationException(
@@ -2549,8 +2856,6 @@ public sealed partial class MainWindow : Window
 
         DocumentTabs.TabItems.Remove(session.TabItem);
         EditorHost.Children.Remove(session.Content);
-        session.ExternalFileWatcher?.Dispose();
-        session.ExternalFileWatcher = null;
         _ = DeleteRecoverySnapshotAsync(session);
         session.Dispose();
         if (ReferenceEquals(lastDocumentSession, session))
@@ -2977,7 +3282,27 @@ public sealed partial class MainWindow : Window
     {
         session.TabItem.Header = session.HeaderText;
         ToolTipService.SetToolTip(session.TabItem, session.DisplayName);
-        AutomationProperties.SetName(session.TabItem, session.HeaderText);
+        var accessibilityStates = new List<string>();
+        if (session.DocumentService.DocumentPath is null)
+        {
+            accessibilityStates.Add("new drawing");
+        }
+        accessibilityStates.Add(session.IsDirty ? "unsaved changes" : "saved");
+        if (session.IsSuspended || session.IsUnloaded)
+        {
+            accessibilityStates.Add("sleeping");
+        }
+        if (session.ExternalFileState is not ExternalFileState.None)
+        {
+            accessibilityStates.Add("changed on disk");
+        }
+
+        AutomationProperties.SetName(
+            session.TabItem,
+            $"{session.DisplayName}, {string.Join(", ", accessibilityStates)}");
+        AutomationProperties.SetHelpText(
+            session.TabItem,
+            session.DocumentService.DocumentPath ?? "Unsaved drawing");
     }
 
     private void UpdateWindowTitle()

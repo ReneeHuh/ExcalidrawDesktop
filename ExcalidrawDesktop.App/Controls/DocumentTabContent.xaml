@@ -15,9 +15,10 @@
 
         <Border
             x:Name="StartupOverlay"
-            Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-            IsHitTestVisible="False">
+            Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
             <StackPanel
+                MaxWidth="560"
+                Margin="32"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Spacing="16">
@@ -29,7 +30,46 @@
                 <TextBlock
                     x:Name="StartupStatus"
                     AutomationProperties.AutomationId="StartupStatusText"
+                    AutomationProperties.LiveSetting="Assertive"
+                    FontSize="18"
+                    FontWeight="SemiBold"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap"
                     Text="Starting Excalidraw Desktop…" />
+                <TextBlock
+                    x:Name="StartupGuidance"
+                    AutomationProperties.AutomationId="StartupGuidanceText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
+                <StackPanel
+                    x:Name="FailureActions"
+                    HorizontalAlignment="Center"
+                    Spacing="8"
+                    Visibility="Collapsed">
+                    <Button
+                        x:Name="RetryEditorButton"
+                        HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="RetryEditorButton"
+                        AutomationProperties.Name="Retry starting this editor"
+                        Click="OnRetryClick"
+                        Content="Retry" />
+                    <Button
+                        x:Name="WebView2HelpButton"
+                        HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="WebView2HelpButton"
+                        AutomationProperties.Name="Open Microsoft WebView2 install and repair help"
+                        Click="OnWebView2HelpClick"
+                        Content="WebView2 help"
+                        Visibility="Collapsed" />
+                    <Button
+                        HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="CloseFailedTabButton"
+                        AutomationProperties.Name="Close this failed drawing tab"
+                        Click="OnCloseTabClick"
+                        Content="Close tab" />
+                </StackPanel>
             </StackPanel>
         </Border>
 

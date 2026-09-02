@@ -70,6 +70,12 @@ Excalidraw Desktop currently targets Windows 11 on x64 PCs and requires the
 Microsoft Edge WebView2 Runtime. A packaged release and end-user installation
 instructions will be added before the first public release.
 
+If an editor tab cannot start, use its **Retry** action first. The failure view
+also links to Microsoft's
+[WebView2 download and repair page](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
+Install or repair the Evergreen WebView2 Runtime, restart Excalidraw Desktop,
+and retry the tab. A failed editor does not overwrite its saved drawing.
+
 This project is an independent desktop host for the open-source
 [Excalidraw](https://github.com/excalidraw/excalidraw) editor. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and licensing
