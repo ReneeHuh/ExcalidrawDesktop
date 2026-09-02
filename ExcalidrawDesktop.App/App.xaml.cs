@@ -67,6 +67,12 @@ public partial class App : Application
         var multiWindowSmokeRequestPath = Path.Combine(
             AppContext.BaseDirectory,
             "multi-window-smoke.request");
+        var multiWindowExitSmokeRequestPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "multi-window-exit-smoke.request");
+        var multiWindowDirtyExitSmokeRequestPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "multi-window-dirty-exit-smoke.request");
         var performanceSmokeRequestPath = Path.Combine(
             AppContext.BaseDirectory,
             "performance-smoke.request");
@@ -77,6 +83,9 @@ public partial class App : Application
         var verifyRecoverySmoke = File.Exists(recoveryRestoreRequestPath);
         var runTitleBarSmoke = File.Exists(titleBarSmokeRequestPath);
         var runMultiWindowSmoke = File.Exists(multiWindowSmokeRequestPath);
+        var runMultiWindowExitSmoke = File.Exists(multiWindowExitSmokeRequestPath);
+        var runMultiWindowDirtyExitSmoke = File.Exists(
+            multiWindowDirtyExitSmokeRequestPath);
         var performanceTabCount = ReadPerformanceTabCount(
             performanceSmokeRequestPath);
         var performanceSuspendInactive = ReadPerformanceSuspendMode(
@@ -96,6 +105,8 @@ public partial class App : Application
                         ? Path.Combine(AppContext.BaseDirectory, "titlebar-smoke-state.json")
                     : runMultiWindowSmoke
                         ? Path.Combine(AppContext.BaseDirectory, "multi-window-smoke-state.json")
+                    : runMultiWindowExitSmoke || runMultiWindowDirtyExitSmoke
+                        ? Path.Combine(AppContext.BaseDirectory, "multi-window-exit-smoke-state.json")
                     : performanceTabCount > 0
                         ? Path.Combine(AppContext.BaseDirectory, "performance-smoke-state.json")
                     : runSuspensionSmoke
@@ -131,6 +142,14 @@ public partial class App : Application
         {
             File.Delete(multiWindowSmokeRequestPath);
         }
+        if (File.Exists(multiWindowExitSmokeRequestPath))
+        {
+            File.Delete(multiWindowExitSmokeRequestPath);
+        }
+        if (File.Exists(multiWindowDirtyExitSmokeRequestPath))
+        {
+            File.Delete(multiWindowDirtyExitSmokeRequestPath);
+        }
         if (File.Exists(performanceSmokeRequestPath))
         {
             File.Delete(performanceSmokeRequestPath);
@@ -146,6 +165,8 @@ public partial class App : Application
         const bool verifyRecoverySmoke = false;
         const bool runTitleBarSmoke = false;
         const bool runMultiWindowSmoke = false;
+        const bool runMultiWindowExitSmoke = false;
+        const bool runMultiWindowDirtyExitSmoke = false;
         const int performanceTabCount = 0;
         const bool performanceSuspendInactive = false;
         const bool performanceUnloadInactive = false;
@@ -167,7 +188,9 @@ public partial class App : Application
             performanceSuspendInactive,
             performanceUnloadInactive,
             restoreWorkspace: true,
-            runMultiWindowSmoke: runMultiWindowSmoke);
+            runMultiWindowSmoke: runMultiWindowSmoke,
+            runMultiWindowExitSmoke: runMultiWindowExitSmoke,
+            runMultiWindowDirtyExitSmoke: runMultiWindowDirtyExitSmoke);
         workspaceCoordinator.RegisterWindow(window, firstRestoredWindow);
         window.Activate();
         MainWindow? restoredActiveWindow =

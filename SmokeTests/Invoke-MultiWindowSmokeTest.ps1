@@ -138,6 +138,10 @@ try {
                 OriginPreserved = $true
                 WindowHandlersRebound = $true
                 EmptyDestinationClosed = $true
+                UnsafeMoveRejected = $true
+                DirtyStatePreserved = $true
+                WatcherRebound = $true
+                RepeatedMoveCleanup = $true
             }
             return
         }

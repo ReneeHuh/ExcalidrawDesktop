@@ -375,7 +375,7 @@ Exit criteria:
 - [ ] Test narrow, maximized, snapped, and mixed-DPI windows.
 - [ ] Test keyboard-only use, Narrator, touch, pen, and title-bar input.
 - [ ] Rerun the 1/5/10/20-tab memory matrix across one and several windows.
-- [ ] Verify all WebViews, file watchers, handlers, and empty tear-out windows
+- [x] Verify all WebViews, file watchers, handlers, and empty tear-out windows
   are released.
 
 Exit criteria:

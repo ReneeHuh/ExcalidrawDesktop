@@ -117,11 +117,14 @@ try {
         -DeadlineUtc ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds))
 
     $savedState = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
-    if ($savedState.Tabs.Count -ne 2 -or
-        @($savedState.Tabs | Where-Object { -not $_.WasDirty }).Count -ne 0) {
+    $savedTabs = @($savedState.Windows | ForEach-Object { $_.Tabs })
+    if ($savedState.Version -ne 3 -or
+        $savedState.Windows.Count -ne 1 -or
+        $savedTabs.Count -ne 2 -or
+        @($savedTabs | Where-Object { -not $_.WasDirty }).Count -ne 0) {
         throw "Both dirty tabs were not written to workspace recovery metadata."
     }
-    foreach ($tab in $savedState.Tabs) {
+    foreach ($tab in $savedTabs) {
         $snapshotPath = Join-Path $recoveryDirectory "$($tab.RecoveryId).excalidraw"
         if (-not [System.IO.File]::Exists($snapshotPath)) {
             throw "A dirty tab recovery snapshot was not written."

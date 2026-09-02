@@ -43,6 +43,8 @@ public sealed partial class MainWindow : Window
     private readonly bool verifyRecoverySmoke;
     private readonly bool runTitleBarSmoke;
     private readonly bool runMultiWindowSmoke;
+    private readonly bool runMultiWindowExitSmoke;
+    private readonly bool runMultiWindowDirtyExitSmoke;
     private readonly bool runSuspensionSmoke;
     private readonly bool performanceSuspendInactive;
     private readonly bool performanceUnloadInactive;
@@ -58,6 +60,7 @@ public sealed partial class MainWindow : Window
     private bool titleBarRootSubscribed;
     private bool titleBarSmokeStarted;
     private bool multiWindowSmokeStarted;
+    private bool multiWindowExitSmokeStarted;
     private MainWindow? pendingTearOutWindow;
     private bool performanceSmokeStarted;
     private bool suspensionSmokeStarted;
@@ -70,7 +73,6 @@ public sealed partial class MainWindow : Window
     private bool restoringWorkspace = true;
     private bool recoverySmokeStarted;
     private bool resourcesDisposed;
-    private TaskCompletionSource<bool>? programmaticCloseCompletion;
     private int recoverySnapshotsSaved;
     private int recoveryTabsRestored;
     private int untitledSequence;
@@ -89,7 +91,9 @@ public sealed partial class MainWindow : Window
         bool performanceUnloadInactive = false,
         bool restoreWorkspace = true,
         bool createInitialTab = true,
-        bool runMultiWindowSmoke = false)
+        bool runMultiWindowSmoke = false,
+        bool runMultiWindowExitSmoke = false,
+        bool runMultiWindowDirtyExitSmoke = false)
     {
         InitializeComponent();
         this.workspaceCoordinator = workspaceCoordinator;
@@ -112,6 +116,8 @@ public sealed partial class MainWindow : Window
         this.verifyRecoverySmoke = verifyRecoverySmoke;
         this.runTitleBarSmoke = runTitleBarSmoke;
         this.runMultiWindowSmoke = runMultiWindowSmoke;
+        this.runMultiWindowExitSmoke = runMultiWindowExitSmoke;
+        this.runMultiWindowDirtyExitSmoke = runMultiWindowDirtyExitSmoke;
         this.performanceTabCount = performanceTabCount;
         this.runSuspensionSmoke = runSuspensionSmoke;
         this.performanceSuspendInactive = performanceSuspendInactive;
@@ -286,6 +292,9 @@ public sealed partial class MainWindow : Window
             PopulateRecentFilesMenu();
         }
         isWindowReady = true;
+#if DEBUG
+        TryRunMultiWindowExitSmoke();
+#endif
         if (ActiveSession is { } session)
         {
             _ = InitializeSessionAsync(session);
@@ -567,8 +576,6 @@ public sealed partial class MainWindow : Window
         }
 
         resourcesDisposed = true;
-        programmaticCloseCompletion?.TrySetResult(true);
-        programmaticCloseCompletion = null;
         workspaceCoordinator.UnregisterWindow(this);
         suspensionTimer.Stop();
         suspensionTimer.Tick -= OnSuspensionTimerTick;
@@ -1182,6 +1189,7 @@ public sealed partial class MainWindow : Window
 #if DEBUG
         TryRunTitleBarSmoke();
         TryRunMultiWindowSmoke();
+        TryRunMultiWindowExitSmoke();
         TryRunPerformanceSmoke();
         TryRunSuspensionSmoke();
 #endif
@@ -1808,8 +1816,91 @@ public sealed partial class MainWindow : Window
         _ = RunMultiWindowSmokeAsync();
     }
 
+    private void TryRunMultiWindowExitSmoke()
+    {
+        if ((!runMultiWindowExitSmoke && !runMultiWindowDirtyExitSmoke) ||
+            multiWindowExitSmokeStarted ||
+            !isWindowReady ||
+            restoringWorkspace ||
+            sessions.Any(session => !session.IsReady))
+        {
+            return;
+        }
+
+        multiWindowExitSmokeStarted = true;
+        _ = RunMultiWindowExitSmokeAsync();
+    }
+
+    private async Task RunMultiWindowExitSmokeAsync()
+    {
+        try
+        {
+            var destination = workspaceCoordinator.CreateWindow();
+            var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
+            while ((!destination.IsReadyForActivation ||
+                    destination.OpenSessions.Count != 1 ||
+                    !destination.OpenSessions[0].IsReady) &&
+                DateTimeOffset.UtcNow < deadline)
+            {
+                await Task.Delay(100);
+            }
+
+            if (!destination.IsReadyForActivation ||
+                destination.OpenSessions.Count != 1 ||
+                !destination.OpenSessions[0].IsReady ||
+                workspaceCoordinator.Windows.Count != 2)
+            {
+                throw new InvalidOperationException(
+                    "The second clean window did not become ready for Exit.");
+            }
+
+            if (runMultiWindowDirtyExitSmoke)
+            {
+                await Task.Delay(250);
+                var dirtyMessage = BridgeEventJson.Create(
+                    "document.dirtyChanged",
+                    new { isDirty = true });
+                foreach (var targetWindow in workspaceCoordinator.Windows)
+                {
+                    var targetSession = targetWindow.OpenSessions[0];
+                    targetSession.ForceDirtyForSmoke = true;
+                    await targetSession.CoreWebView!.ExecuteScriptAsync(
+                        $"window.chrome.webview.postMessage({dirtyMessage})");
+                }
+                var dirtyDeadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+                while (workspaceCoordinator.Windows.Any(targetWindow =>
+                        !targetWindow.OpenSessions[0].IsDirty) &&
+                    DateTimeOffset.UtcNow < dirtyDeadline)
+                {
+                    await Task.Delay(50);
+                }
+                if (workspaceCoordinator.Windows.Any(targetWindow =>
+                    !targetWindow.OpenSessions[0].IsDirty))
+                {
+                    throw new InvalidOperationException(
+                        "The dirty Exit fixture did not reach both native sessions.");
+                }
+            }
+
+            await workspaceCoordinator.PersistWorkspaceAsync();
+            await File.WriteAllTextAsync(
+                Path.Combine(AppContext.BaseDirectory, "multi-window-exit-smoke.ready"),
+                "ready");
+            await workspaceCoordinator.RequestExitAsync();
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            if (!resourcesDisposed)
+            {
+                Title = $"Excalidraw Desktop — Multi-window Exit smoke failed: {exception.Message}";
+            }
+        }
+    }
+
     private async Task RunMultiWindowSmokeAsync()
     {
+        string? watcherProbePath = null;
         try
         {
             if (sessions.Count != 2 || sessions.Any(session =>
@@ -1822,20 +1913,52 @@ public sealed partial class MainWindow : Window
             var session = sessions[1];
             var originalCoreWebView = session.CoreWebView;
             var originalOrigin = session.TabOrigin;
+            var originalWindowCount = workspaceCoordinator.Windows.Count;
+
+            session.IsSuspended = true;
+            if (workspaceCoordinator.MoveSessionToNewWindow(this, session) ||
+                !sessions.Contains(session) ||
+                workspaceCoordinator.Windows.Count != originalWindowCount)
+            {
+                throw new InvalidOperationException(
+                    "A suspended drawing was allowed to enter a transfer.");
+            }
+            session.IsSuspended = false;
+
+            watcherProbePath = Path.Combine(
+                AppContext.BaseDirectory,
+                "multi-window-watcher-cleanup.tmp");
+            await File.WriteAllTextAsync(
+                watcherProbePath,
+                "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[],\"appState\":{},\"files\":{}}");
+            await session.DocumentService.RestoreActiveFileAsync(watcherProbePath);
+            WatchExternalFile(session, watcherProbePath);
+            var sourceWatcher = session.ExternalFileWatcher;
+            session.IsDirty = true;
+            UpdateTabHeader(session);
             var destination = workspaceCoordinator.CreateWindow(
                 activate: true,
                 createInitialTab: false);
             await Task.Delay(250);
-            if (!workspaceCoordinator.MoveSession(this, session, destination) ||
-                sessions.Contains(session) ||
-                !destination.OpenSessions.Contains(session) ||
-                !ReferenceEquals(session.CoreWebView, originalCoreWebView) ||
-                session.TabOrigin != originalOrigin ||
-                session.IsMoving ||
-                !session.IsReady)
+            var movedToDestination = workspaceCoordinator.MoveSession(
+                this,
+                session,
+                destination);
+            var firstMoveFailures = new List<string>();
+            if (!movedToDestination) firstMoveFailures.Add("move rejected");
+            if (sessions.Contains(session)) firstMoveFailures.Add("source retained session");
+            if (!destination.OpenSessions.Contains(session)) firstMoveFailures.Add("destination missing session");
+            if (!ReferenceEquals(session.CoreWebView, originalCoreWebView)) firstMoveFailures.Add("WebView identity changed");
+            if (session.TabOrigin != originalOrigin) firstMoveFailures.Add("origin changed");
+            if (!session.IsDirty) firstMoveFailures.Add("dirty state lost");
+            if (session.IsMoving) firstMoveFailures.Add("move flag remained set");
+            if (!session.IsReady) firstMoveFailures.Add("session stopped being ready");
+            if (session.ExternalFileWatcher is null) firstMoveFailures.Add("watcher missing");
+            if (ReferenceEquals(session.ExternalFileWatcher, sourceWatcher)) firstMoveFailures.Add("watcher was not rebound");
+            if (firstMoveFailures.Count > 0)
             {
                 throw new InvalidOperationException(
-                    "The live drawing did not move into the second window intact.");
+                    $"The live drawing did not move into the second window intact: {string.Join(", ", firstMoveFailures)}.");
             }
 
             if (!workspaceCoordinator.MoveSession(destination, session, this, 0) ||
@@ -1843,13 +1966,59 @@ public sealed partial class MainWindow : Window
                 destination.OpenSessions.Contains(session) ||
                 !ReferenceEquals(session.CoreWebView, originalCoreWebView) ||
                 session.TabOrigin != originalOrigin ||
+                !session.IsDirty ||
                 session.DetachWindowHandlers is null ||
                 session.DetachWebViewHandlers is null ||
-                session.DetachEditorHandlers is null)
+                session.DetachEditorHandlers is null ||
+                session.ExternalFileWatcher is null)
             {
                 throw new InvalidOperationException(
                     "The drawing did not move back to its source window intact.");
             }
+
+            await Task.Delay(100);
+            if (workspaceCoordinator.Windows.Count != originalWindowCount)
+            {
+                throw new InvalidOperationException(
+                    "The empty transfer destination was not released.");
+            }
+
+            for (var iteration = 0; iteration < 2; iteration++)
+            {
+                var repeatedDestination = workspaceCoordinator.CreateWindow(
+                    activate: true,
+                    createInitialTab: false);
+                await Task.Delay(100);
+                if (!workspaceCoordinator.MoveSession(
+                        this,
+                        session,
+                        repeatedDestination) ||
+                    !workspaceCoordinator.MoveSession(
+                        repeatedDestination,
+                        session,
+                        this,
+                        0) ||
+                    !ReferenceEquals(session.CoreWebView, originalCoreWebView) ||
+                    session.TabOrigin != originalOrigin ||
+                    session.DetachWindowHandlers is null ||
+                    session.DetachWebViewHandlers is null ||
+                    session.DetachEditorHandlers is null ||
+                    session.ExternalFileWatcher is null)
+                {
+                    throw new InvalidOperationException(
+                        "A repeated live transfer leaked or duplicated session resources.");
+                }
+                await Task.Delay(100);
+            }
+
+            if (workspaceCoordinator.Windows.Count != originalWindowCount)
+            {
+                throw new InvalidOperationException(
+                    "A repeated transfer leaked an empty window.");
+            }
+
+            session.IsDirty = false;
+            UpdateTabHeader(session);
 
             Title = "Excalidraw Desktop — Multi-window smoke passed";
         }
@@ -1857,6 +2026,17 @@ public sealed partial class MainWindow : Window
         {
             Debug.WriteLine(exception);
             Title = $"Excalidraw Desktop — Multi-window smoke failed: {exception.Message}";
+        }
+        finally
+        {
+            sessions.FirstOrDefault(candidate =>
+                DesktopDocumentPath.Equals(
+                    candidate.DocumentService.DocumentPath,
+                    watcherProbePath))?.DetachExternalFileWatcher();
+            if (watcherProbePath is not null && File.Exists(watcherProbePath))
+            {
+                File.Delete(watcherProbePath);
+            }
         }
     }
 
@@ -1897,6 +2077,7 @@ public sealed partial class MainWindow : Window
                 Math.Abs(TitleBarRightInset.Width.Value - expectedRightInset) > 0.75 ||
                 Math.Abs(TitleBarContainer.ActualHeight - 48) > 0.75 ||
                 Math.Abs(DocumentTabs.ActualHeight - 48) > 0.75 ||
+                !DocumentTabs.CanTearOutTabs ||
                 WindowDragRegion.ActualWidth <= 0 ||
                 !string.Equals(FileMenu.Title?.ToString(), "File", StringComparison.Ordinal) ||
                 RecentFilesMenu.Items.Count == 0 ||
@@ -1913,6 +2094,7 @@ public sealed partial class MainWindow : Window
             {
                 (VirtualKey.T, VirtualKeyModifiers.Control),
                 (VirtualKey.N, VirtualKeyModifiers.Control),
+                (VirtualKey.N, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift),
                 (VirtualKey.W, VirtualKeyModifiers.Control),
                 (VirtualKey.O, VirtualKeyModifiers.Control),
                 (VirtualKey.S, VirtualKeyModifiers.Control),
@@ -2003,6 +2185,7 @@ public sealed partial class MainWindow : Window
             await Task.Yield();
             if (!settingsPageVisible ||
                 settingsTabItem is null ||
+                settingsTabItem.CanDrag ||
                 !DocumentTabs.TabItems.Contains(settingsTabItem) ||
                 FindSession(settingsTabItem) is not null ||
                 AppSettingsPage.Visibility != Visibility.Visible ||
@@ -2383,6 +2566,12 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+#if DEBUG
+        if (session.ForceDirtyForSmoke && !isDirty)
+        {
+            return;
+        }
+#endif
         session.IsDirty = isDirty;
         if (!ReferenceEquals(session, ActiveSession))
         {
@@ -2679,21 +2868,38 @@ public sealed partial class MainWindow : Window
         _ = workspaceCoordinator.RequestExitAsync();
     }
 
-    internal Task<bool> RequestCloseAsync()
+    internal async Task<bool> RequestCloseAsync()
     {
         if (resourcesDisposed)
         {
-            return Task.FromResult(true);
+            return true;
         }
         if (windowClosePromptOpen)
         {
-            return Task.FromResult(false);
+            return false;
         }
 
-        programmaticCloseCompletion ??= new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        Close();
-        return programmaticCloseCompletion.Task;
+        windowClosePromptOpen = true;
+        try
+        {
+            if (!await ResolveWindowCloseAsync())
+            {
+                return false;
+            }
+
+            allowClose = true;
+            Close();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return false;
+        }
+        finally
+        {
+            windowClosePromptOpen = false;
+        }
     }
 
     private void OnSettingsClick(object sender, RoutedEventArgs args)
@@ -3410,35 +3616,6 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var dirtySessions = sessions.Where(session => session.IsDirty).ToList();
-        if (dirtySessions.Count == 0)
-        {
-            args.Cancel = true;
-            if (windowClosePromptOpen)
-            {
-                return;
-            }
-
-            windowClosePromptOpen = true;
-            try
-            {
-                await PersistWorkspaceAsync();
-                await workspaceCoordinator.PruneRecoverySnapshotsAsync();
-                allowClose = true;
-                Close();
-            }
-            finally
-            {
-                windowClosePromptOpen = false;
-                if (!allowClose)
-                {
-                    programmaticCloseCompletion?.TrySetResult(false);
-                    programmaticCloseCompletion = null;
-                }
-            }
-            return;
-        }
-
         args.Cancel = true;
         if (windowClosePromptOpen)
         {
@@ -3448,60 +3625,8 @@ public sealed partial class MainWindow : Window
         windowClosePromptOpen = true;
         try
         {
-            var names = string.Join(
-                Environment.NewLine,
-                dirtySessions.Select(session => $"• {session.DisplayName}"));
-            var reviewRequested = false;
-            var reviewButton = new Button
+            if (await ResolveWindowCloseAsync())
             {
-                Content = "Review tabs individually",
-                HorizontalAlignment = HorizontalAlignment.Left,
-            };
-            AutomationProperties.SetName(
-                reviewButton,
-                "Review unsaved tabs individually");
-            var content = new StackPanel { Spacing = 16 };
-            content.Children.Add(new TextBlock
-            {
-                Text = $"{dirtySessions.Count} drawing(s) have unsaved changes:\n\n{names}",
-                TextWrapping = TextWrapping.Wrap,
-            });
-            content.Children.Add(reviewButton);
-            var dialog = new ContentDialog
-            {
-                XamlRoot = DocumentTabs.XamlRoot,
-                Title = "Unsaved drawings",
-                Content = content,
-                PrimaryButtonText = "Save all",
-                SecondaryButtonText = "Discard all",
-                CloseButtonText = "Cancel",
-                DefaultButton = ContentDialogButton.Close,
-            };
-            reviewButton.Click += (_, _) =>
-            {
-                reviewRequested = true;
-                dialog.Hide();
-            };
-
-            var result = await dialog.ShowAsync();
-            if (reviewRequested)
-            {
-                DocumentTabs.SelectedItem = dirtySessions[0].TabItem;
-            }
-            else if (result == ContentDialogResult.Primary)
-            {
-                if (await SaveAllForWindowCloseAsync(dirtySessions))
-                {
-                    await PersistWorkspaceAsync();
-                    await workspaceCoordinator.PruneRecoverySnapshotsAsync();
-                    allowClose = true;
-                    Close();
-                }
-            }
-            else if (result == ContentDialogResult.Secondary)
-            {
-                await PersistWorkspaceAsync(treatDirtyAsClean: true);
-                await workspaceCoordinator.PruneRecoverySnapshotsAsync(this);
                 allowClose = true;
                 Close();
             }
@@ -3513,11 +3638,100 @@ public sealed partial class MainWindow : Window
         finally
         {
             windowClosePromptOpen = false;
-            if (!allowClose)
+        }
+    }
+
+    private async Task<bool> ResolveWindowCloseAsync()
+    {
+        var dirtySessions = sessions.Where(session => session.IsDirty).ToList();
+        if (dirtySessions.Count == 0)
+        {
+            await PersistWorkspaceAsync();
+            await workspaceCoordinator.PruneRecoverySnapshotsAsync();
+            return true;
+        }
+
+        var names = string.Join(
+            Environment.NewLine,
+            dirtySessions.Select(session => $"• {session.DisplayName}"));
+        var reviewRequested = false;
+        var reviewButton = new Button
+        {
+            Content = "Review tabs individually",
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        AutomationProperties.SetName(
+            reviewButton,
+            "Review unsaved tabs individually");
+        var content = new StackPanel { Spacing = 16 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"{dirtySessions.Count} drawing(s) have unsaved changes:\n\n{names}",
+            TextWrapping = TextWrapping.Wrap,
+        });
+        content.Children.Add(reviewButton);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = DocumentTabs.XamlRoot,
+            Title = "Unsaved drawings",
+            Content = content,
+            PrimaryButtonText = "Save all",
+            SecondaryButtonText = "Discard all",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        reviewButton.Click += (_, _) =>
+        {
+            reviewRequested = true;
+            dialog.Hide();
+        };
+
+        var result = await dialog.ShowAsync();
+        if (reviewRequested)
+        {
+            DocumentTabs.SelectedItem = dirtySessions[0].TabItem;
+            return false;
+        }
+        if (result == ContentDialogResult.Primary)
+        {
+            if (!await SaveAllForWindowCloseAsync(dirtySessions))
             {
-                programmaticCloseCompletion?.TrySetResult(false);
-                programmaticCloseCompletion = null;
+                return false;
             }
+            await PersistWorkspaceAsync();
+            await workspaceCoordinator.PruneRecoverySnapshotsAsync();
+            return true;
+        }
+        if (result != ContentDialogResult.Secondary)
+        {
+            return false;
+        }
+
+        var discardedSessions = dirtySessions
+            .Where(session => sessions.Contains(session) && session.IsDirty)
+            .ToArray();
+        foreach (var discardedSession in discardedSessions)
+        {
+#if DEBUG
+            discardedSession.ForceDirtyForSmoke = false;
+#endif
+            discardedSession.IsDirty = false;
+        }
+        workspaceCoordinator.RecordWindowDiscarded(this);
+        try
+        {
+            await workspaceCoordinator.PersistWorkspaceAsync();
+            await workspaceCoordinator.PruneRecoverySnapshotsAsync();
+            return true;
+        }
+        catch
+        {
+            foreach (var discardedSession in discardedSessions)
+            {
+                discardedSession.IsDirty = true;
+                UpdateTabHeader(discardedSession);
+            }
+            throw;
         }
     }
 
@@ -3616,17 +3830,27 @@ public sealed partial class MainWindow : Window
             (lastDocumentSession is not null && sessions.Contains(lastDocumentSession)
                 ? lastDocumentSession
                 : null);
-        var position = AppWindow.Position;
-        var size = AppWindow.Size;
-        var isMaximized = AppWindow.Presenter is OverlappedPresenter presenter &&
-            presenter.State == OverlappedPresenterState.Maximized;
-        return new WorkspaceWindowState(
-            workspaceCoordinator.GetLogicalWindowId(this),
-            new WorkspaceWindowBounds(
+        WorkspaceWindowBounds? bounds = null;
+        var isMaximized = false;
+        try
+        {
+            var position = AppWindow.Position;
+            var size = AppWindow.Size;
+            bounds = new WorkspaceWindowBounds(
                 position.X,
                 position.Y,
                 size.Width,
-                size.Height),
+                size.Height);
+            isMaximized = AppWindow.Presenter is OverlappedPresenter presenter &&
+                presenter.State == OverlappedPresenterState.Maximized;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Window placement capture skipped during close: {exception}");
+        }
+        return new WorkspaceWindowState(
+            workspaceCoordinator.GetLogicalWindowId(this),
+            bounds,
             isMaximized,
             activeSession?.RecoveryId,
             GetOrderedSessions()

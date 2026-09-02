@@ -49,6 +49,9 @@ internal sealed class DocumentSession : IDisposable
     public string DisplayName { get; set; }
 
     public bool IsDirty { get; set; }
+#if DEBUG
+    public bool ForceDirtyForSmoke { get; set; }
+#endif
 
     public bool IsReady { get; set; }
 

@@ -134,6 +134,10 @@ internal sealed class ApplicationWorkspaceCoordinator
         {
             QueuePersistWorkspace();
         }
+        else if (windows.Count == 0 && !isExiting)
+        {
+            Microsoft.UI.Xaml.Application.Current.Exit();
+        }
     }
 
     public void NotifyRecentFilesChanged()
@@ -143,6 +147,15 @@ internal sealed class ApplicationWorkspaceCoordinator
             window.RefreshRecentFiles();
         }
         QueuePersistWorkspace();
+    }
+
+    public void RecordWindowDiscarded(MainWindow window)
+    {
+        if (exitWorkspace is not null && logicalWindowIds.TryGetValue(window, out var id))
+        {
+            var state = window.CaptureWorkspaceState(treatDirtyAsClean: true);
+            exitWorkspace[id] = state;
+        }
     }
 
     public void QueuePersistWorkspace()
@@ -355,6 +368,9 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
 
         isExiting = true;
+        queuedPersistence?.Cancel();
+        queuedPersistence?.Dispose();
+        queuedPersistence = null;
         exitWorkspace = windows.ToDictionary(
             GetLogicalWindowId,
             window => window.CaptureWorkspaceState());
@@ -363,11 +379,20 @@ internal sealed class ApplicationWorkspaceCoordinator
             await PersistWorkspaceAsync();
             foreach (var window in windows.ToArray())
             {
-                if (windows.Contains(window) && !await window.RequestCloseAsync())
+                if (!windows.Contains(window))
+                {
+                    continue;
+                }
+
+                window.Activate();
+                await Task.Delay(100);
+                if (!await window.RequestCloseAsync())
                 {
                     return;
                 }
+                await Task.Delay(200);
             }
+            await PersistWorkspaceAsync();
         }
         finally
         {
