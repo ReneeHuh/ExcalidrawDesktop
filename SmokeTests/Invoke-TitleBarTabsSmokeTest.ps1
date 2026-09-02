@@ -117,9 +117,6 @@ try {
                 "ApplicationMenu",
                 "FileMenu",
                 "SettingsButton",
-                "DocumentStatusBar",
-                "StatusDocumentText",
-                "StatusStateText",
                 "ExcalidrawEditorWebView",
                 "Minimize",
                 "Maximize",
@@ -166,6 +163,7 @@ try {
                 FailureActions = "Passed"
                 FailureRetry = "Passed"
                 ClosedTabResourceCleanup = "Passed"
+                RecoverySnapshotCleanup = "Passed"
             }
             return
         }

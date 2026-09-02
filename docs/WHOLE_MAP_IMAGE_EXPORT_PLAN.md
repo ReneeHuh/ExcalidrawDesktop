@@ -1,6 +1,7 @@
 # Whole Map Image Export Plan
 
-Status: Core implementation complete; packaged and visual validation remains
+Status: Implementation and packaged end-to-end automation complete; manual
+visual and failure-environment validation remains
 Created: September 2, 2026
 Tracked by: [`DESKTOP_BACKLOG.md`](DESKTOP_BACKLOG.md)
 
@@ -38,18 +39,22 @@ dimensions. The previous web-owned `Export` and `SaveAsImage` menu items were
 removed so there is one clear image-save path.
 
 The typed JSON bridge carries only bounded export metadata. PNG bytes travel
-as a same-origin HTTP POST intercepted by the owning WebView2 host, where they
-are signature-checked, limited to 100 MB and 16,384 pixels per dimension, and
-written through a transacted Windows stream. Export identifiers, exact tab
-origins, and session state prevent cross-tab or cross-window delivery.
+as an HTTP POST to an isolated, unmapped per-session HTTPS origin intercepted
+by the owning WebView2 host, where origin, CORS preflight, export identifier,
+signature, 100 MB size, and 16,384-pixel dimension constraints are enforced
+before a transacted Windows-stream write. The upload cannot use the editor's
+mapped virtual host because WebView2 does not raise `WebResourceRequested` for
+virtual-host folder mappings.
 
 Exporting blocks moving, unloading, suspending, or closing the owning tab until
 it completes. Picker cancellation is non-destructive, late or mismatched
 messages are ignored, WebView failure clears the operation, and a two-minute
 timeout prevents a session remaining permanently busy. Core and web unit tests,
 type checking, the production web build, desktop build, startup smoke test, and
-title-bar/lifecycle smoke test pass. The visual and packaged cases below remain
-to be recorded.
+title-bar/lifecycle smoke test pass. A packaged export of a representative
+off-screen scene also produced a validated 14,400×3,880 PNG through the real
+binary transfer and native writer. The manual visual and failure-environment
+cases below remain to be recorded.
 
 ## Implementation plan
 
@@ -67,10 +72,10 @@ to be recorded.
 
 - Add an `image.exportRequested` host-to-web event containing an export ID and
   the fixed first-release options.
-- Correlate the host event, same-origin upload URL, request header, and HTTP
-  response with one export ID. Use a typed bridge failure event when rendering
-  fails before upload; the intercepted HTTP response reports write completion
-  or rejection.
+- Correlate the host event, isolated per-session upload URL, request origin,
+  request header, and HTTP response with one export ID. Use a typed bridge
+  failure event when rendering fails before upload; the intercepted HTTP
+  response reports write completion or rejection.
 - Validate export IDs, formats, dimensions, and byte counts on the native side.
 - Keep PNG bytes out of ordinary JSON bridge payloads.
 - Ensure late responses from a closed, navigated, or hibernated tab are ignored

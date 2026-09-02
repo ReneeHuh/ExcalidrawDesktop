@@ -79,6 +79,9 @@ public partial class App : Application
         var suspensionSmokeRequestPath = Path.Combine(
             AppContext.BaseDirectory,
             "suspension-smoke.request");
+        var imageExportSmokeRequestPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "image-export-smoke.request");
         var runRecoverySmoke = File.Exists(recoverySmokeRequestPath);
         var verifyRecoverySmoke = File.Exists(recoveryRestoreRequestPath);
         var runTitleBarSmoke = File.Exists(titleBarSmokeRequestPath);
@@ -93,6 +96,7 @@ public partial class App : Application
         var performanceUnloadInactive = ReadPerformanceUnloadMode(
             performanceSmokeRequestPath);
         var runSuspensionSmoke = File.Exists(suspensionSmokeRequestPath);
+        var runImageExportSmoke = File.Exists(imageExportSmokeRequestPath);
         string? workspaceStatePath = File.Exists(workspaceSmokeRequestPath)
             ? Path.Combine(AppContext.BaseDirectory, "workspace-smoke-state.json")
             : runTabSmoke
@@ -111,6 +115,8 @@ public partial class App : Application
                         ? Path.Combine(AppContext.BaseDirectory, "performance-smoke-state.json")
                     : runSuspensionSmoke
                         ? Path.Combine(AppContext.BaseDirectory, "suspension-smoke-state.json")
+                    : runImageExportSmoke
+                        ? Path.Combine(AppContext.BaseDirectory, "image-export-smoke-state.json")
                     : runRecoverySmoke || verifyRecoverySmoke
                         ? Path.Combine(AppContext.BaseDirectory, "recovery-smoke-state.json")
                         : null;
@@ -158,6 +164,10 @@ public partial class App : Application
         {
             File.Delete(suspensionSmokeRequestPath);
         }
+        if (File.Exists(imageExportSmokeRequestPath))
+        {
+            File.Delete(imageExportSmokeRequestPath);
+        }
 #else
         const bool runTabSmoke = false;
         const string? workspaceStatePath = null;
@@ -171,6 +181,7 @@ public partial class App : Application
         const bool performanceSuspendInactive = false;
         const bool performanceUnloadInactive = false;
         const bool runSuspensionSmoke = false;
+        const bool runImageExportSmoke = false;
 #endif
         workspaceCoordinator = new ApplicationWorkspaceCoordinator(workspaceStatePath);
         await workspaceCoordinator.InitializeAsync();
@@ -190,7 +201,8 @@ public partial class App : Application
             restoreWorkspace: true,
             runMultiWindowSmoke: runMultiWindowSmoke,
             runMultiWindowExitSmoke: runMultiWindowExitSmoke,
-            runMultiWindowDirtyExitSmoke: runMultiWindowDirtyExitSmoke);
+            runMultiWindowDirtyExitSmoke: runMultiWindowDirtyExitSmoke,
+            runImageExportSmoke: runImageExportSmoke);
         workspaceCoordinator.RegisterWindow(window, firstRestoredWindow);
         window.Activate();
         MainWindow? restoredActiveWindow =

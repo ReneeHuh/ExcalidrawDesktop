@@ -356,10 +356,12 @@ export class DesktopBridge {
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
           eventPayload.exportId,
         ) &&
-        "uploadPath" in eventPayload &&
-        typeof eventPayload.uploadPath === "string" &&
-        eventPayload.uploadPath ===
-          `/_desktop/export/${eventPayload.exportId}` &&
+        "uploadUrl" in eventPayload &&
+        typeof eventPayload.uploadUrl === "string" &&
+        this.isValidImageExportUrl(
+          eventPayload.uploadUrl,
+          eventPayload.exportId,
+        ) &&
         "maxDimension" in eventPayload &&
         typeof eventPayload.maxDimension === "number" &&
         Number.isSafeInteger(eventPayload.maxDimension) &&
@@ -379,7 +381,7 @@ export class DesktopBridge {
       ) {
         const exportRequest: HostEventMap["image.exportRequested"] = {
           exportId: eventPayload.exportId,
-          uploadPath: eventPayload.uploadPath,
+          uploadUrl: eventPayload.uploadUrl,
           maxDimension: eventPayload.maxDimension,
           maxBytes: eventPayload.maxBytes,
           scale: eventPayload.scale,
@@ -424,5 +426,20 @@ export class DesktopBridge {
     } else {
       pendingRequest.resolve(message.payload);
     }
+  }
+
+  private isValidImageExportUrl(value: string, exportId: string) {
+    const url = this.ownerWindow.document.createElement("a");
+    url.href = value;
+    return (
+      url.protocol === "https:" &&
+      /^export-[0-9a-f]{32}\.excalidraw\.local$/i.test(url.hostname) &&
+      url.port === "" &&
+      url.username === "" &&
+      url.password === "" &&
+      url.pathname === `/_desktop/export/${exportId}` &&
+      url.search === "" &&
+      url.hash === ""
+    );
   }
 }

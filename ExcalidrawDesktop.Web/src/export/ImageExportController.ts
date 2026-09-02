@@ -3,7 +3,7 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 export type WholeDrawingExportRequest = {
   exportId: string;
-  uploadPath: string;
+  uploadUrl: string;
   maxDimension: number;
   maxBytes: number;
   scale: number;
@@ -75,11 +75,11 @@ export const exportWholeDrawingAsPng = async (
   }
 
   if (dependencies.upload) {
-    await dependencies.upload(request.uploadPath, blob, request.exportId);
+    await dependencies.upload(request.uploadUrl, blob, request.exportId);
     return;
   }
 
-  const response = await ownerWindow.fetch(request.uploadPath, {
+  const response = await ownerWindow.fetch(request.uploadUrl, {
     method: "POST",
     headers: {
       "Content-Type": "image/png",

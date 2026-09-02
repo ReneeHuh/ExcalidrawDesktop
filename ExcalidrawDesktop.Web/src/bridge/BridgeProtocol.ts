@@ -93,7 +93,7 @@ export type HostEventMap = {
   };
   "image.exportRequested": {
     exportId: string;
-    uploadPath: string;
+    uploadUrl: string;
     maxDimension: number;
     maxBytes: number;
     scale: number;

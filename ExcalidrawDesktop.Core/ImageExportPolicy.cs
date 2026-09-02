@@ -7,6 +7,9 @@ public static class ImageExportPolicy
     public const int MaxDimension = 16_384;
     public const long MaxPngBytes = 100L * 1024 * 1024;
 
+    public static string GetUploadOrigin(DesktopTabOrigin origin) =>
+        $"https://export-{origin.SessionId:N}.excalidraw.local";
+
     public static string CreateSuggestedBaseName(string displayName)
     {
         var name = Path.GetFileNameWithoutExtension(displayName);
@@ -30,7 +33,10 @@ public static class ImageExportPolicy
         Guid exportId)
     {
         if (!Uri.TryCreate(requestUri, UriKind.Absolute, out var uri) ||
-            !origin.Matches(requestUri) ||
+            !string.Equals(
+                uri.GetLeftPart(UriPartial.Authority),
+                GetUploadOrigin(origin),
+                StringComparison.OrdinalIgnoreCase) ||
             !string.IsNullOrEmpty(uri.Query) ||
             !string.IsNullOrEmpty(uri.Fragment))
         {

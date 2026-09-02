@@ -27,6 +27,7 @@ const createBridge = () => {
   const transport = new FakeTransport();
   const ownerWindow = {
     chrome: { webview: transport },
+    document: window.document,
     setTimeout: window.setTimeout.bind(window),
     clearTimeout: window.clearTimeout.bind(window),
   } as unknown as Window;
@@ -209,7 +210,8 @@ describe("DesktopBridge", () => {
       method: "image.exportRequested",
       payload: {
         exportId,
-        uploadPath: `/_desktop/export/${exportId}`,
+        uploadUrl:
+          `https://export-9d32585b1ac74f489ef08b7a55d49570.excalidraw.local/_desktop/export/${exportId}`,
         maxDimension: 16384,
         maxBytes: 104857600,
         scale: 2,
@@ -228,6 +230,30 @@ describe("DesktopBridge", () => {
       method: "image.exportFailed",
       payload: { exportId, message: "render failed" },
     });
+  });
+
+  it("rejects an image export URL outside the isolated upload origin", () => {
+    const { bridge, transport } = createBridge();
+    const listener = vi.fn();
+    const exportId = "720e34f1-a3ea-4af3-93ed-a950b2357c42";
+    bridge.onImageExportRequested(listener);
+
+    transport.respond({
+      version: 1,
+      kind: "event",
+      requestId: crypto.randomUUID(),
+      method: "image.exportRequested",
+      payload: {
+        exportId,
+        uploadUrl: `https://example.com/_desktop/export/${exportId}`,
+        maxDimension: 16384,
+        maxBytes: 104857600,
+        scale: 2,
+        padding: 10,
+      },
+    });
+
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it("sends typed workspace tab events", () => {

@@ -51,6 +51,7 @@ try {
 
     if ($Deploy -or $Launch) {
         $buildRoot = Join-Path $nativeRoot "bin\$Platform\$Configuration"
+        $loosePackageRoot = $null
         $transformedManifest = Get-ChildItem -LiteralPath $buildRoot -Recurse -Filter "AppxManifest.xml" |
             Where-Object {
                 $_.DirectoryName -notlike "*\AppX" -and
@@ -67,16 +68,50 @@ try {
             }
         }
 
-        $appManifest = Get-ChildItem -LiteralPath $buildRoot -Recurse -Filter "AppxManifest.xml" |
-            Where-Object { $_.DirectoryName -notlike "*\publish*" } |
-            Sort-Object LastWriteTimeUtc -Descending |
-            Select-Object -First 1
+        $appManifest = if ($loosePackageRoot) {
+            Get-Item -LiteralPath (Join-Path $loosePackageRoot "AppxManifest.xml")
+        }
+        else {
+            Get-ChildItem -LiteralPath $buildRoot -Recurse -Filter "AppxManifest.xml" |
+                Where-Object { $_.DirectoryName -notlike "*\publish*" } |
+                Sort-Object LastWriteTimeUtc -Descending |
+                Select-Object -First 1
+        }
 
         if (-not $appManifest) {
             throw "The generated AppxManifest.xml could not be found below $buildRoot."
         }
 
-        Add-AppxPackage -Register $appManifest.FullName
+        [xml] $manifestXml = Get-Content -LiteralPath $appManifest.FullName -Raw
+        $packageName = $manifestXml.Package.Identity.Name
+        $packageVersion = [version] $manifestXml.Package.Identity.Version
+        $packageRoot = [System.IO.Path]::GetFullPath(
+            $appManifest.DirectoryName).TrimEnd(
+                [System.IO.Path]::DirectorySeparatorChar)
+        $registeredPackage = Get-AppxPackage -Name $packageName |
+            Where-Object { $_.Version -eq $packageVersion } |
+            Sort-Object Version -Descending |
+            Select-Object -First 1
+        $registeredRoot = if ($registeredPackage) {
+            [System.IO.Path]::GetFullPath(
+                $registeredPackage.InstallLocation).TrimEnd(
+                    [System.IO.Path]::DirectorySeparatorChar)
+        }
+
+        if ($registeredPackage -and
+            [string]::Equals(
+                $registeredRoot,
+                $packageRoot,
+                [System.StringComparison]::OrdinalIgnoreCase)) {
+            Write-Host (
+                "Development package {0} {1} is already registered from {2}." -f
+                    $packageName,
+                    $packageVersion,
+                    $packageRoot)
+        }
+        else {
+            Add-AppxPackage -Register $appManifest.FullName
+        }
     }
 
     if ($Launch) {

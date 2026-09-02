@@ -38,12 +38,15 @@ The packaged test verifies:
   maximize, and close buttons are present in the UI Automation tree;
 - drawing-tab accessible names include a readable document state such as
   `saved`, `new drawing`, or `unsaved changes`;
+- the native status bar follows the active drawing, exposes accessible names,
+  switches to a native conflict action, and hides on Settings;
 - editor startup failures expose Retry, Close tab, and optional WebView2 help
   actions with accessible names;
 - retry replaces the failed WebView and reaches bridge-ready state with a fresh
   owned set of subscriptions;
 - closing a tab detaches CoreWebView2 events and virtual-host mapping, routed
   drag/drop handlers, and file-watcher delegates before closing the WebView;
+- closing a tab deletes its recovery snapshot after pending snapshot work;
 - hibernation releases the same WebView resources and recreation attaches a
   fresh owned set of handlers.
 
@@ -58,10 +61,12 @@ TabInteractions          : Passed
 KeyboardAccelerators     : Passed
 LightAndDarkThemes       : Passed
 AutomationNames          : Passed
+NativeStatusBar          : Passed
 CaptionButtonAutomation  : Passed
 FailureActions           : Passed
 FailureRetry             : Passed
 ClosedTabResourceCleanup : Passed
+RecoverySnapshotCleanup  : Passed
 ```
 
 ## Manual validation matrix

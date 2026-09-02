@@ -48,6 +48,7 @@ public sealed partial class MainWindow : Window
     private readonly bool runMultiWindowExitSmoke;
     private readonly bool runMultiWindowDirtyExitSmoke;
     private readonly bool runSuspensionSmoke;
+    private readonly bool runImageExportSmoke;
     private readonly bool performanceSuspendInactive;
     private readonly bool performanceUnloadInactive;
     private readonly int performanceTabCount;
@@ -66,6 +67,8 @@ public sealed partial class MainWindow : Window
     private MainWindow? pendingTearOutWindow;
     private bool performanceSmokeStarted;
     private bool suspensionSmokeStarted;
+    private bool imageExportSmokeStarted;
+    private string? imageExportSmokeOutputPath;
     private bool settingsPageVisible;
     private bool windowClosePromptOpen;
     private bool openPickerActive;
@@ -95,7 +98,8 @@ public sealed partial class MainWindow : Window
         bool createInitialTab = true,
         bool runMultiWindowSmoke = false,
         bool runMultiWindowExitSmoke = false,
-        bool runMultiWindowDirtyExitSmoke = false)
+        bool runMultiWindowDirtyExitSmoke = false,
+        bool runImageExportSmoke = false)
     {
         InitializeComponent();
         this.workspaceCoordinator = workspaceCoordinator;
@@ -120,6 +124,7 @@ public sealed partial class MainWindow : Window
         this.runMultiWindowSmoke = runMultiWindowSmoke;
         this.runMultiWindowExitSmoke = runMultiWindowExitSmoke;
         this.runMultiWindowDirtyExitSmoke = runMultiWindowDirtyExitSmoke;
+        this.runImageExportSmoke = runImageExportSmoke;
         this.performanceTabCount = performanceTabCount;
         this.runSuspensionSmoke = runSuspensionSmoke;
         this.performanceSuspendInactive = performanceSuspendInactive;
@@ -963,11 +968,11 @@ public sealed partial class MainWindow : Window
             session.TabOrigin.Host,
             webAssetPath,
             CoreWebView2HostResourceAccessKind.DenyCors);
-        var exportFilter = $"{session.TabOrigin.Origin}/_desktop/export/*";
+        var exportFilter =
+            $"{ImageExportPolicy.GetUploadOrigin(session.TabOrigin)}/_desktop/export/*";
         coreWebView.AddWebResourceRequestedFilter(
             exportFilter,
-            CoreWebView2WebResourceContext.All,
-            CoreWebView2WebResourceRequestSourceKinds.Document);
+            CoreWebView2WebResourceContext.All);
 
         coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = true;
         coreWebView.Settings.AreDefaultContextMenusEnabled = true;
@@ -1011,8 +1016,7 @@ public sealed partial class MainWindow : Window
             coreWebView.WebResourceRequested -= webResourceRequested;
             coreWebView.RemoveWebResourceRequestedFilter(
                 exportFilter,
-                CoreWebView2WebResourceContext.All,
-                CoreWebView2WebResourceRequestSourceKinds.Document);
+                CoreWebView2WebResourceContext.All);
             coreWebView.ClearVirtualHostNameToFolderMapping(
                 session.TabOrigin.Host);
         };
@@ -1203,41 +1207,82 @@ public sealed partial class MainWindow : Window
         if (session.PendingImageExport is not { } pending ||
             !sessions.Contains(session) ||
             !ReferenceEquals(session.CoreWebView, coreWebView) ||
-            !string.Equals(args.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) ||
             !ImageExportPolicy.IsMatchingUpload(
                 args.Request.Uri,
                 session.TabOrigin,
-                pending.ExportId) ||
-            args.Request.Content is null)
+                pending.ExportId))
         {
             return;
         }
 
-        string? requestExportId;
-        string? contentType;
-        try
+        string? ReadHeader(string name)
         {
-            requestExportId = args.Request.Headers.GetHeader(
-                "X-Excalidraw-Export-Id");
-            contentType = args.Request.Headers.GetHeader("Content-Type");
+            try
+            {
+                return args.Request.Headers.GetHeader(name);
+            }
+            catch
+            {
+                return null;
+            }
         }
-        catch
+
+        var requestExportId = ReadHeader("X-Excalidraw-Export-Id");
+        var contentType = ReadHeader("Content-Type");
+        var requestOrigin = ReadHeader("Origin");
+        var requestedMethod = ReadHeader("Access-Control-Request-Method");
+        var requestedHeaders = ReadHeader("Access-Control-Request-Headers");
+
+        if (!string.Equals(
+                requestOrigin,
+                session.TabOrigin.Origin,
+                StringComparison.OrdinalIgnoreCase))
         {
-            requestExportId = null;
-            contentType = null;
+            args.Response = CreateImageExportResponse(
+                coreWebView,
+                403,
+                "Forbidden",
+                session.TabOrigin.Origin);
+            return;
+        }
+
+        if (string.Equals(
+                args.Request.Method,
+                "OPTIONS",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var validPreflight = string.Equals(
+                    requestedMethod,
+                    "POST",
+                    StringComparison.OrdinalIgnoreCase) &&
+                requestedHeaders?.Contains(
+                    "x-excalidraw-export-id",
+                    StringComparison.OrdinalIgnoreCase) == true;
+            args.Response = CreateImageExportResponse(
+                coreWebView,
+                validPreflight ? 204 : 400,
+                validPreflight ? "No Content" : "Bad Request",
+                session.TabOrigin.Origin,
+                includePreflightHeaders: validPreflight);
+            return;
         }
 
         if (!string.Equals(
+                args.Request.Method,
+                "POST",
+                StringComparison.OrdinalIgnoreCase) ||
+            args.Request.Content is null ||
+            !string.Equals(
                 requestExportId,
                 pending.ExportId.ToString("D"),
                 StringComparison.OrdinalIgnoreCase) ||
             contentType?.StartsWith("image/png", StringComparison.OrdinalIgnoreCase) != true)
         {
-            args.Response = coreWebView.Environment.CreateWebResourceResponse(
-                new InMemoryRandomAccessStream(),
+            args.Response = CreateImageExportResponse(
+                coreWebView,
                 400,
                 "Bad Request",
-                "Content-Type: text/plain");
+                session.TabOrigin.Origin);
             _ = FailImageExportAsync(
                 session,
                 pending.ExportId,
@@ -1258,19 +1303,19 @@ public sealed partial class MainWindow : Window
             }
 
             CompleteImageExport(session, pending, pending.Destination.Name);
-            args.Response = coreWebView.Environment.CreateWebResourceResponse(
-                new InMemoryRandomAccessStream(),
+            args.Response = CreateImageExportResponse(
+                coreWebView,
                 204,
                 "No Content",
-                string.Empty);
+                session.TabOrigin.Origin);
         }
         catch (OperationCanceledException)
         {
-            args.Response = coreWebView.Environment.CreateWebResourceResponse(
-                new InMemoryRandomAccessStream(),
+            args.Response = CreateImageExportResponse(
+                coreWebView,
                 409,
                 "Cancelled",
-                "Content-Type: text/plain");
+                session.TabOrigin.Origin);
         }
         catch (Exception exception)
         {
@@ -1279,16 +1324,38 @@ public sealed partial class MainWindow : Window
                 session,
                 pending.ExportId,
                 GetImageExportFailureMessage(exception));
-            args.Response = coreWebView.Environment.CreateWebResourceResponse(
-                new InMemoryRandomAccessStream(),
+            args.Response = CreateImageExportResponse(
+                coreWebView,
                 500,
                 "Export Failed",
-                "Content-Type: text/plain");
+                session.TabOrigin.Origin);
         }
         finally
         {
             deferral.Complete();
         }
+    }
+
+    private static CoreWebView2WebResourceResponse CreateImageExportResponse(
+        CoreWebView2 coreWebView,
+        int statusCode,
+        string reasonPhrase,
+        string allowedOrigin,
+        bool includePreflightHeaders = false)
+    {
+        var headers = $"Access-Control-Allow-Origin: {allowedOrigin}\r\n" +
+            "Vary: Origin\r\nContent-Type: text/plain";
+        if (includePreflightHeaders)
+        {
+            headers += "\r\nAccess-Control-Allow-Methods: POST" +
+                "\r\nAccess-Control-Allow-Headers: Content-Type, X-Excalidraw-Export-Id" +
+                "\r\nAccess-Control-Max-Age: 600";
+        }
+        return coreWebView.Environment.CreateWebResourceResponse(
+            new InMemoryRandomAccessStream(),
+            statusCode,
+            reasonPhrase,
+            headers);
     }
 
     private void OnAppReady(DocumentSession session)
@@ -1316,6 +1383,7 @@ public sealed partial class MainWindow : Window
         TryRunMultiWindowExitSmoke();
         TryRunPerformanceSmoke();
         TryRunSuspensionSmoke();
+        TryRunImageExportSmoke();
 #endif
 #if DEBUG
         TryRunRecoverySnapshotSmoke();
@@ -2388,6 +2456,16 @@ public sealed partial class MainWindow : Window
                     "The file-watcher cleanup probe was not attached.");
             }
 
+            var closingRecoveryId = second.RecoveryId;
+            await recoverySnapshotStore.SaveAsync(
+                closingRecoveryId,
+                "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[],\"appState\":{},\"files\":{}}");
+            if (await recoverySnapshotStore.LoadAsync(closingRecoveryId) is null)
+            {
+                throw new InvalidOperationException(
+                    "The recovery cleanup probe was not written.");
+            }
+
             if (sessions.Count != 2 ||
                 !ReferenceEquals(sessions[1], first) ||
                 !ReferenceEquals(ActiveSession, first) ||
@@ -2404,6 +2482,19 @@ public sealed partial class MainWindow : Window
             {
                 throw new InvalidOperationException(
                     "Tab interactions or resource cleanup regressed in the custom title bar.");
+            }
+
+            var recoveryCleanupDeadline =
+                DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+            while (await recoverySnapshotStore.LoadAsync(closingRecoveryId) is not null &&
+                DateTimeOffset.UtcNow < recoveryCleanupDeadline)
+            {
+                await Task.Delay(50);
+            }
+            if (await recoverySnapshotStore.LoadAsync(closingRecoveryId) is not null)
+            {
+                throw new InvalidOperationException(
+                    "Closing a tab did not delete its recovery snapshot.");
             }
 
             Title = "Excalidraw Desktop — Title bar smoke passed";
@@ -2920,6 +3011,170 @@ public sealed partial class MainWindow : Window
         await session.CoreWebView.ExecuteScriptAsync(
             $"window.chrome.webview.postMessage({snapshotMessage})");
     }
+
+    private void TryRunImageExportSmoke()
+    {
+        if (!runImageExportSmoke || imageExportSmokeStarted)
+        {
+            return;
+        }
+
+        if (sessions.FirstOrDefault(candidate => !candidate.IsReady) is { } pending)
+        {
+            DocumentTabs.SelectedItem = pending.TabItem;
+            return;
+        }
+
+        if (ActiveSession is { CoreWebView: not null } session)
+        {
+            imageExportSmokeStarted = true;
+            _ = RunImageExportSmokeAsync(session);
+        }
+    }
+
+    private async Task RunImageExportSmokeAsync(DocumentSession session)
+    {
+        const string sceneJson = """
+            {
+              "type": "excalidraw",
+              "version": 2,
+              "source": "excalidraw-desktop-image-export-smoke",
+              "elements": [
+                {
+                  "id": "left-rectangle",
+                  "type": "rectangle",
+                  "x": -3500,
+                  "y": -900,
+                  "width": 180,
+                  "height": 120,
+                  "angle": 0,
+                  "strokeColor": "#1e1e1e",
+                  "backgroundColor": "#a5d8ff",
+                  "fillStyle": "solid",
+                  "strokeWidth": 2,
+                  "strokeStyle": "solid",
+                  "roughness": 1,
+                  "opacity": 100,
+                  "groupIds": [],
+                  "frameId": null,
+                  "roundness": { "type": 3 },
+                  "seed": 101,
+                  "version": 1,
+                  "versionNonce": 201,
+                  "isDeleted": false,
+                  "boundElements": [],
+                  "updated": 1,
+                  "link": null,
+                  "locked": false
+                },
+                {
+                  "id": "right-rectangle",
+                  "type": "rectangle",
+                  "x": 3500,
+                  "y": 900,
+                  "width": 180,
+                  "height": 120,
+                  "angle": 0,
+                  "strokeColor": "#1e1e1e",
+                  "backgroundColor": "#b2f2bb",
+                  "fillStyle": "solid",
+                  "strokeWidth": 2,
+                  "strokeStyle": "solid",
+                  "roughness": 1,
+                  "opacity": 100,
+                  "groupIds": [],
+                  "frameId": null,
+                  "roundness": { "type": 3 },
+                  "seed": 102,
+                  "version": 1,
+                  "versionNonce": 202,
+                  "isDeleted": false,
+                  "boundElements": [],
+                  "updated": 1,
+                  "link": null,
+                  "locked": false
+                },
+                {
+                  "id": "embedded-image",
+                  "type": "image",
+                  "x": 0,
+                  "y": 0,
+                  "width": 128,
+                  "height": 128,
+                  "angle": 0,
+                  "strokeColor": "transparent",
+                  "backgroundColor": "transparent",
+                  "fillStyle": "solid",
+                  "strokeWidth": 1,
+                  "strokeStyle": "solid",
+                  "roughness": 0,
+                  "opacity": 100,
+                  "groupIds": [],
+                  "frameId": null,
+                  "roundness": null,
+                  "seed": 103,
+                  "version": 1,
+                  "versionNonce": 203,
+                  "isDeleted": false,
+                  "boundElements": [],
+                  "updated": 1,
+                  "link": null,
+                  "locked": false,
+                  "fileId": "smoke-image-file",
+                  "status": "saved",
+                  "scale": [1, 1],
+                  "crop": null
+                }
+              ],
+              "appState": { "viewBackgroundColor": "#ffffff" },
+              "files": {
+                "smoke-image-file": {
+                  "id": "smoke-image-file",
+                  "dataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=",
+                  "mimeType": "image/png",
+                  "created": 1,
+                  "lastRetrieved": 1
+                }
+              }
+            }
+            """;
+
+        try
+        {
+            var scenePath = Path.Combine(
+                AppContext.BaseDirectory,
+                "image-export-smoke.excalidraw");
+            imageExportSmokeOutputPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "image-export-smoke.png");
+            await File.WriteAllTextAsync(scenePath, sceneJson);
+            await File.WriteAllBytesAsync(imageExportSmokeOutputPath, []);
+
+            var document = await session.DocumentService.OpenPathAsync(scenePath);
+            AttachDocumentToSession(session, document, select: true);
+            var loadDeadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
+            while (session.PendingDocumentLoad is not null &&
+                DateTimeOffset.UtcNow < loadDeadline)
+            {
+                await Task.Delay(50);
+            }
+            if (session.PendingDocumentLoad is not null ||
+                session.CoreWebView is not { } coreWebView)
+            {
+                throw new InvalidOperationException(
+                    "The representative export scene did not load.");
+            }
+
+            var destination = await StorageFile.GetFileFromPathAsync(
+                imageExportSmokeOutputPath);
+            StartImageExport(session, coreWebView, destination);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            Title = $"Excalidraw Desktop — Image export smoke failed: {exception.Message}";
+        }
+    }
 #endif
 
     private async Task DeleteRecoverySnapshotAsync(DocumentSession session)
@@ -3007,28 +3262,7 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            var exportId = Guid.NewGuid();
-            session.PendingImageExport = new PendingImageExport(
-                exportId,
-                destination,
-                new CancellationTokenSource());
-            session.IsExporting = true;
-            session.ExportStatusMessage = null;
-            UpdateFileMenuState(session);
-            UpdateStatusBar(session);
-            coreWebView.PostWebMessageAsJson(
-                BridgeEventJson.Create(
-                    "image.exportRequested",
-                    new
-                    {
-                        exportId = exportId.ToString("D"),
-                        uploadPath = $"/_desktop/export/{exportId:D}",
-                        maxDimension = ImageExportPolicy.MaxDimension,
-                        maxBytes = ImageExportPolicy.MaxPngBytes,
-                        scale = ImageExportPolicy.Scale,
-                        padding = ImageExportPolicy.Padding,
-                    }));
-            _ = WatchImageExportTimeoutAsync(session, exportId);
+            StartImageExport(session, coreWebView, destination);
         }
         catch (Exception exception)
         {
@@ -3053,6 +3287,36 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void StartImageExport(
+        DocumentSession session,
+        CoreWebView2 coreWebView,
+        StorageFile destination)
+    {
+        var exportId = Guid.NewGuid();
+        session.PendingImageExport = new PendingImageExport(
+            exportId,
+            destination,
+            new CancellationTokenSource());
+        session.IsExporting = true;
+        session.ExportStatusMessage = null;
+        UpdateFileMenuState(session);
+        UpdateStatusBar(session);
+        coreWebView.PostWebMessageAsJson(
+            BridgeEventJson.Create(
+                "image.exportRequested",
+                new
+                {
+                    exportId = exportId.ToString("D"),
+                    uploadUrl = $"{ImageExportPolicy.GetUploadOrigin(session.TabOrigin)}" +
+                        $"/_desktop/export/{exportId:D}",
+                    maxDimension = ImageExportPolicy.MaxDimension,
+                    maxBytes = ImageExportPolicy.MaxPngBytes,
+                    scale = ImageExportPolicy.Scale,
+                    padding = ImageExportPolicy.Padding,
+                }));
+        _ = WatchImageExportTimeoutAsync(session, exportId);
+    }
+
     private void CompleteImageExport(
         DocumentSession session,
         PendingImageExport pending,
@@ -3069,6 +3333,14 @@ public sealed partial class MainWindow : Window
         session.ExportStatusMessage = $"Exported {fileName}";
         UpdateFileMenuState(ActiveSession);
         UpdateStatusBar(session);
+#if DEBUG
+        if (runImageExportSmoke &&
+            imageExportSmokeOutputPath is { } outputPath &&
+            DesktopDocumentPath.Equals(pending.Destination.Path, outputPath))
+        {
+            Title = "Excalidraw Desktop — Image export smoke passed";
+        }
+#endif
         _ = ClearImageExportStatusAsync(session, session.ExportStatusMessage);
     }
 
@@ -3121,6 +3393,13 @@ public sealed partial class MainWindow : Window
         session.ExportStatusMessage = null;
         UpdateFileMenuState(ActiveSession);
         UpdateStatusBar(session);
+#if DEBUG
+        if (runImageExportSmoke)
+        {
+            Title = $"Excalidraw Desktop — Image export smoke failed: {message}";
+            return;
+        }
+#endif
         await ShowImageExportErrorAsync(message);
     }
 

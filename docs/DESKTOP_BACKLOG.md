@@ -36,8 +36,12 @@ plan in the same change.
 
 ## Immediate verification
 
+- [x] Make repeated command-line development deployment idempotent when the
+  same loose-package version and install path are already registered.
 - [ ] Confirm Visual Studio F5 upgrades the installed development package from
-  `0.1.3.0` to source version `0.1.4.0` without DEP0700.
+  an older version to the current source version without DEP0700. Version
+  `0.1.4.0` is installed and repeated `Build-Desktop.ps1 -Deploy` now passes;
+  recreating the older-to-newer Visual Studio transition remains manual.
 - [ ] Complete and record the remaining hardware-dependent title-bar checks.
   Automated results and the open manual matrix are already recorded under
   `docs/validation`.
@@ -77,6 +81,12 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
 2.35 GB to 588 MB (74.9%) and private memory from 1.73 GB to 298 MB (82.7%).
 
 ### Document safety and packaged evidence
+
+The current packaged suite passes startup, unique tab origins and local-storage
+isolation, workspace restore, forced recovery, suspend/unload/recreate,
+multi-window session transfer, clean coordinated exit, two-window dirty
+Discard All, and file activation. The narrower unchecked cases below still
+need purpose-built automation or manual evidence.
 
 - [ ] Prove with packaged tests that Save and Save As affect only the owning
   tab and file.
@@ -130,7 +140,9 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
   when tabs close.
 - [x] Verify file watchers, WebViews, routed input, and event subscriptions are
   released when tabs close.
-- [ ] Verify recovery snapshot resources are released when tabs close.
+- [x] Verify recovery snapshot resources are released when tabs close. The
+  packaged title-bar/lifecycle smoke writes, closes, and confirms deletion of
+  a real per-tab snapshot.
 
 ## Windows desktop and release completion
 
@@ -143,6 +155,9 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
   [`WHOLE_MAP_IMAGE_EXPORT_PLAN.md`](WHOLE_MAP_IMAGE_EXPORT_PLAN.md), including
   bounded binary transfer, transactional writing, and per-session lifecycle
   isolation.
+- [x] Add a packaged full-scene PNG integration test covering off-screen bounds,
+  embedded-image input, the isolated WebView2 binary transfer, PNG validation,
+  and the transactional native writer.
 - [ ] Complete the packaged and visual PNG export matrix, then decide ownership
   of the richer editor export dialog and remaining formats.
 - [ ] Define Release x64 performance and reliability budgets.

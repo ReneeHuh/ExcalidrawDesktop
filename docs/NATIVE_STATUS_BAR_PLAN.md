@@ -1,7 +1,7 @@
 # Native Status Bar Plan
 
-Status: Implemented September 2, 2026; build and unit validation complete.
-Packaged smoke plus manual visual, DPI, theme, and assistive-technology
+Status: Implemented September 2, 2026; build, unit, and packaged smoke
+validation complete. Manual visual, DPI, theme, and assistive-technology
 validation remains.
 
 ## Goal
@@ -41,7 +41,7 @@ drawing, while editor content uses the WebView's full height.
 - [x] Settings hides the drawing status surface.
 - [x] External-file resolution is invoked directly from native UI.
 - [x] Obsolete status bridge messages and HTML/CSS are removed.
-- [ ] Run the packaged title-bar/status-bar smoke test after resolving the
+- [x] Run the packaged title-bar/status-bar smoke test after resolving the
   locally installed development-package registration conflict (`0x80073CFB`).
 - [ ] Confirm layout at 100%, 150%, and 200% scaling on hardware.
 - [ ] Confirm light, dark, and high-contrast rendering on hardware.

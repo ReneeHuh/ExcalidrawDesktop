@@ -21,11 +21,19 @@ public sealed class ImageExportPolicyTests
         var origin = DesktopTabOrigin.Create(sessionId);
 
         Assert.True(ImageExportPolicy.IsMatchingUpload(
+            $"{ImageExportPolicy.GetUploadOrigin(origin)}/_desktop/export/{exportId:D}",
+            origin,
+            exportId));
+        Assert.False(ImageExportPolicy.IsMatchingUpload(
+            $"{ImageExportPolicy.GetUploadOrigin(origin)}/_desktop/export/{Guid.NewGuid():D}",
+            origin,
+            exportId));
+        Assert.False(ImageExportPolicy.IsMatchingUpload(
             $"{origin.Origin}/_desktop/export/{exportId:D}",
             origin,
             exportId));
         Assert.False(ImageExportPolicy.IsMatchingUpload(
-            $"{origin.Origin}/_desktop/export/{Guid.NewGuid():D}",
+            $"{ImageExportPolicy.GetUploadOrigin(origin)}/_desktop/export/{exportId:D}?redirect=true",
             origin,
             exportId));
         Assert.False(ImageExportPolicy.IsMatchingUpload(

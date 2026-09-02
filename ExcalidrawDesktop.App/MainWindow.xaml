@@ -211,6 +211,7 @@
             Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
             BorderThickness="0,1,0,0"
+            AutomationProperties.AccessibilityView="Content"
             AutomationProperties.AutomationId="DocumentStatusBar"
             AutomationProperties.Name="Drawing status">
             <Grid ColumnSpacing="12">
@@ -225,6 +226,7 @@
                     FontSize="12"
                     Text="Untitled"
                     TextTrimming="CharacterEllipsis"
+                    AutomationProperties.AccessibilityView="Content"
                     AutomationProperties.AutomationId="StatusDocumentText" />
 
                 <TextBlock
@@ -233,6 +235,7 @@
                     VerticalAlignment="Center"
                     FontSize="12"
                     Text="New drawing"
+                    AutomationProperties.AccessibilityView="Content"
                     AutomationProperties.AutomationId="StatusStateText"
                     AutomationProperties.LiveSetting="Polite" />
 

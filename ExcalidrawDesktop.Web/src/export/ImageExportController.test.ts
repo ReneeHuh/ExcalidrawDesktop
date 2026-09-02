@@ -5,7 +5,8 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 const request = {
   exportId: "720e34f1-a3ea-4af3-93ed-a950b2357c42",
-  uploadPath: "/_desktop/export/720e34f1-a3ea-4af3-93ed-a950b2357c42",
+  uploadUrl:
+    "https://export-9d32585b1ac74f489ef08b7a55d49570.excalidraw.local/_desktop/export/720e34f1-a3ea-4af3-93ed-a950b2357c42",
   maxDimension: 16_384,
   maxBytes: 100 * 1024 * 1024,
   scale: 2,
@@ -51,7 +52,7 @@ describe("exportWholeDrawingAsPng", () => {
       }),
     );
     expect(upload).toHaveBeenCalledWith(
-      request.uploadPath,
+      request.uploadUrl,
       png,
       request.exportId,
     );
