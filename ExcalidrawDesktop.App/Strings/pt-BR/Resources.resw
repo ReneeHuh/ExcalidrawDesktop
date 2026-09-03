@@ -40,6 +40,8 @@
   <data name="StartupSection.Text" xml:space="preserve"><value>Inicialização</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Reabrir guias de desenhos salvos</value></data>
   <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaura as guias salvas da sessão anterior. A recuperação não salva sempre é preservada.</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Salvar automaticamente desenhos alterados ao fechar</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Salva desenhos alterados ao fechar uma guia ou janela, ou ao sair. Desenhos sem título ainda perguntam onde salvar, e cancelar mantém a janela aberta.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Desempenho</value></data>
   <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>Suspender guias inativas</value></data>
   <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>Suspende guias seguras e sem alterações após cinco minutos de inatividade.</value></data>

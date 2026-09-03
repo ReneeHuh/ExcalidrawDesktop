@@ -40,6 +40,8 @@
   <data name="StartupSection.Text" xml:space="preserve"><value>Inicio</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Volver a abrir pestañas guardadas</value></data>
   <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaura las pestañas guardadas de la sesión anterior. La recuperación sin guardar siempre se conserva.</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Guardar automáticamente los dibujos modificados al cerrar</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Guarda los dibujos modificados al cerrar una pestaña o ventana, o al salir. Los dibujos sin título siguen preguntando dónde guardarse y cancelar mantiene la ventana abierta.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Rendimiento</value></data>
   <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>Suspender pestañas inactivas</value></data>
   <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>Suspende las pestañas seguras y limpias tras cinco minutos de inactividad.</value></data>

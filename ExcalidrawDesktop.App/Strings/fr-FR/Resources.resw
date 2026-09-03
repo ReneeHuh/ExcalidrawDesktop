@@ -40,6 +40,8 @@
   <data name="StartupSection.Text" xml:space="preserve"><value>Démarrage</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Rouvrir les onglets enregistrés</value></data>
   <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaure les onglets enregistrés de la session précédente. La récupération non enregistrée est toujours conservée.</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Enregistrer automatiquement les dessins modifiés à la fermeture</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Enregistre les dessins modifiés lors de la fermeture d’un onglet, d’une fenêtre ou de l’application. Les dessins sans titre demandent toujours où être enregistrés et l’annulation garde la fenêtre ouverte.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Performances</value></data>
   <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>Mettre en veille les onglets inactifs</value></data>
   <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>Suspend les onglets sûrs et propres après cinq minutes d’inactivité.</value></data>

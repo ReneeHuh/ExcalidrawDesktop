@@ -40,6 +40,8 @@
   <data name="StartupSection.Text" xml:space="preserve"><value>起動</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>保存済み図面のタブを再度開く</value></data>
   <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>前回のセッションから保存済みタブを復元します。未保存の復旧データは常に保持されます。</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>終了時に変更済みの図面を自動保存</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>タブやウィンドウを閉じるか終了するときに変更済みの図面を保存します。無題の図面では保存先を確認し、キャンセルするとウィンドウを開いたままにします。</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>パフォーマンス</value></data>
   <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>非アクティブなタブをスリープ</value></data>
   <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>安全で変更のないタブを 5 分間非アクティブになった後に一時停止します。</value></data>

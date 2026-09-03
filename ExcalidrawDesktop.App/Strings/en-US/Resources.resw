@@ -48,6 +48,8 @@
   <data name="StartupSection.Text" xml:space="preserve"><value>Startup</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Reopen saved drawing tabs</value></data>
   <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restore clean file-backed tabs from the previous session. Unsaved recovery is always preserved.</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Automatically save dirty drawings on close</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Save changed drawings when closing a tab or window, or when exiting. Untitled drawings still ask where to save, and cancelling keeps the window open.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Performance</value></data>
   <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>Sleep inactive tabs</value></data>
   <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>Suspend safe clean tabs after five inactive minutes to reduce background activity.</value></data>

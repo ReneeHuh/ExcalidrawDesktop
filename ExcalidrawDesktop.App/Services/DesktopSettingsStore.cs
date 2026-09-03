@@ -7,6 +7,8 @@ internal sealed class DesktopSettingsStore
 {
     private const string ThemeKey = "Settings.Theme";
     private const string ReopenSavedTabsKey = "Settings.ReopenSavedTabs";
+    private const string SaveDirtyDrawingsOnCloseKey =
+        "Settings.SaveDirtyDrawingsOnClose";
     private const string SuspendInactiveTabsKey = "Settings.SuspendInactiveTabs";
     private const string UnloadInactiveTabsKey = "Settings.UnloadInactiveTabs";
     private const string LanguageKey = "Settings.Language";
@@ -24,6 +26,9 @@ internal sealed class DesktopSettingsStore
         return new DesktopPreferences(
             theme,
             ReadBoolean(ReopenSavedTabsKey, defaults.ReopenSavedTabs),
+            ReadBoolean(
+                SaveDirtyDrawingsOnCloseKey,
+                defaults.SaveDirtyDrawingsOnClose),
             ReadBoolean(SuspendInactiveTabsKey, defaults.SuspendInactiveTabs),
             ReadBoolean(UnloadInactiveTabsKey, defaults.UnloadInactiveTabs),
             ExcalidrawDesktop.Core.DesktopLanguages.NormalizePreference(
@@ -34,6 +39,8 @@ internal sealed class DesktopSettingsStore
     {
         values.Values[ThemeKey] = preferences.Theme.ToString();
         values.Values[ReopenSavedTabsKey] = preferences.ReopenSavedTabs;
+        values.Values[SaveDirtyDrawingsOnCloseKey] =
+            preferences.SaveDirtyDrawingsOnClose;
         values.Values[SuspendInactiveTabsKey] = preferences.SuspendInactiveTabs;
         values.Values[UnloadInactiveTabsKey] = preferences.UnloadInactiveTabs;
         values.Values[LanguageKey] = preferences.Language;

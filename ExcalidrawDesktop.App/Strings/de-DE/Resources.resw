@@ -40,6 +40,8 @@
   <data name="StartupSection.Text" xml:space="preserve"><value>Start</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Gespeicherte Zeichnungstabs erneut öffnen</value></data>
   <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Saubere dateibasierte Tabs der vorherigen Sitzung wiederherstellen. Ungesicherte Wiederherstellungen bleiben erhalten.</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Geänderte Zeichnungen beim Schließen automatisch speichern</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Geänderte Zeichnungen beim Schließen eines Tabs oder Fensters sowie beim Beenden speichern. Bei unbenannten Zeichnungen wird weiterhin nach einem Speicherort gefragt; Abbrechen lässt das Fenster geöffnet.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Leistung</value></data>
   <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>Inaktive Tabs in den Ruhezustand versetzen</value></data>
   <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>Sichere, unveränderte Tabs nach fünf Minuten Inaktivität anhalten.</value></data>

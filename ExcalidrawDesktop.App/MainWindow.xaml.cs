@@ -5591,7 +5591,9 @@ public sealed partial class MainWindow : Window
         DocumentTabs.SelectedItem = session.TabItem;
         try
         {
-            var decision = await session.DocumentService.PromptToSaveBeforeCloseAsync();
+            var decision = desktopPreferences.SaveDirtyDrawingsOnClose
+                ? CloseDecision.Save
+                : await session.DocumentService.PromptToSaveBeforeCloseAsync();
             if (decision == CloseDecision.Discard)
             {
                 CloseSession(session);
@@ -6039,6 +6041,17 @@ public sealed partial class MainWindow : Window
         var dirtySessions = sessions.Where(session => session.IsDirty).ToList();
         if (dirtySessions.Count == 0)
         {
+            await PersistWorkspaceAsync();
+            await workspaceCoordinator.PruneRecoverySnapshotsAsync();
+            return true;
+        }
+
+        if (desktopPreferences.SaveDirtyDrawingsOnClose)
+        {
+            if (!await SaveAllForWindowCloseAsync(dirtySessions))
+            {
+                return false;
+            }
             await PersistWorkspaceAsync();
             await workspaceCoordinator.PruneRecoverySnapshotsAsync();
             return true;

@@ -40,6 +40,8 @@
   <data name="StartupSection.Text" xml:space="preserve"><value>启动</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>重新打开已保存的绘图标签页</value></data>
   <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>恢复上次会话中已保存的标签页。未保存的恢复数据始终会保留。</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>关闭时自动保存已修改的绘图</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>关闭标签页、窗口或退出时保存已修改的绘图。无标题绘图仍会询问保存位置，取消操作会使窗口保持打开。</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>性能</value></data>
   <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>休眠非活动标签页</value></data>
   <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>安全且无更改的标签页闲置五分钟后暂停运行。</value></data>

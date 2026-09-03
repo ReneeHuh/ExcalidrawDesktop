@@ -10,6 +10,7 @@ internal enum DesktopThemePreference
 internal sealed record DesktopPreferences(
     DesktopThemePreference Theme,
     bool ReopenSavedTabs,
+    bool SaveDirtyDrawingsOnClose,
     bool SuspendInactiveTabs,
     bool UnloadInactiveTabs,
     string Language)
@@ -17,6 +18,7 @@ internal sealed record DesktopPreferences(
     public static DesktopPreferences Default { get; } = new(
         DesktopThemePreference.System,
         ReopenSavedTabs: true,
+        SaveDirtyDrawingsOnClose: false,
         SuspendInactiveTabs: true,
         UnloadInactiveTabs: true,
         ExcalidrawDesktop.Core.DesktopLanguages.SystemPreference);

@@ -59,6 +59,8 @@ public sealed partial class SettingsPage : Page
             _ => 0,
         };
         ReopenSavedTabsToggle.IsOn = preferences.ReopenSavedTabs;
+        SaveDirtyDrawingsOnCloseToggle.IsOn =
+            preferences.SaveDirtyDrawingsOnClose;
         SuspendInactiveTabsToggle.IsOn = preferences.SuspendInactiveTabs;
         UnloadInactiveTabsToggle.IsOn = preferences.UnloadInactiveTabs;
         var language = DesktopLanguages.NormalizePreference(preferences.Language);
@@ -98,6 +100,7 @@ public sealed partial class SettingsPage : Page
             new PreferencesChangedEventArgs(new DesktopPreferences(
                 theme,
                 ReopenSavedTabsToggle.IsOn,
+                SaveDirtyDrawingsOnCloseToggle.IsOn,
                 SuspendInactiveTabsToggle.IsOn,
                 UnloadInactiveTabsToggle.IsOn,
                 (LanguagePicker.SelectedItem as ComboBoxItem)?.Tag?.ToString() ??

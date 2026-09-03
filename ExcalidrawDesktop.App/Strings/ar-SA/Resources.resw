@@ -40,6 +40,8 @@
   <data name="StartupSection.Text" xml:space="preserve"><value>بدء التشغيل</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>إعادة فتح علامات تبويب الرسومات المحفوظة</value></data>
   <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>استعادة علامات التبويب المحفوظة من الجلسة السابقة. يتم دائمًا الاحتفاظ ببيانات الاسترداد غير المحفوظة.</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>حفظ الرسومات المعدّلة تلقائيًا عند الإغلاق</value></data>
+  <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>يحفظ الرسومات المعدّلة عند إغلاق علامة تبويب أو نافذة أو إنهاء التطبيق. تظل الرسومات بلا عنوان تطلب مكان الحفظ، ويؤدي الإلغاء إلى إبقاء النافذة مفتوحة.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>الأداء</value></data>
   <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>تعليق علامات التبويب غير النشطة</value></data>
   <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>تعليق علامات التبويب الآمنة وغير المعدلة بعد خمس دقائق من عدم النشاط.</value></data>
