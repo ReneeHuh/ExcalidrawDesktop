@@ -32,6 +32,8 @@ PowerShell process. The document-safety additions produced these results:
 | Preserve the large drawing through three unload/recreate cycles | Passed |
 | Isolate Save, Save As, and external changes across two windows | Passed |
 | Preserve recovery identity/content through a live window transfer | Passed |
+| Reject transfers during initialization, suspend, resume, and unload | Passed |
+| Reject a process-failed transfer and recover the isolated editor | Passed |
 
 The recovery test now requests a real Excalidraw scene update through the
 session-bound bridge. It then waits for the normal dirty notification and

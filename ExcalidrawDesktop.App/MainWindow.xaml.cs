@@ -92,6 +92,9 @@ public sealed partial class MainWindow : Window
     private int recoveryTabsRestored;
     private int untitledSequence;
     private XamlRoot? titleBarXamlRoot;
+#if DEBUG
+    private TaskCompletionSource? multiWindowInitializationRelease;
+#endif
 
     internal MainWindow(
         ApplicationWorkspaceCoordinator workspaceCoordinator,
@@ -1120,6 +1123,12 @@ public sealed partial class MainWindow : Window
         }
 
         session.IsInitializing = true;
+#if DEBUG
+        if (runMultiWindowSmoke && multiWindowInitializationRelease is { } release)
+        {
+            await release.Task;
+        }
+#endif
         var webView = session.Content.Editor;
         Title = DesktopResources.Get(
             "InitializingEditorTitle",
@@ -1363,9 +1372,16 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        HandleWebViewProcessFailure(session, args.ProcessFailedKind.ToString());
+    }
+
+    private void HandleWebViewProcessFailure(
+        DocumentSession session,
+        string failureKind)
+    {
         session.IsReady = false;
         session.IsSuspended = false;
-        session.LastLifecycleFailure = args.ProcessFailedKind.ToString();
+        session.LastLifecycleFailure = failureKind;
         if (session.PendingImageExport is { } pendingExport)
         {
             _ = FailImageExportAsync(
@@ -1382,7 +1398,7 @@ public sealed partial class MainWindow : Window
             DesktopResources.Format(
                 "EditorProcessFailureGuidanceFormat",
                 "WebView2 reported {0}. Retry the editor. If failures continue, repair the WebView2 Runtime.",
-                args.ProcessFailedKind),
+                failureKind),
             showWebView2Help: true);
         UpdateTabHeader(session);
         UpdateStatusBar(session);
@@ -1390,6 +1406,11 @@ public sealed partial class MainWindow : Window
             "EditorProcessFailedTitle",
             "Excalidraw Desktop — Editor process failed");
     }
+
+#if DEBUG
+    private void SimulateWebViewProcessFailureForSmoke(DocumentSession session) =>
+        HandleWebViewProcessFailure(session, "SmokeProcessFailure");
+#endif
 
     private async void OnNewWindowRequested(
         CoreWebView2NewWindowRequestedEventArgs args)
@@ -2413,12 +2434,17 @@ public sealed partial class MainWindow : Window
 
             var sourceSession = sessions[0];
             var session = sessions[1];
-            var originalCoreWebView = session.CoreWebView;
             var originalOrigin = session.TabOrigin;
             var originalRecoveryId = session.RecoveryId;
             var originalWindowCount = workspaceCoordinator.Windows.Count;
 
-            session.IsSuspended = true;
+            session.InactiveSince = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(6);
+            if (!await SuspendSessionAsync(session, requireIdle: true) ||
+                !session.IsSuspended)
+            {
+                throw new InvalidOperationException(
+                    "The transfer fixture could not suspend its inactive drawing.");
+            }
             if (workspaceCoordinator.MoveSessionToNewWindow(this, session) ||
                 !sessions.Contains(session) ||
                 workspaceCoordinator.Windows.Count != originalWindowCount)
@@ -2426,7 +2452,99 @@ public sealed partial class MainWindow : Window
                 throw new InvalidOperationException(
                     "A suspended drawing was allowed to enter a transfer.");
             }
-            session.IsSuspended = false;
+
+            ResumeSession(session);
+            if (!session.IsResuming || session.IsSuspended ||
+                workspaceCoordinator.MoveSessionToNewWindow(this, session) ||
+                !sessions.Contains(session))
+            {
+                throw new InvalidOperationException(
+                    "A resuming drawing was allowed to enter a transfer.");
+            }
+            if (!await WaitUntilAsync(
+                    () => !session.IsResuming,
+                    TimeSpan.FromSeconds(5)))
+            {
+                throw new InvalidOperationException(
+                    "The transfer fixture did not finish resuming.");
+            }
+
+            session.InactiveSince = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(16);
+            if (!await UnloadSessionAsync(session, requireIdle: true) ||
+                !session.IsUnloaded ||
+                workspaceCoordinator.MoveSessionToNewWindow(this, session) ||
+                !sessions.Contains(session))
+            {
+                throw new InvalidOperationException(
+                    "An unloaded drawing was allowed to enter a transfer.");
+            }
+
+            var wakeTask = WakeUnloadedSessionAsync(session);
+            if (!session.IsRestoringFromHibernation ||
+                !session.IsResuming ||
+                workspaceCoordinator.MoveSessionToNewWindow(this, session) ||
+                !sessions.Contains(session))
+            {
+                throw new InvalidOperationException(
+                    "A recreating drawing was allowed to enter a transfer.");
+            }
+            await wakeTask;
+            if (!await WaitUntilAsync(
+                    () => session.IsReady &&
+                        !session.IsRestoringFromHibernation &&
+                        !session.IsResuming,
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The unloaded transfer fixture did not recreate its editor.");
+            }
+
+            var coreBeforeFailure = session.CoreWebView;
+            SimulateWebViewProcessFailureForSmoke(session);
+            if (session.IsReady)
+            {
+                throw new InvalidOperationException(
+                    "The simulated WebView failure left the session ready.");
+            }
+            if (session.LastLifecycleFailure != "SmokeProcessFailure")
+            {
+                throw new InvalidOperationException(
+                    $"The simulated WebView failure reason changed to '{session.LastLifecycleFailure}'.");
+            }
+            if (workspaceCoordinator.MoveSessionToNewWindow(this, session) ||
+                !sessions.Contains(session))
+            {
+                throw new InvalidOperationException(
+                    "A process-failed drawing entered a transfer.");
+            }
+
+            multiWindowInitializationRelease = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var retryTask = RetrySessionAsync(session);
+            if (!await WaitUntilAsync(
+                    () => session.IsInitializing,
+                    TimeSpan.FromSeconds(5)) ||
+                workspaceCoordinator.MoveSessionToNewWindow(this, session) ||
+                !sessions.Contains(session))
+            {
+                throw new InvalidOperationException(
+                    "An initializing drawing was allowed to enter a transfer.");
+            }
+            multiWindowInitializationRelease.TrySetResult();
+            multiWindowInitializationRelease = null;
+            await retryTask;
+            if (!await WaitUntilAsync(
+                    () => session.IsReady && !session.IsInitializing,
+                    TimeSpan.FromSeconds(20)) ||
+                session.CoreWebView is null ||
+                ReferenceEquals(session.CoreWebView, coreBeforeFailure) ||
+                session.TabOrigin != originalOrigin)
+            {
+                throw new InvalidOperationException(
+                    "The process-failed drawing did not recover with its origin intact.");
+            }
+
+            var originalCoreWebView = session.CoreWebView;
 
             var sourcePath = Path.Combine(
                 AppContext.BaseDirectory,
@@ -2720,6 +2838,8 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
+            multiWindowInitializationRelease?.TrySetResult();
+            multiWindowInitializationRelease = null;
             foreach (var openSession in workspaceCoordinator.Windows
                 .SelectMany(window => window.OpenSessions))
             {
@@ -5564,6 +5684,7 @@ public sealed partial class MainWindow : Window
 
     private bool CanMoveSession(DocumentSession session) =>
         sessions.Contains(session) &&
+        session.IsReady &&
         !session.IsSuspended &&
         !session.IsUnloaded &&
         !session.IsRestoringFromHibernation &&

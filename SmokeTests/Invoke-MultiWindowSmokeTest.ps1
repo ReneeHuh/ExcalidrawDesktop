@@ -146,6 +146,11 @@ try {
                 SaveAsIsolation = $true
                 ExternalChangeIsolation = $true
                 RecoveryIdentityPreserved = $true
+                InitializationMoveRejected = $true
+                ResumeMoveRejected = $true
+                UnloadedMoveRejected = $true
+                WebViewFailureMoveRejected = $true
+                WebViewFailureRecovered = $true
             }
             return
         }

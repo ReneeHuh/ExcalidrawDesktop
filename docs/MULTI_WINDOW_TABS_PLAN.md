@@ -373,10 +373,10 @@ Exit criteria:
 - [x] Test window-close and application-exit decisions with several dirty
   drawings.
 - [x] Test external modification, move, and deletion across windows.
-- [ ] Test transfer during initialization, recovery, suspend, resume, unload,
-  and WebView process failure. Recovery identity/content now survives a live
-  transfer and suspended transfers are rejected; the other transition races
-  remain open.
+- [x] Test transfer during initialization, recovery, suspend, resume, unload,
+  and WebView process failure. Packaged automation rejects each unsafe state,
+  preserves recovery identity/content during a live transfer, and verifies
+  process-failure retry recreates the editor with its isolated origin intact.
 - [ ] Test narrow, maximized, snapped, and mixed-DPI windows.
 - [ ] Test keyboard-only use, Narrator, touch, pen, and title-bar input.
 - [ ] Rerun the 1/5/10/20-tab memory matrix across one and several windows.
