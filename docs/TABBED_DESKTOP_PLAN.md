@@ -11,19 +11,19 @@ Related implemented plan: [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.m
 | Area | Implementation | Verification |
 | --- | --- | --- |
 | Native tabs and per-tab WebView2 | Implemented | Packaged two-origin smoke coverage; broader interaction checks remain manual |
-| Unique exact per-tab origins | Implemented | Unit-tested exact matching and packaged `localStorage` isolation |
+| Unique exact per-tab origins | Implemented | Unit-tested exact matching and packaged `localStorage` and IndexedDB isolation |
 | Per-tab open, save, Save As, dirty state, and close protection | Implemented | Packaged cross-tab save isolation and individual close-decision coverage pass |
 | Reorder, adjacent navigation, and close/close-others/close-right commands | Implemented | Core ordering helpers are unit tested |
 | Middle-click close, Copy Path, and Reveal in Explorer | Implemented | Packaged and manual interaction coverage remains |
 | Recent files and clean workspace restoration | Implemented | Packaged restore smoke coverage |
 | Per-tab recovery after forced termination | Implemented | Real editor edits recover after forced termination in packaged automation |
 | External modification, move, and deletion protection | Implemented | File-stamp logic and packaged external-change detection pass |
-| Consolidated window close | Save All, Discard All, Review Individually, or Cancel implemented | Per-document selection in one dialog is not implemented |
+| Consolidated window close | Save All, Discard All, Review Individually, or Cancel implemented | All four paths pass packaged automation; per-document selection in one dialog is not implemented |
 | File association and existing-instance file activation | Implemented | Packaged cold-start and existing-instance automation passes |
 | Multi-file drag/drop and jump lists | Implemented | Jump-list selection still needs recorded validation |
 | Tabs in the native title bar | Implemented | Hardware-dependent manual matrix remains; see [`EDGE_STYLE_TITLEBAR_TABS_PLAN.md`](EDGE_STYLE_TITLEBAR_TABS_PLAN.md) |
 | Multiple windows and tab tear-out | Implemented | M5 hardening remains; see [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md) |
-| Performance target and hibernation decision | Measured and implemented | Five-minute suspension and fifteen-minute safe clean-editor unloading |
+| Performance target and hibernation decision | Measured and implemented | Five-minute suspension and fifteen-minute safe clean-editor unloading; a 501-element embedded-image drawing survives recreation |
 
 “Implemented” describes code present in the repository. It does not imply that
 every manual matrix item or every originally proposed internal abstraction has
@@ -496,11 +496,12 @@ its in-memory undo history.
 
 Tasks:
 
-- Test large scenes and embedded images across multiple tabs.
+- [x] Test a large scene and embedded image across suspension, unload, and
+  editor recreation.
 - Record Release-build memory and switching performance on the minimum
   supported machine.
-- Validate hibernation with large scenes, embedded images, external changes,
-  and repeated unload/recreate cycles.
+- Validate repeated unload/recreate cycles and external changes during
+  hibernation; the large-scene and embedded-image path is covered.
 - Improve loading, failure, recovery, and empty-workspace visuals.
 - Add structured diagnostics that never contain drawing contents.
 
@@ -523,10 +524,9 @@ The lists below are the target coverage. Current automated evidence consists of:
   cross-tab file/bridge isolation, external file changes, close decisions, and
   Explorer activation into a single running instance.
 
-Current automation does **not** yet prove IndexedDB isolation, independent undo
-and viewport state, the interactive conflict-dialog choices, or taskbar
-jump-list selection. Keep those items open until a packaged test or a recorded
-manual validation provides evidence.
+Current automation does **not** yet prove the interactive conflict-dialog
+choices or taskbar jump-list selection. Keep those items open until a packaged
+test or a recorded manual validation provides evidence.
 
 ### Unit tests
 
@@ -607,9 +607,9 @@ manual validation provides evidence.
 
 1. Record the remaining title-bar, accessibility, input, DPI, and jump-list
    manual validation.
-2. Validate full unloading with realistic large drawings and embedded images,
-   then define the supported tab-count and memory budgets.
-4. Round-trip representative drawings with excalidraw.com and complete the
+2. Define the supported tab-count and memory budgets on the minimum supported
+   machine.
+3. Round-trip representative drawings with excalidraw.com and complete the
    remaining release gates in [`DESKTOP_BACKLOG.md`](DESKTOP_BACKLOG.md).
 
 Do not extract a `DocumentWorkspace` solely to match the original proposal.

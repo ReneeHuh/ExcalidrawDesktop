@@ -15,7 +15,6 @@ $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
 $startedProcess = $null
 $requestPath = $null
 $statePath = $null
-
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -87,8 +86,10 @@ try {
             throw "Excalidraw Desktop exited during the tab smoke test."
         }
 
-        if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Tab smoke failed") {
-            throw "The packaged tab storage-isolation check failed."
+        if ($startedProcess.MainWindowTitle.StartsWith(
+                "Excalidraw Desktop — Tab smoke failed",
+                [System.StringComparison]::Ordinal)) {
+            throw "The packaged tab isolation check failed. $($startedProcess.MainWindowTitle)"
         }
 
         if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Tab smoke passed") {
@@ -98,6 +99,11 @@ try {
                 TabCount = 2
                 UniqueOrigins = 2
                 LocalStorageIsolated = $true
+                IndexedDbIsolated = $true
+                SceneStateIsolated = $true
+                ViewportAndZoomIsolated = $true
+                SelectionIsolated = $true
+                UndoHistoryIsolated = $true
             }
             return
         }

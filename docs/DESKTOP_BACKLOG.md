@@ -61,7 +61,9 @@ plan in the same change.
 - [x] Rerun and evaluate the 1/5/10/20-tab performance matrix after suspension.
 - [x] Fully unload safe clean editors after fifteen inactive minutes and
   recreate them on selection, preserving the native session and isolated origin.
-- [ ] Test large scenes and embedded images across multiple tabs.
+- [x] Test large scenes and embedded images across multiple tabs. Packaged
+  lifecycle automation preserves a 501-element drawing and embedded PNG through
+  suspension, full unload, and editor recreation.
 - [ ] Establish supported tab-count, startup, switching, and memory budgets on
   the minimum supported machine.
 
@@ -95,12 +97,12 @@ still need purpose-built automation or manual evidence.
   boundaries.
 - [x] Validate dirty indicators and Save, Don't Save, and Cancel for individual
   tab closes.
-- [ ] Validate Save All, Discard All, Review Tabs, and Cancel for window close.
+- [x] Validate Save All, Discard All, Review Tabs, and Cancel for window close.
 - [x] Generate real edits, force termination during the recovery debounce
   interval, and verify exact recovery.
 - [x] Add packaged tests for files modified, renamed, moved, and deleted by an
   external process.
-- [ ] Test independent IndexedDB, undo history, viewport, zoom, and selection
+- [x] Test independent IndexedDB, undo history, viewport, zoom, and selection
   state across tabs.
 - [ ] Exercise taskbar jump-list selection in packaged UI automation or record
   a manual validation.

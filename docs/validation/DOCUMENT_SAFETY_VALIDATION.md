@@ -18,12 +18,23 @@ PowerShell process. The document-safety additions produced these results:
 | Cancel an individual dirty-tab close without losing the tab | Passed |
 | Discard and close an individual dirty tab | Passed |
 | Save an individual dirty tab to its owning file and close it | Passed |
+| Cancel a window close and preserve all dirty drawings | Passed |
+| Review window-close drawings and select the first dirty tab | Passed |
+| Save All writes three dirty drawings to their owning files | Passed |
 | Generate a real editor edit and recover it after forced termination | Passed |
+| Isolate IndexedDB, scene, viewport, zoom, and selection across two tabs | Passed |
+| Undo only the active tab's captured editor change | Passed |
+| Preserve a 501-element drawing and embedded PNG through unload/recreation | Passed |
 
 The recovery test now requests a real Excalidraw scene update through the
 session-bound bridge. It then waits for the normal dirty notification and
 recovery debounce, terminates the process, relaunches it, and has the restored
 editor validate the snapshot.
+
+The state-isolation test assigns distinct real Excalidraw scene, viewport,
+zoom, selection, and IndexedDB values to two exact-origin WebViews. It then
+issues Ctrl+Z through Chromium's trusted input path and verifies that only the
+active tab's undo history changes.
 
 ## Broader packaged regression results
 

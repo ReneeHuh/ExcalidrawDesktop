@@ -1136,7 +1136,8 @@ public sealed partial class MainWindow : Window
 
             await webView.EnsureCoreWebView2Async();
             ConfigureWebView(session, webView.CoreWebView2);
-            var entryPoint = runRecoverySmoke || verifyRecoverySmoke ||
+            var entryPoint = runTabSmoke || runSuspensionSmoke ||
+                runRecoverySmoke || verifyRecoverySmoke ||
                 runDocumentSafetySmoke || runCloseDecisionsSmoke
                     ? $"{session.TabOrigin.EntryPoint}?desktopSmoke=1"
                     : session.TabOrigin.EntryPoint;
@@ -2998,6 +2999,9 @@ public sealed partial class MainWindow : Window
 
     private async Task RunSuspensionSmokeAsync()
     {
+        var largeScenePath = Path.Combine(
+            AppContext.BaseDirectory,
+            "suspension-large-scene.excalidraw");
         try
         {
             if (sessions.Count != 3 || ActiveSession is not { } active)
@@ -3018,6 +3022,23 @@ public sealed partial class MainWindow : Window
                 !ReferenceEquals(session, active)).ToArray();
             var sleeping = inactive[0];
             var unloading = inactive[1];
+
+            await File.WriteAllTextAsync(
+                largeScenePath,
+                CreateLargeLifecycleScene(elementCount: 500));
+            AttachDocumentToSession(
+                unloading,
+                await unloading.DocumentService.OpenPathAsync(largeScenePath),
+                select: false);
+            if (!await WaitUntilAsync(
+                    () => unloading.PendingDocumentLoad is null,
+                    TimeSpan.FromSeconds(20)) ||
+                unloading.IsDirty)
+            {
+                throw new InvalidOperationException(
+                    "The large embedded-image drawing did not load cleanly.");
+            }
+
             sleeping.InactiveSince = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(6);
             if (!await SuspendSessionAsync(sleeping, requireIdle: true) ||
                 !sleeping.IsSuspended ||
@@ -3076,6 +3097,15 @@ public sealed partial class MainWindow : Window
                     "The unloaded tab did not recreate its isolated editor.");
             }
 
+            var restoredState = await ReadSmokeStateAsync(unloading);
+            if (restoredState.ElementIds.Length != 501 ||
+                !restoredState.ElementIds.Contains("lifecycle-embedded-image") ||
+                !restoredState.FileIds.Contains("lifecycle-image-file"))
+            {
+                throw new InvalidOperationException(
+                    "The large drawing or its embedded image was not preserved across unload/recreate.");
+            }
+
             Title = "Excalidraw Desktop — Suspension smoke passed";
         }
         catch (Exception exception)
@@ -3083,6 +3113,108 @@ public sealed partial class MainWindow : Window
             Debug.WriteLine(exception);
             Title = $"Excalidraw Desktop — Suspension smoke failed: {exception.Message}";
         }
+        finally
+        {
+            foreach (var session in sessions.Where(session =>
+                string.Equals(
+                    session.DocumentService.DocumentPath,
+                    largeScenePath,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                session.DetachExternalFileWatcher();
+            }
+            if (File.Exists(largeScenePath))
+            {
+                File.Delete(largeScenePath);
+            }
+        }
+    }
+
+    private static string CreateLargeLifecycleScene(int elementCount)
+    {
+        var elements = new List<Dictionary<string, object?>>(elementCount + 1);
+        for (var index = 0; index < elementCount; index++)
+        {
+            elements.Add(new Dictionary<string, object?>
+            {
+                ["id"] = $"lifecycle-rectangle-{index}",
+                ["type"] = "rectangle",
+                ["x"] = (index % 25) * 180,
+                ["y"] = (index / 25) * 140,
+                ["width"] = 140,
+                ["height"] = 100,
+                ["angle"] = 0,
+                ["strokeColor"] = "#1e1e1e",
+                ["backgroundColor"] = index % 2 == 0 ? "#a5d8ff" : "#b2f2bb",
+                ["fillStyle"] = "solid",
+                ["strokeWidth"] = 2,
+                ["strokeStyle"] = "solid",
+                ["roughness"] = 1,
+                ["opacity"] = 100,
+                ["groupIds"] = Array.Empty<string>(),
+                ["frameId"] = null,
+                ["roundness"] = new { type = 3 },
+                ["seed"] = 1000 + index,
+                ["version"] = 1,
+                ["versionNonce"] = 2000 + index,
+                ["isDeleted"] = false,
+                ["boundElements"] = Array.Empty<object>(),
+                ["updated"] = 1,
+                ["link"] = null,
+                ["locked"] = false,
+            });
+        }
+        elements.Add(new Dictionary<string, object?>
+        {
+            ["id"] = "lifecycle-embedded-image",
+            ["type"] = "image",
+            ["x"] = 200,
+            ["y"] = 200,
+            ["width"] = 128,
+            ["height"] = 128,
+            ["angle"] = 0,
+            ["strokeColor"] = "transparent",
+            ["backgroundColor"] = "transparent",
+            ["fillStyle"] = "solid",
+            ["strokeWidth"] = 1,
+            ["strokeStyle"] = "solid",
+            ["roughness"] = 0,
+            ["opacity"] = 100,
+            ["groupIds"] = Array.Empty<string>(),
+            ["frameId"] = null,
+            ["roundness"] = null,
+            ["seed"] = 9001,
+            ["version"] = 1,
+            ["versionNonce"] = 9002,
+            ["isDeleted"] = false,
+            ["boundElements"] = Array.Empty<object>(),
+            ["updated"] = 1,
+            ["link"] = null,
+            ["locked"] = false,
+            ["fileId"] = "lifecycle-image-file",
+            ["status"] = "saved",
+            ["scale"] = new[] { 1, 1 },
+            ["crop"] = null,
+        });
+        return JsonSerializer.Serialize(new
+        {
+            type = "excalidraw",
+            version = 2,
+            source = "excalidraw-desktop-lifecycle-smoke",
+            elements,
+            appState = new { viewBackgroundColor = "#ffffff" },
+            files = new Dictionary<string, object>
+            {
+                ["lifecycle-image-file"] = new
+                {
+                    id = "lifecycle-image-file",
+                    dataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=",
+                    mimeType = "image/png",
+                    created = 1,
+                    lastRetrieved = 1,
+                },
+            },
+        });
     }
 #endif
 
@@ -3124,6 +3256,80 @@ public sealed partial class MainWindow : Window
 
             var originallyFirst = sessions[0];
             var originallySecond = sessions[1];
+            await ConfigureSmokeStateAsync(
+                originallyFirst,
+                "first-state-element",
+                scrollX: 111,
+                scrollY: -222,
+                zoom: 1.5,
+                indexedDbValue: "first-indexed-db");
+            await ConfigureSmokeStateAsync(
+                originallySecond,
+                "second-state-element",
+                scrollX: -333,
+                scrollY: 444,
+                zoom: 0.75,
+                indexedDbValue: "second-indexed-db");
+
+            DocumentTabs.SelectedItem = originallyFirst.TabItem;
+            await Task.Delay(100);
+            var firstState = await ReadSmokeStateAsync(originallyFirst);
+            DocumentTabs.SelectedItem = originallySecond.TabItem;
+            await Task.Delay(100);
+            var secondState = await ReadSmokeStateAsync(originallySecond);
+            if (!SmokeStateMatches(
+                    firstState,
+                    "first-state-element",
+                    111,
+                    -222,
+                    1.5,
+                    "first-indexed-db") ||
+                !SmokeStateMatches(
+                    secondState,
+                    "second-state-element",
+                    -333,
+                    444,
+                    0.75,
+                    "second-indexed-db"))
+            {
+                throw new InvalidOperationException(
+                    "Scene, viewport, selection, or IndexedDB state crossed tab origins.");
+            }
+
+            DocumentTabs.SelectedItem = originallyFirst.TabItem;
+            originallyFirst.Content.Editor.Focus(FocusState.Programmatic);
+            var canvasFocused = await originallyFirst.CoreWebView!.ExecuteScriptAsync(
+                "window.__EXCALIDRAW_DESKTOP_SMOKE__.focusCanvas()");
+            if (canvasFocused != "true")
+            {
+                throw new InvalidOperationException(
+                    "The active editor canvas could not receive focus for undo validation.");
+            }
+            var firstAfterUndo = await ReadSmokeStateAsync(originallyFirst);
+            for (var attempt = 0;
+                attempt < 4 &&
+                    firstAfterUndo.ElementIds.Contains("first-state-element");
+                attempt++)
+            {
+                await originallyFirst.CoreWebView!.CallDevToolsProtocolMethodAsync(
+                    "Input.dispatchKeyEvent",
+                    """{"type":"rawKeyDown","modifiers":2,"key":"z","code":"KeyZ","windowsVirtualKeyCode":90,"nativeVirtualKeyCode":90}""");
+                await originallyFirst.CoreWebView.CallDevToolsProtocolMethodAsync(
+                    "Input.dispatchKeyEvent",
+                    """{"type":"keyUp","modifiers":2,"key":"z","code":"KeyZ","windowsVirtualKeyCode":90,"nativeVirtualKeyCode":90}""");
+                await Task.Delay(100);
+                firstAfterUndo = await ReadSmokeStateAsync(originallyFirst);
+            }
+            var secondAfterFirstUndo = await ReadSmokeStateAsync(originallySecond);
+            if (firstAfterUndo.ElementIds.Contains("first-state-element") ||
+                !secondAfterFirstUndo.ElementIds.Contains("second-state-element"))
+            {
+                throw new InvalidOperationException(
+                    $"Undo history was not isolated to the active editor tab. " +
+                    $"First=[{string.Join(',', firstAfterUndo.ElementIds)}]; " +
+                    $"Second=[{string.Join(',', secondAfterFirstUndo.ElementIds)}].");
+            }
+
             DocumentTabs.TabItems.Remove(originallySecond.TabItem);
             DocumentTabs.TabItems.Insert(0, originallySecond.TabItem);
             SynchronizeSessionOrder();
@@ -3145,9 +3351,105 @@ public sealed partial class MainWindow : Window
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            Title = "Excalidraw Desktop — Tab smoke failed";
+            Title = $"Excalidraw Desktop — Tab smoke failed: {exception.Message}";
         }
     }
+
+    private static async Task ConfigureSmokeStateAsync(
+        DocumentSession session,
+        string elementId,
+        double scrollX,
+        double scrollY,
+        double zoom,
+        string indexedDbValue)
+    {
+        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(10);
+        string readiness;
+        do
+        {
+            readiness = await session.CoreWebView!.ExecuteScriptAsync(
+                "typeof window.__EXCALIDRAW_DESKTOP_SMOKE__");
+            if (readiness == "\"object\"")
+            {
+                break;
+            }
+            await Task.Delay(50);
+        }
+        while (DateTimeOffset.UtcNow < deadline);
+        if (readiness != "\"object\"")
+        {
+            throw new InvalidOperationException(
+                "The scoped editor smoke API was not installed.");
+        }
+
+        var options = JsonSerializer.Serialize(new
+        {
+            elementId,
+            scrollX,
+            scrollY,
+            zoom,
+            indexedDbValue,
+        });
+        var configured = await session.CoreWebView!.ExecuteScriptAsync(
+            $"window.__EXCALIDRAW_DESKTOP_SMOKE__.configureState({options}); true");
+        if (configured != "true")
+        {
+            throw new InvalidOperationException(
+                "The editor smoke state could not be configured.");
+        }
+
+        SmokeState state;
+        do
+        {
+            await Task.Delay(50);
+            state = await ReadSmokeStateAsync(session);
+        }
+        while (state.IndexedDbValue != indexedDbValue &&
+            DateTimeOffset.UtcNow < deadline);
+        if (state.IndexedDbValue != indexedDbValue)
+        {
+            throw new InvalidOperationException(
+                "The editor IndexedDB state was not written and read back.");
+        }
+    }
+
+    private static async Task<SmokeState> ReadSmokeStateAsync(
+        DocumentSession session)
+    {
+        var encoded = await session.CoreWebView!.ExecuteScriptAsync(
+            "JSON.stringify(window.__EXCALIDRAW_DESKTOP_SMOKE__.readState())");
+        var json = JsonSerializer.Deserialize<string>(encoded) ??
+            throw new InvalidOperationException("The editor returned no smoke state.");
+        return JsonSerializer.Deserialize<SmokeState>(
+                json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ??
+            throw new InvalidOperationException("The editor smoke state was invalid.");
+    }
+
+    private static bool SmokeStateMatches(
+        SmokeState state,
+        string elementId,
+        double scrollX,
+        double scrollY,
+        double zoom,
+        string indexedDbValue) =>
+        state.ElementIds.Length == 2 &&
+        state.ElementIds.Contains($"{elementId}-baseline") &&
+        state.ElementIds.Contains(elementId) &&
+        Math.Abs(state.ScrollX - scrollX) < 0.01 &&
+        Math.Abs(state.ScrollY - scrollY) < 0.01 &&
+        Math.Abs(state.Zoom - zoom) < 0.01 &&
+        state.SelectedElementIds.SequenceEqual([elementId]) &&
+        state.IndexedDbValue == indexedDbValue;
+
+    private sealed record SmokeState(
+        string[] ElementIds,
+        string[] FileIds,
+        double ScrollX,
+        double ScrollY,
+        double Zoom,
+        string[] SelectedElementIds,
+        string? IndexedDbValue);
 #endif
 
     private void OnCloseReady(DocumentSession session)
@@ -3673,6 +3975,11 @@ public sealed partial class MainWindow : Window
         var savedPath = Path.Combine(
             AppContext.BaseDirectory,
             "close-decisions-save.excalidraw");
+        var windowClosePaths = Enumerable.Range(1, 3)
+            .Select(index => Path.Combine(
+                AppContext.BaseDirectory,
+                $"window-close-save-{index}.excalidraw"))
+            .ToArray();
         try
         {
             var cancelAndDiscardSession = sessions[0];
@@ -3735,6 +4042,74 @@ public sealed partial class MainWindow : Window
                     "Save did not write and close the owning drawing.");
             }
 
+            while (sessions.Count < 3)
+            {
+                CreateTab(select: false);
+            }
+            for (var index = 0; index < sessions.Count; index++)
+            {
+                var session = sessions[index];
+                DocumentTabs.SelectedItem = session.TabItem;
+                await InitializeSessionAsync(session);
+                await File.WriteAllTextAsync(
+                    windowClosePaths[index],
+                    CreateDocumentSafetyScene($"window-close-initial-{index}", index));
+                AttachDocumentToSession(
+                    session,
+                    await session.DocumentService.OpenPathAsync(windowClosePaths[index]),
+                    select: false);
+            }
+            if (!await WaitUntilAsync(
+                    () => sessions.All(session =>
+                        session.IsReady && session.PendingDocumentLoad is null),
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The window-close drawings did not finish loading.");
+            }
+            for (var index = 0; index < sessions.Count; index++)
+            {
+                var session = sessions[index];
+                DocumentTabs.SelectedItem = session.TabItem;
+                await Task.Delay(100);
+                RequestAutomationEdit(session, $"window-close-edited-{index}");
+                if (!await WaitUntilAsync(
+                        () => session.IsDirty,
+                        TimeSpan.FromSeconds(10)))
+                {
+                    throw new InvalidOperationException(
+                        $"Window-close drawing {index + 1} did not become dirty.");
+                }
+            }
+
+            Title = "Excalidraw Desktop — Window close smoke: choose Cancel";
+            if (await ResolveWindowCloseAsync() ||
+                sessions.Any(session => !session.IsDirty))
+            {
+                throw new InvalidOperationException(
+                    "Window-close Cancel did not preserve every dirty drawing.");
+            }
+
+            var firstDirtySession = sessions[0];
+            Title = "Excalidraw Desktop — Window close smoke: choose Review Tabs";
+            if (await ResolveWindowCloseAsync() ||
+                !ReferenceEquals(ActiveSession, firstDirtySession) ||
+                sessions.Any(session => !session.IsDirty))
+            {
+                throw new InvalidOperationException(
+                    "Review Tabs did not preserve and select the first dirty drawing.");
+            }
+
+            Title = "Excalidraw Desktop — Window close smoke: choose Save All";
+            if (!await ResolveWindowCloseAsync() ||
+                sessions.Any(session => session.IsDirty) ||
+                windowClosePaths.Where((path, index) =>
+                    !FileContains(path, $"window-close-edited-{index}")).Any())
+            {
+                throw new InvalidOperationException(
+                    "Save All did not save every owning drawing.");
+            }
+
             Title = "Excalidraw Desktop — Close decisions smoke passed";
             await File.WriteAllTextAsync(
                 Path.Combine(AppContext.BaseDirectory, "close-decisions-smoke.result"),
@@ -3757,6 +4132,13 @@ public sealed partial class MainWindow : Window
             if (File.Exists(savedPath))
             {
                 File.Delete(savedPath);
+            }
+            foreach (var path in windowClosePaths)
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
             }
         }
     }
@@ -5200,6 +5582,7 @@ public sealed partial class MainWindow : Window
                 "Review tabs individually"),
             HorizontalAlignment = HorizontalAlignment.Left,
         };
+        AutomationProperties.SetAutomationId(reviewButton, "ReviewTabsButton");
         AutomationProperties.SetName(
             reviewButton,
             DesktopResources.Get(

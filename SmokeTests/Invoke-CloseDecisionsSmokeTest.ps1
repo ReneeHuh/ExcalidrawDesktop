@@ -114,6 +114,9 @@ try {
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "SecondaryButton" -DeadlineUtc $deadlineUtc
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "ReviewTabsButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
     while ([DateTime]::UtcNow -lt $deadlineUtc -and
         -not [System.IO.File]::Exists($resultPath)) {
         Start-Sleep -Milliseconds 100
@@ -132,6 +135,9 @@ try {
         CancelPreservedDirtyDrawing = $true
         DiscardClosedDirtyDrawing = $true
         SaveWroteOwningFileAndClosed = $true
+        WindowCancelPreservedAllDirtyDrawings = $true
+        ReviewSelectedFirstDirtyDrawing = $true
+        SaveAllWroteEveryOwningFile = $true
     }
 }
 finally {

@@ -97,6 +97,8 @@ try {
                 CleanInactiveTabUnloaded = $true
                 SelectedTabRecreated = $true
                 UniqueOriginPreserved = $true
+                LargeScenePreserved = $true
+                EmbeddedImagePreserved = $true
             }
             return
         }
