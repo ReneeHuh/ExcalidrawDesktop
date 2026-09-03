@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using ExcalidrawDesktop.Core;
 using ExcalidrawDesktop.App.Controls;
@@ -24,6 +25,7 @@ namespace ExcalidrawDesktop.App;
 
 public sealed partial class MainWindow : Window
 {
+    private const int InvalidStateHResult = unchecked((int)0x8007139F);
     private const string WebView2HelpUri =
         "https://developer.microsoft.com/en-us/microsoft-edge/webview2/";
     private static readonly TimeSpan ExitActivationTimeout =
@@ -285,12 +287,13 @@ public sealed partial class MainWindow : Window
 
     private void SendEditorTheme(DocumentSession session)
     {
-        if (!session.IsReady || session.CoreWebView is null)
+        if (!CanPostEditorMessage(session))
         {
             return;
         }
 
-        session.CoreWebView.PostWebMessageAsJson(
+        TryPostEditorMessage(
+            session,
             BridgeEventJson.Create(
                 "app.themeChanged",
                 new { theme = MainLayout.ActualTheme == ElementTheme.Dark ? "dark" : "light" }));
@@ -298,13 +301,14 @@ public sealed partial class MainWindow : Window
 
     private void SendEditorLanguage(DocumentSession session)
     {
-        if (!session.IsReady || session.CoreWebView is null)
+        if (!CanPostEditorMessage(session))
         {
             return;
         }
 
         var language = workspaceCoordinator.EffectiveLanguage;
-        session.CoreWebView.PostWebMessageAsJson(
+        TryPostEditorMessage(
+            session,
             BridgeEventJson.Create(
                 "app.languageChanged",
                 new
@@ -312,6 +316,31 @@ public sealed partial class MainWindow : Window
                     langCode = language.ExcalidrawCode,
                     direction = language.Direction,
                 }));
+    }
+
+    private static bool CanPostEditorMessage(DocumentSession session) =>
+        session.IsReady &&
+        !session.IsSuspended &&
+        !session.IsSuspensionChanging &&
+        !session.IsUnloading &&
+        !session.IsUnloaded &&
+        !session.IsResuming &&
+        session.CoreWebView is not null;
+
+    private static void TryPostEditorMessage(
+        DocumentSession session,
+        string message)
+    {
+        try
+        {
+            session.CoreWebView!.PostWebMessageAsJson(message);
+        }
+        catch (COMException exception) when (
+            exception.HResult == InvalidStateHResult)
+        {
+            Debug.WriteLine(
+                $"Editor message skipped during a WebView lifecycle transition: {exception.Message}");
+        }
     }
 
     private void OnEditorLanguageApplied(
@@ -1112,6 +1141,8 @@ public sealed partial class MainWindow : Window
 
         session.IsResuming = false;
         session.InactiveSince = null;
+        SendEditorTheme(session);
+        SendEditorLanguage(session);
         UpdateStatusBar(session);
     }
 
