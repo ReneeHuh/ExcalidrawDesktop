@@ -99,6 +99,8 @@ try {
                 UniqueOriginPreserved = $true
                 LargeScenePreserved = $true
                 EmbeddedImagePreserved = $true
+                UnloadFailureKeptEditorLive = $true
+                RepeatedUnloadRecreateCycles = 3
             }
             return
         }

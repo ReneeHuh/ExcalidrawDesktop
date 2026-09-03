@@ -1136,7 +1136,7 @@ public sealed partial class MainWindow : Window
 
             await webView.EnsureCoreWebView2Async();
             ConfigureWebView(session, webView.CoreWebView2);
-            var entryPoint = runTabSmoke || runSuspensionSmoke ||
+            var entryPoint = runTabSmoke || runMultiWindowSmoke || runSuspensionSmoke ||
                 runRecoverySmoke || verifyRecoverySmoke ||
                 runDocumentSafetySmoke || runCloseDecisionsSmoke
                     ? $"{session.TabOrigin.EntryPoint}?desktopSmoke=1"
@@ -2401,7 +2401,7 @@ public sealed partial class MainWindow : Window
 
     private async Task RunMultiWindowSmokeAsync()
     {
-        string? watcherProbePath = null;
+        var paths = new List<string>();
         try
         {
             if (sessions.Count != 2 || sessions.Any(session =>
@@ -2411,9 +2411,11 @@ public sealed partial class MainWindow : Window
                     "The multi-window smoke test requires two ready drawing tabs.");
             }
 
+            var sourceSession = sessions[0];
             var session = sessions[1];
             var originalCoreWebView = session.CoreWebView;
             var originalOrigin = session.TabOrigin;
+            var originalRecoveryId = session.RecoveryId;
             var originalWindowCount = workspaceCoordinator.Windows.Count;
 
             session.IsSuspended = true;
@@ -2426,17 +2428,71 @@ public sealed partial class MainWindow : Window
             }
             session.IsSuspended = false;
 
-            watcherProbePath = Path.Combine(
+            var sourcePath = Path.Combine(
                 AppContext.BaseDirectory,
-                "multi-window-watcher-cleanup.tmp");
+                "multi-window-source.excalidraw");
+            var movedPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "multi-window-moved.excalidraw");
+            var saveAsPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "multi-window-moved-save-as.excalidraw");
+            var renamedPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "multi-window-moved-renamed.excalidraw");
+            paths.AddRange([sourcePath, movedPath, saveAsPath, renamedPath]);
+            var sourceInitial = CreateDocumentSafetyScene(
+                "multi-window-source-initial",
+                -200);
+            var movedInitial = CreateDocumentSafetyScene(
+                "multi-window-moved-initial",
+                200);
+            await File.WriteAllTextAsync(sourcePath, sourceInitial);
+            await File.WriteAllTextAsync(movedPath, movedInitial);
             await File.WriteAllTextAsync(
-                watcherProbePath,
-                "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[],\"appState\":{},\"files\":{}}");
-            await session.DocumentService.RestoreActiveFileAsync(watcherProbePath);
-            WatchExternalFile(session, watcherProbePath);
+                saveAsPath,
+                CreateDocumentSafetyScene("multi-window-save-as-placeholder", 0));
+            AttachDocumentToSession(
+                sourceSession,
+                await sourceSession.DocumentService.OpenPathAsync(sourcePath),
+                select: true);
+            AttachDocumentToSession(
+                session,
+                await session.DocumentService.OpenPathAsync(movedPath),
+                select: false);
+            if (!await WaitUntilAsync(
+                    () => sourceSession.PendingDocumentLoad is null &&
+                        session.PendingDocumentLoad is null,
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The multi-window file fixtures did not finish loading.");
+            }
             var sourceWatcher = session.ExternalFileWatcher;
-            session.IsDirty = true;
-            UpdateTabHeader(session);
+            DocumentTabs.SelectedItem = session.TabItem;
+            if (!await WaitUntilAsync(
+                    () => ReferenceEquals(ActiveSession, session),
+                    TimeSpan.FromSeconds(5)))
+            {
+                throw new InvalidOperationException(
+                    "The transfer fixture could not activate its drawing.");
+            }
+            RequestAutomationEdit(session, "multi-window-moved-edited");
+            if (!await WaitUntilAsync(
+                    () => session.IsDirty,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "The transferred drawing did not become dirty.");
+            }
+            DocumentTabs.SelectedItem = sourceSession.TabItem;
+            if (!await WaitUntilAsync(
+                    () => ReferenceEquals(ActiveSession, sourceSession),
+                    TimeSpan.FromSeconds(5)))
+            {
+                throw new InvalidOperationException(
+                    "The transfer fixture could not return focus to the source drawing.");
+            }
             var destination = workspaceCoordinator.CreateWindow(
                 activate: true,
                 createInitialTab: false);
@@ -2462,12 +2518,130 @@ public sealed partial class MainWindow : Window
                     $"The live drawing did not move into the second window intact: {string.Join(", ", firstMoveFailures)}.");
             }
 
+            RequestSessionSave(session);
+            if (!await WaitUntilAsync(
+                    () => !session.IsDirty &&
+                        FileContains(movedPath, "multi-window-moved-edited"),
+                    TimeSpan.FromSeconds(20)) ||
+                !string.Equals(
+                    await File.ReadAllTextAsync(sourcePath),
+                    sourceInitial,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Saving in the destination window changed the wrong file.");
+            }
+
+            RequestAutomationEdit(sourceSession, "multi-window-source-edited");
+            if (!await WaitUntilAsync(
+                    () => sourceSession.IsDirty,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "The source-window drawing did not become dirty.");
+            }
+            RequestSessionSave(sourceSession);
+            if (!await WaitUntilAsync(
+                    () => !sourceSession.IsDirty &&
+                        FileContains(sourcePath, "multi-window-source-edited"),
+                    TimeSpan.FromSeconds(20)) ||
+                !FileContains(movedPath, "multi-window-moved-edited"))
+            {
+                throw new InvalidOperationException(
+                    "Saving in the source window changed the destination file.");
+            }
+
+            RequestAutomationEdit(session, "multi-window-save-as-edited");
+            if (!await WaitUntilAsync(
+                    () => session.IsDirty,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "The cross-window Save As fixture did not become dirty.");
+            }
+            session.DocumentService.SaveFileOverrideForSmoke =
+                await StorageFile.GetFileFromPathAsync(saveAsPath);
+            RequestSessionSave(session, reason: "saveAs");
+            if (!await WaitUntilAsync(
+                    () => !session.IsDirty &&
+                        DesktopDocumentPath.Equals(
+                            session.DocumentService.DocumentPath,
+                            saveAsPath) &&
+                        FileContains(saveAsPath, "multi-window-save-as-edited"),
+                    TimeSpan.FromSeconds(20)) ||
+                !FileContains(sourcePath, "multi-window-source-edited"))
+            {
+                throw new InvalidOperationException(
+                    "Save As did not remain isolated to the destination window.");
+            }
+
+            var externallyModified = CreateDocumentSafetyScene(
+                "multi-window-external-modified",
+                300);
+            await File.WriteAllTextAsync(saveAsPath, externallyModified);
+            await destination.CheckExternalFileStateAsync(session, showPrompt: false);
+            if (session.ExternalFileState != ExternalFileState.Modified ||
+                sourceSession.ExternalFileState != ExternalFileState.None)
+            {
+                throw new InvalidOperationException(
+                    "An external modification crossed window ownership boundaries.");
+            }
+            await destination.ReloadExternalFileAsync(session);
+            if (!await WaitUntilAsync(
+                    () => session.PendingDocumentLoad is null,
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The destination window could not reload its modified file.");
+            }
+
+            File.Move(saveAsPath, renamedPath, overwrite: true);
+            await destination.CheckExternalFileStateAsync(session, showPrompt: false);
+            if (session.ExternalFileState is not
+                (ExternalFileState.Moved or ExternalFileState.Deleted))
+            {
+                throw new InvalidOperationException(
+                    "The destination window did not detect an external move.");
+            }
+            File.Move(renamedPath, saveAsPath, overwrite: true);
+            await session.DocumentService.RestoreActiveFileAsync(saveAsPath);
+            destination.WatchExternalFile(session, saveAsPath);
+            session.ExternalFileState = ExternalFileState.None;
+
+            var restoredContent = await File.ReadAllTextAsync(saveAsPath);
+            File.Delete(saveAsPath);
+            await destination.CheckExternalFileStateAsync(session, showPrompt: false);
+            if (session.ExternalFileState != ExternalFileState.Deleted)
+            {
+                throw new InvalidOperationException(
+                    "The destination window did not detect external deletion.");
+            }
+            await File.WriteAllTextAsync(saveAsPath, restoredContent);
+            await session.DocumentService.RestoreActiveFileAsync(saveAsPath);
+            destination.WatchExternalFile(session, saveAsPath);
+            session.ExternalFileState = ExternalFileState.None;
+
+            RequestAutomationEdit(session, "multi-window-recovery-edited");
+            if (!await WaitUntilAsync(
+                    () => session.IsDirty && session.RecoveryUpdatedAt is not null,
+                    TimeSpan.FromSeconds(20)) ||
+                await destination.recoverySnapshotStore.LoadAsync(
+                    originalRecoveryId) is not { } recoveryContent ||
+                !recoveryContent.Contains(
+                    "multi-window-recovery-edited",
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "The destination window did not persist the transferred session recovery snapshot.");
+            }
+
             if (!workspaceCoordinator.MoveSession(destination, session, this, 0) ||
                 !sessions.Contains(session) ||
                 destination.OpenSessions.Contains(session) ||
                 !ReferenceEquals(session.CoreWebView, originalCoreWebView) ||
                 session.TabOrigin != originalOrigin ||
                 !session.IsDirty ||
+                session.RecoveryId != originalRecoveryId ||
                 session.DetachWindowHandlers is null ||
                 session.DetachWebViewHandlers is null ||
                 session.DetachEditorHandlers is null ||
@@ -2475,6 +2649,25 @@ public sealed partial class MainWindow : Window
             {
                 throw new InvalidOperationException(
                     "The drawing did not move back to its source window intact.");
+            }
+
+            if (await recoverySnapshotStore.LoadAsync(originalRecoveryId) is not
+                    { } transferredRecovery ||
+                !transferredRecovery.Contains(
+                    "multi-window-recovery-edited",
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Recovery identity or content was lost during transfer.");
+            }
+            RequestSessionSave(session);
+            if (!await WaitUntilAsync(
+                    () => !session.IsDirty &&
+                        FileContains(saveAsPath, "multi-window-recovery-edited"),
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The recovered transferred session did not save to its owning file.");
             }
 
             await Task.Delay(100);
@@ -2518,9 +2711,6 @@ public sealed partial class MainWindow : Window
                     "A repeated transfer leaked an empty window.");
             }
 
-            session.IsDirty = false;
-            UpdateTabHeader(session);
-
             Title = "Excalidraw Desktop — Multi-window smoke passed";
         }
         catch (Exception exception)
@@ -2530,13 +2720,19 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            sessions.FirstOrDefault(candidate =>
-                DesktopDocumentPath.Equals(
-                    candidate.DocumentService.DocumentPath,
-                    watcherProbePath))?.DetachExternalFileWatcher();
-            if (watcherProbePath is not null && File.Exists(watcherProbePath))
+            foreach (var openSession in workspaceCoordinator.Windows
+                .SelectMany(window => window.OpenSessions))
             {
-                File.Delete(watcherProbePath);
+                if (paths.Any(path => DesktopDocumentPath.Equals(
+                    openSession.DocumentService.DocumentPath,
+                    path)))
+                {
+                    openSession.DetachExternalFileWatcher();
+                }
+            }
+            foreach (var path in paths.Where(File.Exists))
+            {
+                File.Delete(path);
             }
         }
     }
@@ -3039,6 +3235,27 @@ public sealed partial class MainWindow : Window
                     "The large embedded-image drawing did not load cleanly.");
             }
 
+            var liveCoreBeforeFailure = unloading.CoreWebView;
+            await File.WriteAllTextAsync(largeScenePath, "{ invalid lifecycle fixture");
+            unloading.InactiveSince = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(16);
+            if (await UnloadSessionAsync(unloading, requireIdle: true) ||
+                unloading.IsUnloaded ||
+                !unloading.IsReady ||
+                unloading.CoreWebView is null ||
+                !ReferenceEquals(unloading.CoreWebView, liveCoreBeforeFailure) ||
+                !unloading.Content.HasEditor ||
+                string.IsNullOrWhiteSpace(unloading.LastLifecycleFailure))
+            {
+                throw new InvalidOperationException(
+                    "A failed unload did not leave the live editor available for recovery.");
+            }
+            await File.WriteAllTextAsync(
+                largeScenePath,
+                CreateLargeLifecycleScene(elementCount: 500));
+            await unloading.DocumentService.RestoreActiveFileAsync(largeScenePath);
+            unloading.ExternalFileState = ExternalFileState.None;
+            unloading.LastLifecycleFailure = null;
+
             sleeping.InactiveSince = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(6);
             if (!await SuspendSessionAsync(sleeping, requireIdle: true) ||
                 !sleeping.IsSuspended ||
@@ -3060,50 +3277,70 @@ public sealed partial class MainWindow : Window
                     "The sleeping tab did not resume when selected.");
             }
 
-            unloading.InactiveSince = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(16);
-            if (!await SuspendSessionAsync(unloading, requireIdle: false) ||
-                !unloading.IsSuspended ||
-                !await UnloadSessionAsync(unloading, requireIdle: true) ||
-                !unloading.IsUnloaded ||
-                unloading.CoreWebView is not null ||
-                unloading.DetachWebViewHandlers is not null ||
-                unloading.DetachEditorHandlers is not null ||
-                unloading.Content.HasEditor ||
-                unloading.LastLifecycleFailure is not null)
+            for (var cycle = 0; cycle < 3; cycle++)
             {
-                throw new InvalidOperationException(
-                    $"The inactive clean tab did not fully unload. {unloading.LastLifecycleFailure}");
-            }
+                DocumentTabs.SelectedItem = sleeping.TabItem;
+                if (!await WaitUntilAsync(
+                        () => ReferenceEquals(ActiveSession, sleeping) &&
+                            unloading.Content.Visibility != Visibility.Visible,
+                        TimeSpan.FromSeconds(5)))
+                {
+                    throw new InvalidOperationException(
+                        $"Unload cycle {cycle + 1} could not deactivate the target tab.");
+                }
+                unloading.InactiveSince =
+                    DateTimeOffset.UtcNow - TimeSpan.FromMinutes(16);
+                var suspensionReady = cycle != 0 ||
+                    await SuspendSessionAsync(unloading, requireIdle: false);
+                var unloadedForCycle = suspensionReady &&
+                    await UnloadSessionAsync(unloading, requireIdle: true);
+                if (!suspensionReady ||
+                    !unloadedForCycle ||
+                    !unloading.IsUnloaded ||
+                    unloading.CoreWebView is not null ||
+                    unloading.DetachWebViewHandlers is not null ||
+                    unloading.DetachEditorHandlers is not null ||
+                    unloading.Content.HasEditor ||
+                    unloading.LastLifecycleFailure is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"C{cycle + 1}: ready={unloading.IsReady}, dirty={unloading.IsDirty}, " +
+                        $"suspended={unloading.IsSuspended}, unloaded={unloading.IsUnloaded}, " +
+                        $"core={unloading.CoreWebView is not null}, " +
+                        $"pending={unloading.PendingDocumentLoad is not null}; " +
+                        unloading.LastLifecycleFailure);
+                }
 
-            DocumentTabs.SelectedItem = unloading.TabItem;
-            var resumeDeadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
-            while ((!unloading.IsReady || unloading.IsRestoringFromHibernation) &&
-                DateTimeOffset.UtcNow < resumeDeadline)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(100));
-            }
+                DocumentTabs.SelectedItem = unloading.TabItem;
+                var resumeDeadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
+                while ((!unloading.IsReady || unloading.IsRestoringFromHibernation) &&
+                    DateTimeOffset.UtcNow < resumeDeadline)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(100));
+                }
 
-            if (!unloading.IsReady ||
-                unloading.IsUnloaded ||
-                unloading.IsRestoringFromHibernation ||
-                !ReferenceEquals(ActiveSession, unloading) ||
-                unloading.CoreWebView is null ||
-                unloading.DetachWebViewHandlers is null ||
-                unloading.DetachEditorHandlers is null ||
-                !unloading.Content.HasEditor ||
-                !unloading.TabOrigin.Matches(unloading.CoreWebView.Source))
-            {
-                throw new InvalidOperationException(
-                    "The unloaded tab did not recreate its isolated editor.");
-            }
+                if (!unloading.IsReady ||
+                    unloading.IsUnloaded ||
+                    unloading.IsRestoringFromHibernation ||
+                    !ReferenceEquals(ActiveSession, unloading) ||
+                    unloading.CoreWebView is null ||
+                    unloading.DetachWebViewHandlers is null ||
+                    unloading.DetachEditorHandlers is null ||
+                    !unloading.Content.HasEditor ||
+                    !unloading.TabOrigin.Matches(unloading.CoreWebView.Source))
+                {
+                    throw new InvalidOperationException(
+                        $"Unload cycle {cycle + 1} did not recreate its isolated editor.");
+                }
 
-            var restoredState = await ReadSmokeStateAsync(unloading);
-            if (restoredState.ElementIds.Length != 501 ||
-                !restoredState.ElementIds.Contains("lifecycle-embedded-image") ||
-                !restoredState.FileIds.Contains("lifecycle-image-file"))
-            {
-                throw new InvalidOperationException(
-                    "The large drawing or its embedded image was not preserved across unload/recreate.");
+                var restoredState = await ReadSmokeStateAsync(unloading);
+                if (restoredState.ElementIds.Length != 501 ||
+                    !restoredState.ElementIds.Contains("lifecycle-embedded-image") ||
+                    !restoredState.FileIds.Contains("lifecycle-image-file"))
+                {
+                    throw new InvalidOperationException(
+                        $"Unload cycle {cycle + 1} lost the large drawing or embedded image.");
+                }
             }
 
             Title = "Excalidraw Desktop — Suspension smoke passed";
@@ -3733,9 +3970,13 @@ public sealed partial class MainWindow : Window
             var movedPath = Path.Combine(
                 AppContext.BaseDirectory,
                 "document-safety-first-moved.excalidraw");
+            var saveAsPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "document-safety-conflict-save-as.excalidraw");
             paths.Add(firstPath);
             paths.Add(secondPath);
             paths.Add(movedPath);
+            paths.Add(saveAsPath);
 
             var firstInitial = CreateDocumentSafetyScene("first-initial", -200);
             var secondInitial = CreateDocumentSafetyScene("second-initial", 200);
@@ -3799,25 +4040,93 @@ public sealed partial class MainWindow : Window
             await File.WriteAllTextAsync(
                 firstPath,
                 CreateDocumentSafetyScene("first-external", -300));
+            Title = "Excalidraw Desktop — Document safety smoke: choose Reload";
+            await CheckExternalFileStateAsync(first, showPrompt: true);
             if (!await WaitUntilAsync(
-                    () => first.ExternalFileState == ExternalFileState.Modified,
+                    () => first.PendingDocumentLoad is null &&
+                        first.ExternalFileState == ExternalFileState.None,
+                    TimeSpan.FromSeconds(20)) ||
+                !(await ReadSmokeStateAsync(first)).ElementIds.Contains(
+                    "first-external"))
+            {
+                throw new InvalidOperationException(
+                    "Reload did not adopt the externally modified drawing.");
+            }
+
+            RequestAutomationEdit(first, "first-conflict-save-as");
+            if (!await WaitUntilAsync(
+                    () => first.IsDirty,
                     TimeSpan.FromSeconds(10)))
             {
                 throw new InvalidOperationException(
-                    "An external file modification was not detected.");
+                    "The Save As conflict fixture did not become dirty.");
+            }
+            var originalExternalContent = CreateDocumentSafetyScene(
+                "first-external-before-save-as",
+                -350);
+            await File.WriteAllTextAsync(firstPath, originalExternalContent);
+            await File.WriteAllTextAsync(
+                saveAsPath,
+                CreateDocumentSafetyScene("save-as-placeholder", 0));
+            first.DocumentService.SaveFileOverrideForSmoke =
+                await StorageFile.GetFileFromPathAsync(saveAsPath);
+            Title = "Excalidraw Desktop — Document safety smoke: choose Save As";
+            await CheckExternalFileStateAsync(first, showPrompt: true);
+            if (!await WaitUntilAsync(
+                    () => DesktopDocumentPath.Equals(
+                            first.DocumentService.DocumentPath,
+                            saveAsPath) &&
+                        !first.IsDirty &&
+                        FileContains(saveAsPath, "first-conflict-save-as"),
+                    TimeSpan.FromSeconds(20)) ||
+                !string.Equals(
+                    await File.ReadAllTextAsync(firstPath),
+                    originalExternalContent,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Save As did not preserve the external file and write the chosen file.");
             }
 
-            var refreshedFirst = await first.DocumentService.OpenPathAsync(firstPath);
+            RequestAutomationEdit(first, "first-keep-editing");
+            if (!await WaitUntilAsync(
+                    () => first.IsDirty,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "The Keep Editing conflict fixture did not become dirty.");
+            }
+            var keepEditingDiskContent = CreateDocumentSafetyScene(
+                "first-external-keep-editing",
+                -400);
+            await File.WriteAllTextAsync(saveAsPath, keepEditingDiskContent);
+            Title = "Excalidraw Desktop — Document safety smoke: choose Keep Editing";
+            await CheckExternalFileStateAsync(first, showPrompt: true);
+            if (!first.IsDirty ||
+                first.ExternalFileState != ExternalFileState.Modified ||
+                !DesktopDocumentPath.Equals(
+                    first.DocumentService.DocumentPath,
+                    saveAsPath) ||
+                !string.Equals(
+                    await File.ReadAllTextAsync(saveAsPath),
+                    keepEditingDiskContent,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Keep Editing did not preserve the dirty editor and external file.");
+            }
+
+            var refreshedFirst = await first.DocumentService.OpenPathAsync(saveAsPath);
             AttachDocumentToSession(first, refreshedFirst, select: true);
             if (!await WaitUntilAsync(
                     () => first.PendingDocumentLoad is null,
                     TimeSpan.FromSeconds(20)))
             {
                 throw new InvalidOperationException(
-                    "The modified drawing could not be reloaded.");
+                    "The conflict-resolution drawing could not be refreshed.");
             }
 
-            File.Move(firstPath, movedPath, overwrite: true);
+            File.Move(saveAsPath, movedPath, overwrite: true);
             if (!await WaitUntilAsync(
                     () => first.ExternalFileState is
                         ExternalFileState.Moved or ExternalFileState.Deleted,
@@ -3927,12 +4236,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void RequestSessionSave(DocumentSession session)
+    private void RequestSessionSave(
+        DocumentSession session,
+        string reason = "save")
     {
         session.CoreWebView!.PostWebMessageAsJson(
             BridgeEventJson.Create(
                 "document.saveRequested",
-                new { reason = "save" }));
+                new { reason }));
     }
 
     private static async Task<bool> WaitUntilAsync(

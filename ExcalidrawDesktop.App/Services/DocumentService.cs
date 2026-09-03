@@ -62,6 +62,10 @@ public sealed class DocumentService
 
     public Func<string, bool>? IsPathOwnedByAnotherSession { get; set; }
 
+#if DEBUG
+    internal StorageFile? SaveFileOverrideForSmoke { get; set; }
+#endif
+
     public string? DocumentPath => activeCanonicalPath ?? pendingCanonicalPath;
 
     public bool HasActiveFile => activeFile is not null;
@@ -450,6 +454,13 @@ public sealed class DocumentService
 
     private async Task<StorageFile?> PickSaveFileAsync()
     {
+#if DEBUG
+        if (SaveFileOverrideForSmoke is { } smokeFile)
+        {
+            SaveFileOverrideForSmoke = null;
+            return smokeFile;
+        }
+#endif
         var picker = new FileSavePicker
         {
             SuggestedStartLocation = PickerLocationId.DocumentsLibrary,

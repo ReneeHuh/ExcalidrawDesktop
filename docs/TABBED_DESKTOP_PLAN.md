@@ -500,8 +500,9 @@ Tasks:
   editor recreation.
 - Record Release-build memory and switching performance on the minimum
   supported machine.
-- Validate repeated unload/recreate cycles and external changes during
-  hibernation; the large-scene and embedded-image path is covered.
+- [x] Validate repeated unload/recreate cycles and external changes during
+  hibernation. Packaged automation keeps the editor live after a rejected
+  unload and preserves a 501-element embedded-image scene across three cycles.
 - Improve loading, failure, recovery, and empty-workspace visuals.
 - Add structured diagnostics that never contain drawing contents.
 

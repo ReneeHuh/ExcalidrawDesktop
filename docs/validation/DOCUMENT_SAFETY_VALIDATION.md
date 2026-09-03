@@ -15,6 +15,9 @@ PowerShell process. The document-safety additions produced these results:
 | Detect an external file modification | Passed |
 | Detect an external move or rename | Passed |
 | Detect an external deletion | Passed |
+| Choose Reload for an interactive external-change conflict | Passed |
+| Choose Save As without overwriting the external version | Passed |
+| Choose Keep Editing and preserve both dirty editor and disk version | Passed |
 | Cancel an individual dirty-tab close without losing the tab | Passed |
 | Discard and close an individual dirty tab | Passed |
 | Save an individual dirty tab to its owning file and close it | Passed |
@@ -25,6 +28,10 @@ PowerShell process. The document-safety additions produced these results:
 | Isolate IndexedDB, scene, viewport, zoom, and selection across two tabs | Passed |
 | Undo only the active tab's captured editor change | Passed |
 | Preserve a 501-element drawing and embedded PNG through unload/recreation | Passed |
+| Reject an unsafe unload while retaining the live editor | Passed |
+| Preserve the large drawing through three unload/recreate cycles | Passed |
+| Isolate Save, Save As, and external changes across two windows | Passed |
+| Preserve recovery identity/content through a live window transfer | Passed |
 
 The recovery test now requests a real Excalidraw scene update through the
 session-bound bridge. It then waits for the normal dirty notification and

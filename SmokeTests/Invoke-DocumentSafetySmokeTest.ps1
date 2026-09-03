@@ -13,10 +13,51 @@ $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
 . (Join-Path $testRoot "SmokeTestCommon.ps1")
+Add-Type -AssemblyName UIAutomationClient
 
 $startedProcess = $null
 $requestPath = $null
 $statePath = $null
+
+function Invoke-DialogButton {
+    param(
+        [Parameter(Mandatory)] [System.Diagnostics.Process] $Process,
+        [Parameter(Mandatory)] [string] $ButtonAutomationId,
+        [Parameter(Mandatory)] [DateTime] $DeadlineUtc
+    )
+
+    $processCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+        $Process.Id)
+    $buttonIdCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        $ButtonAutomationId)
+    while ([DateTime]::UtcNow -lt $DeadlineUtc) {
+        $Process.Refresh()
+        if ($Process.HasExited) {
+            throw "Excalidraw Desktop exited while waiting for '$ButtonAutomationId'."
+        }
+        if ($Process.MainWindowTitle.StartsWith(
+                "Excalidraw Desktop — Document safety smoke failed:",
+                [System.StringComparison]::Ordinal)) {
+            throw $Process.MainWindowTitle
+        }
+        $button = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.AndCondition]::new(
+                $processCondition,
+                $buttonIdCondition))
+        if ($button -and $button.Current.IsEnabled) {
+            $invoke = $button.GetCurrentPattern(
+                [System.Windows.Automation.InvokePattern]::Pattern)
+            $invoke.Invoke()
+            Start-Sleep -Milliseconds 500
+            return
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    throw "Timed out waiting for '$ButtonAutomationId'. Last title: $($Process.MainWindowTitle)"
+}
 
 try {
     if (-not $SkipBuild) {
@@ -49,6 +90,10 @@ try {
 
     [System.IO.File]::WriteAllText($requestPath, "run")
     $startedProcess = Start-DesktopPackagedApp -Package $package
+    $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "SecondaryButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
     Wait-DesktopWindowTitle `
         -Process $startedProcess `
         -ExpectedTitle "Excalidraw Desktop — Document safety smoke passed" `
@@ -63,6 +108,9 @@ try {
         ExternalModification = $true
         ExternalMoveOrRename = $true
         ExternalDeletion = $true
+        ConflictReload = $true
+        ConflictSaveAs = $true
+        ConflictKeepEditing = $true
     }
 }
 finally {

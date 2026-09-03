@@ -142,6 +142,10 @@ try {
                 DirtyStatePreserved = $true
                 WatcherRebound = $true
                 RepeatedMoveCleanup = $true
+                SaveIsolation = $true
+                SaveAsIsolation = $true
+                ExternalChangeIsolation = $true
+                RecoveryIdentityPreserved = $true
             }
             return
         }

@@ -369,12 +369,14 @@ Exit criteria:
 
 ### Phase M5: Hardening and release evidence
 
-- [ ] Test Save and Save As isolation across windows.
-- [ ] Test window-close and application-exit decisions with several dirty
+- [x] Test Save and Save As isolation across windows.
+- [x] Test window-close and application-exit decisions with several dirty
   drawings.
-- [ ] Test external modification, move, and deletion across windows.
+- [x] Test external modification, move, and deletion across windows.
 - [ ] Test transfer during initialization, recovery, suspend, resume, unload,
-  and WebView process failure.
+  and WebView process failure. Recovery identity/content now survives a live
+  transfer and suspended transfers are rejected; the other transition races
+  remain open.
 - [ ] Test narrow, maximized, snapped, and mixed-DPI windows.
 - [ ] Test keyboard-only use, Narrator, touch, pen, and title-bar input.
 - [ ] Rerun the 1/5/10/20-tab memory matrix across one and several windows.

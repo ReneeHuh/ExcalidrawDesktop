@@ -56,8 +56,9 @@ plan in the same change.
 - [x] Keep dirty, loading, saving, recovering, or conflicted tabs live until
   their state can be preserved safely.
 - [x] Show sleeping and resuming states in the tab and status bar.
-- [ ] Add packaged suspension failure-recovery coverage. Basic suspend/resume
-  and origin-preservation automation is implemented.
+- [x] Add packaged suspension failure-recovery coverage. The lifecycle smoke
+  rejects an externally changed backing file without disposing the live editor,
+  then verifies three unload/recreate cycles.
 - [x] Rerun and evaluate the 1/5/10/20-tab performance matrix after suspension.
 - [x] Fully unload safe clean editors after fifteen inactive minutes and
   recreate them on selection, preserving the native session and isolated origin.
@@ -88,8 +89,9 @@ The current packaged suite passes startup, unique tab origins and local-storage
 isolation, workspace restore, real-edit forced recovery, suspend/unload/recreate,
 multi-window session transfer, clean coordinated exit, two-window dirty
 Discard All, file activation, document safety, individual close decisions,
-localization, and whole-drawing PNG export. The narrower unchecked cases below
-still need purpose-built automation or manual evidence.
+interactive external-conflict choices, cross-window Save/Save As and recovery
+isolation, localization, and whole-drawing PNG export. The narrower unchecked
+cases below still need purpose-built automation or manual evidence.
 
 - [x] Prove with packaged tests that Save and Save As affect only the owning
   tab and file.
