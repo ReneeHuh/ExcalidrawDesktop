@@ -69,6 +69,36 @@ public sealed class MultiWindowWorkspaceStateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveAsync_DoesNotRewriteUnchangedState()
+    {
+        var path = Path.Combine(testDirectory, "unchanged.json");
+        var store = new MultiWindowWorkspaceStateStore(path);
+        var state = new MultiWindowWorkspaceState(
+            MultiWindowWorkspaceState.CurrentVersion,
+            Array.Empty<string>(),
+            "main",
+            new[]
+            {
+                new WorkspaceWindowState(
+                    "main",
+                    null,
+                    false,
+                    null,
+                    Array.Empty<WorkspaceTabState>()),
+            });
+
+        await store.SaveAsync(state);
+        store = new MultiWindowWorkspaceStateStore(path);
+        await store.LoadAsync();
+        var marker = new DateTime(2020, 1, 2, 3, 4, 6, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(path, marker);
+
+        await store.SaveAsync(state);
+
+        Assert.Equal(marker, File.GetLastWriteTimeUtc(path));
+    }
+
+    [Fact]
     public async Task MigratesVersionTwoIntoOneLogicalWindow()
     {
         var path = Path.Combine(testDirectory, "workspace.json");

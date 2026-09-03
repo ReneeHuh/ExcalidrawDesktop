@@ -148,8 +148,8 @@ try {
                 [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
                 $startedProcess.Id)
             $nameCondition = [System.Windows.Automation.PropertyCondition]::new(
-                [System.Windows.Automation.AutomationElement]::NameProperty,
-                "Discard all")
+                [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+                "SecondaryButton")
             $condition = [System.Windows.Automation.AndCondition]::new(
                 $processCondition,
                 $nameCondition)

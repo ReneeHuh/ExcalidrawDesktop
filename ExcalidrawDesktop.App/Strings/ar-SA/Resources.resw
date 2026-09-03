@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><xsd:import namespace="http://www.w3.org/XML/1998/namespace" /><xsd:element name="root" msdata:IsDataSet="true"><xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /><xsd:element name="comment" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element><xsd:element name="resheader"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" type="xsd:string" use="required" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType></xsd:element></xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="AppDisplayName" xml:space="preserve"><value>Excalidraw Desktop</value></data>
+  <data name="PublisherDisplayName" xml:space="preserve"><value>تطوير Excalidraw Desktop</value></data>
+  <data name="AppDescription" xml:space="preserve"><value>تطبيق سطح مكتب محلي أولًا لـ Excalidraw</value></data>
+  <data name="ExcalidrawFileTypeDisplayName" xml:space="preserve"><value>رسم Excalidraw</value></data>
+  <data name="DocumentTabs.AutomationProperties.Name" xml:space="preserve"><value>الرسومات المفتوحة</value></data>
+  <data name="ApplicationMenu.AutomationProperties.Name" xml:space="preserve"><value>قائمة التطبيق</value></data>
+  <data name="FileMenu.Title" xml:space="preserve"><value>ملف</value></data>
+  <data name="NewTabMenuItem.Text" xml:space="preserve"><value>علامة تبويب جديدة</value></data>
+  <data name="NewWindowMenuItem.Text" xml:space="preserve"><value>نافذة جديدة</value></data>
+  <data name="OpenMenuItem.Text" xml:space="preserve"><value>فتح…</value></data>
+  <data name="RecentFilesMenu.Text" xml:space="preserve"><value>الأخيرة</value></data>
+  <data name="SaveMenuItem.Text" xml:space="preserve"><value>حفظ</value></data>
+  <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>حفظ باسم…</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>حفظ الكل</value></data>
+  <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>تصدير الرسم بالكامل بصيغة PNG…</value></data>
+  <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>إغلاق علامة التبويب</value></data>
+  <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>إغلاق النافذة</value></data>
+  <data name="SettingsMenuItem.Text" xml:space="preserve"><value>الإعدادات</value></data>
+  <data name="ExitMenuItem.Text" xml:space="preserve"><value>خروج</value></data>
+  <data name="WindowDragRegion.AutomationProperties.Name" xml:space="preserve"><value>منطقة سحب النافذة</value></data>
+  <data name="SettingsButton.AutomationProperties.Name" xml:space="preserve"><value>إظهار علامة تبويب الإعدادات</value></data>
+  <data name="StatusBar.AutomationProperties.Name" xml:space="preserve"><value>حالة الرسم</value></data>
+  <data name="StatusDocumentText.Text" xml:space="preserve"><value>بلا عنوان</value></data>
+  <data name="StatusStateText.Text" xml:space="preserve"><value>رسم جديد</value></data>
+  <data name="AppearanceSection.Text" xml:space="preserve"><value>المظهر</value></data>
+  <data name="ThemeSettingsCard.Header" xml:space="preserve"><value>نسق إطار التطبيق</value></data>
+  <data name="ThemeSettingsCard.Description" xml:space="preserve"><value>اختر مظهر شريط العنوان والقوائم وصفحة الإعدادات.</value></data>
+  <data name="ThemeSystemOption.Content" xml:space="preserve"><value>استخدام إعداد النظام</value></data>
+  <data name="ThemeLightOption.Content" xml:space="preserve"><value>فاتح</value></data>
+  <data name="ThemeDarkOption.Content" xml:space="preserve"><value>داكن</value></data>
+  <data name="LanguageSection.Text" xml:space="preserve"><value>اللغة</value></data>
+  <data name="LanguageSettingsCard.Header" xml:space="preserve"><value>لغة التطبيق</value></data>
+  <data name="LanguageSettingsCard.Description" xml:space="preserve"><value>اختر اللغة المستخدمة في سطح المكتب والمحرر. تُطبق التغييرات بعد إعادة التشغيل.</value></data>
+  <data name="LanguageRestartInfoBar.Title" xml:space="preserve"><value>إعادة التشغيل مطلوبة</value></data>
+  <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>أعد تشغيل Excalidraw Desktop لتطبيق اللغة. لن تُغلق الرسومات غير المحفوظة تلقائيًا.</value></data>
+  <data name="StartupSection.Text" xml:space="preserve"><value>بدء التشغيل</value></data>
+  <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>إعادة فتح علامات تبويب الرسومات المحفوظة</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>استعادة علامات التبويب المحفوظة من الجلسة السابقة. يتم دائمًا الاحتفاظ ببيانات الاسترداد غير المحفوظة.</value></data>
+  <data name="PerformanceSection.Text" xml:space="preserve"><value>الأداء</value></data>
+  <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>تعليق علامات التبويب غير النشطة</value></data>
+  <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>تعليق علامات التبويب الآمنة وغير المعدلة بعد خمس دقائق من عدم النشاط.</value></data>
+  <data name="UnloadTabsSettingsCard.Header" xml:space="preserve"><value>إلغاء تحميل المحررات غير النشطة</value></data>
+  <data name="UnloadTabsSettingsCard.Description" xml:space="preserve"><value>إغلاق WebView الآمنة بعد خمس عشرة دقيقة. يؤدي تحديد علامة التبويب إلى إعادة إنشاء المحرر ومسح سجل التراجع.</value></data>
+  <data name="AboutSection.Text" xml:space="preserve"><value>حول</value></data>
+  <data name="AboutSettingsCard.Header" xml:space="preserve"><value>Excalidraw Desktop</value></data>
+  <data name="AboutSettingsCard.Description" xml:space="preserve"><value>تطبيق WinUI محلي أولًا لـ Excalidraw.</value></data>
+  <data name="EditorWebView.AutomationProperties.Name" xml:space="preserve"><value>محرر Excalidraw</value></data>
+  <data name="StartupStatus.Text" xml:space="preserve"><value>جارٍ بدء Excalidraw Desktop…</value></data>
+  <data name="RetryEditorButton.AutomationProperties.Name" xml:space="preserve"><value>إعادة محاولة بدء هذا المحرر</value></data>
+  <data name="RetryEditorButton.Content" xml:space="preserve"><value>إعادة المحاولة</value></data>
+  <data name="WebView2HelpButton.AutomationProperties.Name" xml:space="preserve"><value>فتح تعليمات تثبيت Microsoft WebView2 وإصلاحه</value></data>
+  <data name="WebView2HelpButton.Content" xml:space="preserve"><value>تعليمات WebView2</value></data>
+  <data name="CloseFailedTabButton.AutomationProperties.Name" xml:space="preserve"><value>إغلاق علامة تبويب الرسم التي فشل تشغيلها</value></data>
+  <data name="CloseFailedTabButton.Content" xml:space="preserve"><value>إغلاق علامة التبويب</value></data>
+  <data name="SystemLanguageOption" xml:space="preserve"><value>استخدام لغة النظام</value></data>
+  <data name="VersionFormat" xml:space="preserve"><value>الإصدار {0}.{1}.{2}.{3}</value></data>
+  <data name="LanguageRestartMessageFormat" xml:space="preserve"><value>يستخدم التطبيق حاليًا {0}. أعد تشغيل Excalidraw Desktop لتطبيق اللغة المحددة. لن تُغلق الرسومات غير المحفوظة تلقائيًا.</value></data>
+  <data name="EditorAutomationName" xml:space="preserve"><value>محرر Excalidraw</value></data>
+  <data name="SleepingStatus" xml:space="preserve"><value>في وضع السكون — حدد علامة التبويب هذه للاستئناف</value></data>
+  <data name="EditorFailureGuidance" xml:space="preserve"><value>أعد محاولة تشغيل المحرر أو أغلق علامة التبويب. لم يتغير الرسم المحفوظ.</value></data>
+  <data name="DragOpenCaption" xml:space="preserve"><value>فتح الرسومات في علامات تبويب</value></data>
+  <data name="RecentFilesEmpty" xml:space="preserve"><value>لا توجد رسومات حديثة</value></data>
+  <data name="ClearRecentDrawings" xml:space="preserve"><value>مسح الرسومات الحديثة</value></data>
+  <data name="SettingsTabTitle" xml:space="preserve"><value>الإعدادات</value></data>
+  <data name="ContextNewTab" xml:space="preserve"><value>علامة تبويب جديدة</value></data>
+  <data name="ContextCopyPath" xml:space="preserve"><value>نسخ المسار</value></data>
+  <data name="ContextRevealInExplorer" xml:space="preserve"><value>إظهار في مستكشف الملفات</value></data>
+  <data name="ContextMoveToNewWindow" xml:space="preserve"><value>نقل علامة التبويب إلى نافذة جديدة</value></data>
+  <data name="ContextCloseTab" xml:space="preserve"><value>إغلاق علامة التبويب</value></data>
+  <data name="ContextCloseOtherTabs" xml:space="preserve"><value>إغلاق علامات التبويب الأخرى</value></data>
+  <data name="ContextCloseTabsRight" xml:space="preserve"><value>إغلاق علامات التبويب إلى اليمين</value></data>
+  <data name="ActivatedDrawingOpenFailed" xml:space="preserve"><value>تعذر فتح الرسم الذي تم تنشيطه.</value></data>
+  <data name="ApplicationWindowTitleFormat" xml:space="preserve"><value>Excalidraw Desktop{0}</value></data>
+  <data name="CancelButton" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="ChangedOnDiskTitleSuffix" xml:space="preserve"><value> — تم التغيير على القرص</value></data>
+  <data name="DiscardAllButton" xml:space="preserve"><value>تجاهل الكل</value></data>
+  <data name="DiscardAndCreate" xml:space="preserve"><value>تجاهل وإنشاء</value></data>
+  <data name="DiscardAndOpen" xml:space="preserve"><value>تجاهل وفتح</value></data>
+  <data name="DiscardButton" xml:space="preserve"><value>تجاهل</value></data>
+  <data name="DiscardUnsavedChangesTitle" xml:space="preserve"><value>هل تريد تجاهل التغييرات غير المحفوظة؟</value></data>
+  <data name="DrawingChangedOutsideContent" xml:space="preserve"><value>أعد تحميل إصدار القرص أو احفظ علامة التبويب هذه في ملف مختلف أو تابع التحرير. لن تتم الكتابة فوق الملف الموجود تلقائيًا.</value></data>
+  <data name="DrawingChangedOutsideTitle" xml:space="preserve"><value>تم تغيير الرسم خارج التطبيق</value></data>
+  <data name="DrawingFileMissingContent" xml:space="preserve"><value>تم نقل الملف الأصلي أو حذفه. حدد موقعه أو احفظ علامة التبويب هذه في ملف جديد أو تابع التحرير دون الكتابة فوق أي شيء.</value></data>
+  <data name="DrawingFileMissingTitle" xml:space="preserve"><value>ملف الرسم مفقود</value></data>
+  <data name="DrawingLoadFailedFormat" xml:space="preserve"><value>تعذر تحميل هذا الرسم ({0}).</value></data>
+  <data name="DrawingLoadFailureGuidance" xml:space="preserve"><value>تحقق من تثبيت التطبيق المحلي وأعد المحاولة. إذا تعطلت تطبيقات WebView2 الأخرى أيضًا، فاستخدم تعليمات WebView2 لإصلاح وقت التشغيل.</value></data>
+  <data name="DrawingLocationMissing" xml:space="preserve"><value>لم يعد الرسم موجودًا في موقعه المحفوظ.</value></data>
+  <data name="DrawingPathCopyFailed" xml:space="preserve"><value>تعذر نسخ مسار الرسم.</value></data>
+  <data name="DrawingResumeFailed" xml:space="preserve"><value>تعذر استئناف هذا الرسم.</value></data>
+  <data name="DrawingStartFailed" xml:space="preserve"><value>تعذر بدء هذا الرسم.</value></data>
+  <data name="DrawingWindowTitleFormat" xml:space="preserve"><value>{0}{1} — Excalidraw Desktop</value></data>
+  <data name="DroppedDrawingsOpenFailed" xml:space="preserve"><value>تعذر فتح الرسومات التي تم إفلاتها.</value></data>
+  <data name="EditorBridgeNotReady" xml:space="preserve"><value>تم تحميل المحرر، لكن اتصاله بتطبيق سطح المكتب لم يصبح جاهزًا.</value></data>
+  <data name="EditorBridgeRetryGuidance" xml:space="preserve"><value>أعد محاولة تشغيل المحرر. إذا استمرت المشكلة، فأعد إنشاء أصول الويب المحلية وتطبيق سطح المكتب.</value></data>
+  <data name="EditorProcessFailedTitle" xml:space="preserve"><value>Excalidraw Desktop — فشلت عملية المحرر</value></data>
+  <data name="EditorProcessFailureGuidanceFormat" xml:space="preserve"><value>أبلغ WebView2 عن {0}. أعد محاولة تشغيل المحرر. إذا استمر الفشل، فأصلح WebView2 Runtime.</value></data>
+  <data name="EditorProcessStopped" xml:space="preserve"><value>توقفت عملية المحرر بشكل غير متوقع.</value></data>
+  <data name="EditorRetryGuidance" xml:space="preserve"><value>أعد محاولة تشغيل المحرر. إذا استمرت المشكلة، فأصلح WebView2 أو أعد إنشاء تطبيق سطح المكتب. لم يتغير الرسم المحفوظ.</value></data>
+  <data name="EditorStartupFailedTitle" xml:space="preserve"><value>Excalidraw Desktop — فشل بدء المحرر</value></data>
+  <data name="EditorStoppedDuringExport" xml:space="preserve"><value>توقف المحرر أثناء إنشاء ملف PNG.</value></data>
+  <data name="ExcalidrawDrawingType" xml:space="preserve"><value>رسم Excalidraw</value></data>
+  <data name="ExplorerShowDrawingFailed" xml:space="preserve"><value>تعذر على مستكشف الملفات إظهار هذا الرسم.</value></data>
+  <data name="ExportedFileFormat" xml:space="preserve"><value>تم تصدير {0}</value></data>
+  <data name="FileConflictResolutionFailed" xml:space="preserve"><value>تعذر حل تعارض الملف.</value></data>
+  <data name="FileLocationUnavailableTitle" xml:space="preserve"><value>موقع الملف غير متوفر</value></data>
+  <data name="InitializingEditorTitle" xml:space="preserve"><value>Excalidraw Desktop — جارٍ تهيئة المحرر…</value></data>
+  <data name="InvalidPngExportData" xml:space="preserve"><value>أرسل المحرر بيانات تصدير PNG غير صالحة.</value></data>
+  <data name="KeepEditingButton" xml:space="preserve"><value>متابعة التحرير</value></data>
+  <data name="LocateFileButton" xml:space="preserve"><value>تحديد موقع الملف</value></data>
+  <data name="NewDiscardContent" xml:space="preserve"><value>سيؤدي إنشاء رسم جديد إلى استبدال الرسم الحالي غير المحفوظ.</value></data>
+  <data name="OkButton" xml:space="preserve"><value>موافق</value></data>
+  <data name="OpenDiscardContent" xml:space="preserve"><value>سيؤدي فتح رسم آخر إلى استبدال الرسم الحالي غير المحفوظ.</value></data>
+  <data name="OpenDrawingErrorTitle" xml:space="preserve"><value>تعذر فتح الرسم</value></data>
+  <data name="PngExportAccessDenied" xml:space="preserve"><value>ليس لدى Excalidraw Desktop إذن للكتابة في الموقع المحدد.</value></data>
+  <data name="PngExportDestinationFailed" xml:space="preserve"><value>تعذرت كتابة ملف PNG إلى الموقع المحدد.</value></data>
+  <data name="PngExportErrorTitle" xml:space="preserve"><value>تعذر تصدير PNG</value></data>
+  <data name="PngExportStartFailed" xml:space="preserve"><value>تعذر بدء تصدير PNG.</value></data>
+  <data name="PngExportTimeout" xml:space="preserve"><value>استغرق تصدير PNG وقتًا طويلاً وتم إلغاؤه.</value></data>
+  <data name="PngExportWriteFailed" xml:space="preserve"><value>تعذرت كتابة ملف PNG. تحقق من الوجهة ومساحة القرص المتوفرة.</value></data>
+  <data name="RecentDrawingOpenFailed" xml:space="preserve"><value>تعذر فتح الرسم الأخير.</value></data>
+  <data name="ReloadButton" xml:space="preserve"><value>إعادة التحميل</value></data>
+  <data name="ResumingDrawing" xml:space="preserve"><value>جارٍ استئناف الرسم…</value></data>
+  <data name="RetryingEditor" xml:space="preserve"><value>جارٍ إعادة محاولة تشغيل المحرر…</value></data>
+  <data name="ReviewTabsAutomationName" xml:space="preserve"><value>مراجعة علامات التبويب غير المحفوظة كل على حدة</value></data>
+  <data name="ReviewTabsButton" xml:space="preserve"><value>مراجعة علامات التبويب كل على حدة</value></data>
+  <data name="SaveAllButton" xml:space="preserve"><value>حفظ الكل</value></data>
+  <data name="SaveAsButton" xml:space="preserve"><value>حفظ باسم</value></data>
+  <data name="SaveButton" xml:space="preserve"><value>حفظ</value></data>
+  <data name="SaveChangesBeforeClosingContent" xml:space="preserve"><value>ستفقد تغييراتك إذا أغلقت هذا الرسم دون حفظه.</value></data>
+  <data name="SaveChangesBeforeClosingTitle" xml:space="preserve"><value>هل تريد حفظ التغييرات قبل الإغلاق؟</value></data>
+  <data name="SelectedDrawingOpenFailed" xml:space="preserve"><value>تعذر فتح الرسم المحدد.</value></data>
+  <data name="SettingsButtonToolTip" xml:space="preserve"><value>إظهار علامة تبويب الإعدادات</value></data>
+  <data name="SettingsWindowTitle" xml:space="preserve"><value>الإعدادات — Excalidraw Desktop</value></data>
+  <data name="SleepingTabHeaderFormat" xml:space="preserve"><value>{0} — في وضع السكون</value></data>
+  <data name="StartingWindowTitle" xml:space="preserve"><value>Excalidraw Desktop — جارٍ البدء…</value></data>
+  <data name="StatusChangedOnDisk" xml:space="preserve"><value>تم التغيير على القرص — حل المشكلة</value></data>
+  <data name="StatusDrawingAutomationFormat" xml:space="preserve"><value>الرسم: {0}</value></data>
+  <data name="StatusExportingPng" xml:space="preserve"><value>جارٍ تصدير PNG…</value></data>
+  <data name="StatusFileMissing" xml:space="preserve"><value>الملف مفقود — حل المشكلة</value></data>
+  <data name="StatusFileMoved" xml:space="preserve"><value>تم نقل الملف — حل المشكلة</value></data>
+  <data name="StatusNewDrawing" xml:space="preserve"><value>رسم جديد</value></data>
+  <data name="StatusResolveHelpText" xml:space="preserve"><value>فتح خيارات حل تعارض الملف.</value></data>
+  <data name="StatusResuming" xml:space="preserve"><value>جارٍ الاستئناف</value></data>
+  <data name="StatusSaved" xml:space="preserve"><value>محفوظ</value></data>
+  <data name="StatusSleeping" xml:space="preserve"><value>في وضع السكون</value></data>
+  <data name="StatusUnsaved" xml:space="preserve"><value>تغييرات غير محفوظة</value></data>
+  <data name="StatusUnsavedRecoveredFormat" xml:space="preserve"><value>غير محفوظ • تم الاسترداد في {0}</value></data>
+  <data name="TabAutomationNameFormat" xml:space="preserve"><value>{0}، {1}</value></data>
+  <data name="TabStateChangedOnDisk" xml:space="preserve"><value>تم التغيير على القرص</value></data>
+  <data name="TabStateNewDrawing" xml:space="preserve"><value>رسم جديد</value></data>
+  <data name="TabStateSaved" xml:space="preserve"><value>محفوظ</value></data>
+  <data name="TabStateSleeping" xml:space="preserve"><value>في وضع السكون</value></data>
+  <data name="TabStateUnsaved" xml:space="preserve"><value>تغييرات غير محفوظة</value></data>
+  <data name="UnsavedDrawingHelpText" xml:space="preserve"><value>رسم غير محفوظ</value></data>
+  <data name="UnsavedDrawingsCountFormat" xml:space="preserve"><value>توجد تغييرات غير محفوظة في {0} من الرسومات:&#xA;&#xA;{1}</value></data>
+  <data name="UnsavedDrawingsTitle" xml:space="preserve"><value>رسومات غير محفوظة</value></data>
+  <data name="UntitledName" xml:space="preserve"><value>بلا عنوان</value></data>
+  <data name="UntitledNumberedFormat" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="WaitForDrawingExport" xml:space="preserve"><value>انتظر حتى ينتهي تصدير PNG الحالي قبل إغلاق هذا الرسم.</value></data>
+  <data name="WaitForWindowExports" xml:space="preserve"><value>انتظر حتى تنتهي عمليات تصدير PNG قبل إغلاق هذه النافذة.</value></data>
+  <data name="WebView2RepairGuidance" xml:space="preserve"><value>ثبّت Evergreen WebView2 Runtime أو أصلحه، ثم اختر إعادة المحاولة. لم يتغير الرسم المحفوظ.</value></data>
+  <data name="WebView2Required" xml:space="preserve"><value>يلزم وجود Microsoft Edge WebView2 Runtime.</value></data>
+  <data name="DocumentNotFoundMessage" xml:space="preserve"><value>لم يعد الرسم موجودًا في ذلك الموقع.</value></data>
+  <data name="DocumentAccessDeniedMessage" xml:space="preserve"><value>لا يملك Excalidraw Desktop إذنًا للوصول إلى هذا الرسم.</value></data>
+  <data name="DocumentReadFailedMessage" xml:space="preserve"><value>تعذرت قراءة الرسم.</value></data>
+  <data name="DocumentTooLargeMessage" xml:space="preserve"><value>يتجاوز الرسم المحدد حد 50 ميغابايت.</value></data>
+  <data name="DocumentPathUnavailableMessage" xml:space="preserve"><value>لا يحتوي الرسم المحدد على مسار ملف محلي.</value></data>
+  <data name="DocumentChangedExternallyMessage" xml:space="preserve"><value>تم تغيير الرسم خارج Excalidraw Desktop. قم بحل التعارض قبل الحفظ.</value></data>
+  <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>هذا الرسم مفتوح بالفعل في علامة تبويب أخرى. اختر اسم ملف مختلفًا.</value></data>
+  <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>تعذرت كتابة الرسم على القرص.</value></data>
+  <data name="DocumentInvalidMessage" xml:space="preserve"><value>الملف المحدد ليس رسم Excalidraw صالحًا.</value></data>
+</root>

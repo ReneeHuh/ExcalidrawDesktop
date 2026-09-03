@@ -39,6 +39,7 @@ public sealed class MultiWindowWorkspaceStateStore
     };
 
     private readonly string statePath;
+    private byte[]? lastSavedPayload;
 
     public MultiWindowWorkspaceStateStore(string statePath)
     {
@@ -54,8 +55,8 @@ public sealed class MultiWindowWorkspaceStateStore
                 return MultiWindowWorkspaceState.Empty;
             }
 
-            await using var stream = File.OpenRead(statePath);
-            using var document = await JsonDocument.ParseAsync(stream);
+            var payload = await File.ReadAllBytesAsync(statePath);
+            using var document = JsonDocument.Parse(payload);
             if (!TryReadVersion(document.RootElement, out var version))
             {
                 return MultiWindowWorkspaceState.Empty;
@@ -65,9 +66,12 @@ public sealed class MultiWindowWorkspaceStateStore
             {
                 var state = document.RootElement.Deserialize<MultiWindowWorkspaceState>(
                     SerializerOptions);
-                return IsValid(state)
-                    ? Normalize(state!)
-                    : MultiWindowWorkspaceState.Empty;
+                if (IsValid(state))
+                {
+                    lastSavedPayload = payload;
+                    return Normalize(state!);
+                }
+                return MultiWindowWorkspaceState.Empty;
             }
 
             if (version is 1 or WorkspaceState.CurrentVersion)
@@ -98,6 +102,18 @@ public sealed class MultiWindowWorkspaceStateStore
     public async Task SaveAsync(MultiWindowWorkspaceState state)
     {
         ArgumentNullException.ThrowIfNull(state);
+        var payload = JsonSerializer.SerializeToUtf8Bytes(
+            Normalize(state with
+            {
+                Version = MultiWindowWorkspaceState.CurrentVersion,
+            }),
+            SerializerOptions);
+        if (lastSavedPayload is not null &&
+            lastSavedPayload.AsSpan().SequenceEqual(payload))
+        {
+            return;
+        }
+
         var directory = Path.GetDirectoryName(statePath) ??
             throw new InvalidOperationException(
                 "The workspace state path has no directory.");
@@ -116,17 +132,12 @@ public sealed class MultiWindowWorkspaceStateStore
                 4096,
                 FileOptions.Asynchronous | FileOptions.WriteThrough))
             {
-                await JsonSerializer.SerializeAsync(
-                    stream,
-                    Normalize(state with
-                    {
-                        Version = MultiWindowWorkspaceState.CurrentVersion,
-                    }),
-                    SerializerOptions);
+                await stream.WriteAsync(payload);
                 await stream.FlushAsync();
             }
 
             File.Move(temporaryPath, statePath, overwrite: true);
+            lastSavedPayload = payload;
         }
         finally
         {

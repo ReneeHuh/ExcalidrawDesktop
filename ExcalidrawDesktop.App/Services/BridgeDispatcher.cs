@@ -22,6 +22,7 @@ public sealed class BridgeDispatcher
     private readonly Action closeTabRequested;
     private readonly Action<bool> selectAdjacentTabRequested;
     private readonly Action<Guid, string> imageExportFailed;
+    private readonly Action<string, string>? languageApplied;
 
     public BridgeDispatcher(
         DocumentService documentService,
@@ -38,7 +39,8 @@ public sealed class BridgeDispatcher
         Func<Task> openTabRequested,
         Action closeTabRequested,
         Action<bool> selectAdjacentTabRequested,
-        Action<Guid, string> imageExportFailed)
+        Action<Guid, string> imageExportFailed,
+        Action<string, string>? languageApplied = null)
     {
         this.documentService = documentService;
         this.appReady = appReady;
@@ -55,6 +57,7 @@ public sealed class BridgeDispatcher
         this.closeTabRequested = closeTabRequested;
         this.selectAdjacentTabRequested = selectAdjacentTabRequested;
         this.imageExportFailed = imageExportFailed;
+        this.languageApplied = languageApplied;
     }
 
     public async Task DispatchAsync(CoreWebView2 webView, BridgeMessage message)
@@ -106,6 +109,22 @@ public sealed class BridgeDispatcher
         if (message.Method == "app.ready")
         {
             appReady();
+            return;
+        }
+
+        if (message.Method == "app.languageApplied" &&
+            message.Payload is { ValueKind: JsonValueKind.Object } languagePayload &&
+            languagePayload.TryGetProperty("langCode", out var langCodeElement) &&
+            langCodeElement.ValueKind == JsonValueKind.String &&
+            langCodeElement.GetString() is { Length: > 0 and <= 16 } langCode &&
+            languagePayload.TryGetProperty(
+                "direction",
+                out var languageDirectionElement) &&
+            languageDirectionElement.ValueKind == JsonValueKind.String &&
+            languageDirectionElement.GetString() is { } languageDirection &&
+            languageDirection is "ltr" or "rtl")
+        {
+            languageApplied?.Invoke(langCode, languageDirection);
             return;
         }
 

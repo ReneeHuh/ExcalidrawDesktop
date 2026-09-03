@@ -24,13 +24,18 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
+                x:Uid="AppearanceSection"
                 Grid.Row="0"
                 Style="{ThemeResource BodyStrongTextBlockStyle}"
                 Text="Appearance" />
             <controls:SettingsCard
+                x:Uid="ThemeSettingsCard"
                 Grid.Row="1"
                 Header="App frame theme"
                 Description="Choose the appearance of the native title bar, menus, and settings page.">
@@ -38,19 +43,47 @@
                     x:Name="ThemePicker"
                     MinWidth="140"
                     SelectionChanged="OnPreferenceChanged">
-                    <ComboBoxItem Content="Use system setting" Tag="System" />
-                    <ComboBoxItem Content="Light" Tag="Light" />
-                    <ComboBoxItem Content="Dark" Tag="Dark" />
+                    <ComboBoxItem x:Uid="ThemeSystemOption" Content="Use system setting" Tag="System" />
+                    <ComboBoxItem x:Uid="ThemeLightOption" Content="Light" Tag="Light" />
+                    <ComboBoxItem x:Uid="ThemeDarkOption" Content="Dark" Tag="Dark" />
                 </ComboBox>
             </controls:SettingsCard>
 
             <TextBlock
+                x:Uid="LanguageSection"
                 Grid.Row="2"
+                Margin="0,16,0,0"
+                Style="{ThemeResource BodyStrongTextBlockStyle}"
+                Text="Language" />
+            <controls:SettingsCard
+                x:Uid="LanguageSettingsCard"
+                Grid.Row="3"
+                Header="Application language"
+                Description="Choose the language used by the desktop shell and editor. Changes apply after restart.">
+                <ComboBox
+                    x:Name="LanguagePicker"
+                    MinWidth="200"
+                    SelectionChanged="OnPreferenceChanged" />
+            </controls:SettingsCard>
+            <InfoBar
+                x:Name="LanguageRestartInfoBar"
+                x:Uid="LanguageRestartInfoBar"
+                Grid.Row="4"
+                IsClosable="False"
+                IsOpen="False"
+                Message="Restart Excalidraw Desktop to apply the selected language. Unsaved drawings will not be closed automatically."
+                Severity="Informational"
+                Title="Restart required" />
+
+            <TextBlock
+                x:Uid="StartupSection"
+                Grid.Row="5"
                 Margin="0,16,0,0"
                 Style="{ThemeResource BodyStrongTextBlockStyle}"
                 Text="Startup" />
             <controls:SettingsCard
-                Grid.Row="3"
+                x:Uid="ReopenTabsSettingsCard"
+                Grid.Row="6"
                 Header="Reopen saved drawing tabs"
                 Description="Restore clean file-backed tabs from the previous session. Unsaved recovery is always preserved.">
                 <ToggleSwitch
@@ -59,12 +92,14 @@
             </controls:SettingsCard>
 
             <TextBlock
-                Grid.Row="4"
+                x:Uid="PerformanceSection"
+                Grid.Row="7"
                 Margin="0,16,0,0"
                 Style="{ThemeResource BodyStrongTextBlockStyle}"
                 Text="Performance" />
             <controls:SettingsCard
-                Grid.Row="5"
+                x:Uid="SleepTabsSettingsCard"
+                Grid.Row="8"
                 Header="Sleep inactive tabs"
                 Description="Suspend safe clean tabs after five inactive minutes to reduce background activity.">
                 <ToggleSwitch
@@ -72,7 +107,8 @@
                     Toggled="OnPreferenceChanged" />
             </controls:SettingsCard>
             <controls:SettingsCard
-                Grid.Row="6"
+                x:Uid="UnloadTabsSettingsCard"
+                Grid.Row="9"
                 Header="Unload inactive editors"
                 Description="Close safe clean WebViews after fifteen inactive minutes. Selecting the tab recreates its editor and resets undo history.">
                 <ToggleSwitch
@@ -81,12 +117,14 @@
             </controls:SettingsCard>
 
             <TextBlock
-                Grid.Row="7"
+                x:Uid="AboutSection"
+                Grid.Row="10"
                 Margin="0,16,0,0"
                 Style="{ThemeResource BodyStrongTextBlockStyle}"
                 Text="About" />
             <controls:SettingsCard
-                Grid.Row="8"
+                x:Uid="AboutSettingsCard"
+                Grid.Row="11"
                 Header="Excalidraw Desktop"
                 Description="A local-first WinUI desktop host for Excalidraw.">
                 <TextBlock

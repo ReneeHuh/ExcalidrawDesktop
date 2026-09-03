@@ -86,8 +86,10 @@ public sealed class DocumentService
         pendingNewDocument = false;
 
         if (hasUnsavedChanges && !await ConfirmDiscardChangesAsync(
-            "Opening another drawing will replace the current unsaved drawing.",
-            "Discard and open"))
+            DesktopResources.Get(
+                "OpenDiscardContent",
+                "Opening another drawing will replace the current unsaved drawing."),
+            DesktopResources.Get("DiscardAndOpen", "Discard and open")))
         {
             return DocumentOpenResult.Cancelled;
         }
@@ -299,8 +301,10 @@ public sealed class DocumentService
     {
         pendingNewDocument = false;
         if (hasUnsavedChanges && !await ConfirmDiscardChangesAsync(
-            "Creating a new drawing will replace the current unsaved drawing.",
-            "Discard and create"))
+            DesktopResources.Get(
+                "NewDiscardContent",
+                "Creating a new drawing will replace the current unsaved drawing."),
+            DesktopResources.Get("DiscardAndCreate", "Discard and create")))
         {
             return DocumentNewResult.Cancelled;
         }
@@ -450,10 +454,12 @@ public sealed class DocumentService
         {
             SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
             SuggestedFileName = activeFile is null
-                ? "Untitled"
+                ? DesktopResources.Get("UntitledName", "Untitled")
                 : Path.GetFileNameWithoutExtension(activeFile.Name),
         };
-        picker.FileTypeChoices.Add("Excalidraw drawing", new[] { ".excalidraw" });
+        picker.FileTypeChoices.Add(
+            DesktopResources.Get("ExcalidrawDrawingType", "Excalidraw drawing"),
+            new[] { ".excalidraw" });
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(window));
         return await picker.PickSaveFileAsync();
     }
@@ -488,11 +494,15 @@ public sealed class DocumentService
         var dialog = new ContentDialog
         {
             XamlRoot = dialogRoot.XamlRoot,
-            Title = "Save changes before closing?",
-            Content = "Your changes will be lost if you close this drawing without saving.",
-            PrimaryButtonText = "Save",
-            SecondaryButtonText = "Discard",
-            CloseButtonText = "Cancel",
+            Title = DesktopResources.Get(
+                "SaveChangesBeforeClosingTitle",
+                "Save changes before closing?"),
+            Content = DesktopResources.Get(
+                "SaveChangesBeforeClosingContent",
+                "Your changes will be lost if you close this drawing without saving."),
+            PrimaryButtonText = DesktopResources.Get("SaveButton", "Save"),
+            SecondaryButtonText = DesktopResources.Get("DiscardButton", "Discard"),
+            CloseButtonText = DesktopResources.Get("CancelButton", "Cancel"),
             DefaultButton = ContentDialogButton.Primary,
         };
 
@@ -511,10 +521,12 @@ public sealed class DocumentService
         var dialog = new ContentDialog
         {
             XamlRoot = dialogRoot.XamlRoot,
-            Title = "Discard unsaved changes?",
+            Title = DesktopResources.Get(
+                "DiscardUnsavedChangesTitle",
+                "Discard unsaved changes?"),
             Content = content,
             PrimaryButtonText = primaryButtonText,
-            CloseButtonText = "Cancel",
+            CloseButtonText = DesktopResources.Get("CancelButton", "Cancel"),
             DefaultButton = ContentDialogButton.Close,
         };
 

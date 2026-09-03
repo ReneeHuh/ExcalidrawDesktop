@@ -20,9 +20,12 @@ $webRoot = Join-Path $repositoryRoot "ExcalidrawDesktop.Web"
 $nativeRoot = Join-Path $repositoryRoot "ExcalidrawDesktop.App"
 $projectPath = Join-Path $nativeRoot "ExcalidrawDesktop.App.csproj"
 $webAssetsBuildScript = Join-Path $scriptRoot "Build-WebAssets.ps1"
+$localizationTestScript = Join-Path $scriptRoot "Test-Localization.ps1"
 
 Push-Location $repositoryRoot
 try {
+    & $localizationTestScript
+
     if (-not $SkipRestore) {
         Push-Location $webRoot
         try {
@@ -60,8 +63,9 @@ try {
             Sort-Object LastWriteTimeUtc -Descending |
             Select-Object -First 1
         if ($transformedManifest) {
-            $loosePackageRoot = Join-Path $transformedManifest.DirectoryName "AppX"
-            if (Test-Path -LiteralPath $loosePackageRoot -PathType Container) {
+            $candidateLoosePackageRoot = Join-Path $transformedManifest.DirectoryName "AppX"
+            if (Test-Path -LiteralPath $candidateLoosePackageRoot -PathType Container) {
+                $loosePackageRoot = $candidateLoosePackageRoot
                 Get-ChildItem -LiteralPath $transformedManifest.DirectoryName -Force |
                     Where-Object { $_.Name -notin @("AppX", "publish") } |
                     Copy-Item -Destination $loosePackageRoot -Recurse -Force

@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import {
+  CaptureUpdateAction,
   Excalidraw,
   getSceneVersion,
   MainMenu,
@@ -11,12 +12,16 @@ import {
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
 
-import { DesktopBridge } from "./bridge/DesktopBridge";
+import { DesktopBridge, DesktopBridgeError } from "./bridge/DesktopBridge";
 import {
   loadDocumentContentIntoEditor,
   saveDocumentFromEditor,
 } from "./document/DocumentController";
 import { exportWholeDrawingAsPng } from "./export/ImageExportController";
+import {
+  getDesktopErrorString,
+  getDesktopString,
+} from "./localization/DesktopStrings";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -32,6 +37,8 @@ if (!ownerWindow) {
 }
 
 ownerWindow.EXCALIDRAW_ASSET_PATH = "/";
+ownerDocument.documentElement.lang = "en";
+ownerDocument.documentElement.dir = "ltr";
 const desktopBridge = new DesktopBridge(ownerWindow);
 
 const desktopUIOptions = {
@@ -42,6 +49,10 @@ const desktopUIOptions = {
 };
 
 const DesktopApp = () => {
+  const [language, setLanguage] = React.useState<{
+    langCode: string;
+    direction: "ltr" | "rtl";
+  }>({ langCode: "en", direction: "ltr" });
   const [theme, setTheme] = React.useState<"light" | "dark">(() =>
     ownerWindow.matchMedia("(prefers-color-scheme: dark)").matches
       ? THEME.DARK
@@ -102,6 +113,23 @@ const DesktopApp = () => {
     [],
   );
 
+  React.useEffect(
+    () =>
+      desktopBridge.onLanguageChanged((nextLanguage) => {
+        setLanguage(nextLanguage);
+      }),
+    [],
+  );
+
+  React.useEffect(() => {
+    ownerDocument.documentElement.lang = language.langCode;
+    ownerDocument.documentElement.dir = language.direction;
+    desktopBridge.notifyLanguageApplied(
+      ownerDocument.documentElement.lang,
+      ownerDocument.documentElement.dir === "rtl" ? "rtl" : "ltr",
+    );
+  }, [language]);
+
   React.useEffect(() => {
     void desktopBridge
       .ping()
@@ -159,10 +187,11 @@ const DesktopApp = () => {
       } catch (error: unknown) {
         console.error("The drawing could not be opened.", error);
         excalidrawAPI.setToast({
-          message:
-            error instanceof Error
-              ? error.message
-              : "The drawing could not be opened.",
+          message: getDesktopErrorString(
+            language.langCode,
+            error instanceof DesktopBridgeError ? error.code : undefined,
+            "openFailed",
+          ),
           closable: true,
           duration: 5000,
         });
@@ -170,7 +199,7 @@ const DesktopApp = () => {
         isDocumentOperationInProgress.current = false;
       }
     });
-  }, [excalidrawAPI, updateDirty]);
+  }, [excalidrawAPI, language.langCode, updateDirty]);
 
   const saveDocument = React.useCallback(
     async (saveAs: boolean): Promise<boolean> => {
@@ -197,10 +226,11 @@ const DesktopApp = () => {
       } catch (error: unknown) {
         console.error("The drawing could not be saved.", error);
         excalidrawAPI.setToast({
-          message:
-            error instanceof Error
-              ? error.message
-              : "The drawing could not be saved.",
+          message: getDesktopErrorString(
+            language.langCode,
+            error instanceof DesktopBridgeError ? error.code : undefined,
+            "saveFailed",
+          ),
           closable: true,
           duration: 5000,
         });
@@ -209,7 +239,7 @@ const DesktopApp = () => {
         isDocumentOperationInProgress.current = false;
       }
     },
-    [excalidrawAPI, updateDirty],
+    [excalidrawAPI, language.langCode, updateDirty],
   );
 
   React.useEffect(
@@ -235,6 +265,55 @@ const DesktopApp = () => {
   );
 
   React.useEffect(() => {
+    if (
+      !excalidrawAPI ||
+      !ownerWindow.location.search
+        .slice(1)
+        .split("&")
+        .includes("desktopSmoke=1")
+    ) {
+      return;
+    }
+
+    return desktopBridge.onAutomationEditRequested(({ elementId }) => {
+      const existingElements = excalidrawAPI.getSceneElements();
+      excalidrawAPI.updateScene({
+        elements: [
+          ...existingElements,
+          {
+            id: elementId,
+            type: "rectangle",
+            x: 40 + existingElements.length * 20,
+            y: 40,
+            width: 120,
+            height: 80,
+            angle: 0,
+            strokeColor: "#1e1e1e",
+            backgroundColor: "#a5d8ff",
+            fillStyle: "solid",
+            strokeWidth: 2,
+            strokeStyle: "solid",
+            roughness: 1,
+            opacity: 100,
+            groupIds: [],
+            frameId: null,
+            roundness: { type: 3 },
+            seed: 101 + existingElements.length,
+            version: 1,
+            versionNonce: 201 + existingElements.length,
+            isDeleted: false,
+            boundElements: [],
+            updated: Date.now(),
+            link: null,
+            locked: false,
+          } as never,
+        ],
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      });
+    });
+  }, [excalidrawAPI]);
+
+  React.useEffect(() => {
     if (!excalidrawAPI) {
       return;
     }
@@ -243,7 +322,7 @@ const DesktopApp = () => {
       if (isImageExportInProgress.current) {
         desktopBridge.notifyImageExportFailed(
           request.exportId,
-          "An image export is already running for this drawing.",
+          getDesktopString(language.langCode, "exportRunning"),
         );
         return;
       }
@@ -251,10 +330,11 @@ const DesktopApp = () => {
       isImageExportInProgress.current = true;
       void exportWholeDrawingAsPng(excalidrawAPI, request, ownerWindow)
         .catch((error: unknown) => {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "The drawing could not be exported as a PNG.";
+          const message = getDesktopErrorString(
+            language.langCode,
+            error instanceof DesktopBridgeError ? error.code : undefined,
+            "exportFailed",
+          );
           desktopBridge.notifyImageExportFailed(request.exportId, message);
           excalidrawAPI.setToast({
             message,
@@ -266,7 +346,7 @@ const DesktopApp = () => {
           isImageExportInProgress.current = false;
         });
     });
-  }, [excalidrawAPI]);
+  }, [excalidrawAPI, language.langCode]);
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -337,10 +417,14 @@ const DesktopApp = () => {
   }, [openDocument, saveDocument]);
 
   return (
-    <main className="desktop-app" aria-label="Excalidraw Desktop editor">
+    <main
+      className="desktop-app"
+      aria-label={getDesktopString(language.langCode, "editorLabel")}
+    >
       <div className="editor-surface">
         <Excalidraw
           excalidrawAPI={setExcalidrawAPI}
+          langCode={language.langCode}
           theme={theme}
           UIOptions={desktopUIOptions}
           onChange={(elements) => {
@@ -357,19 +441,19 @@ const DesktopApp = () => {
             onSelect={() => desktopBridge.requestNewTab()}
             shortcut="Ctrl+T"
           >
-            New Tab
+            {getDesktopString(language.langCode, "newTab")}
           </MainMenu.Item>
           <MainMenu.Item onSelect={openDocument} shortcut="Ctrl+O">
-            Open…
+            {getDesktopString(language.langCode, "open")}
           </MainMenu.Item>
           <MainMenu.Item onSelect={() => saveDocument(false)} shortcut="Ctrl+S">
-            Save
+            {getDesktopString(language.langCode, "save")}
           </MainMenu.Item>
           <MainMenu.Item
             onSelect={() => saveDocument(true)}
             shortcut="Ctrl+Shift+S"
           >
-            Save As…
+            {getDesktopString(language.langCode, "saveAs")}
           </MainMenu.Item>
           <MainMenu.Separator />
           <MainMenu.DefaultItems.SearchMenu />

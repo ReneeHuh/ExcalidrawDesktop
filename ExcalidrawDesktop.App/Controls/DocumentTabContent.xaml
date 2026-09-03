@@ -9,6 +9,7 @@
             HorizontalContentAlignment="Stretch"
             VerticalContentAlignment="Stretch">
             <WebView2
+                x:Uid="EditorWebView"
                 AutomationProperties.AutomationId="ExcalidrawEditorWebView"
                 AutomationProperties.Name="Excalidraw editor" />
         </ContentControl>
@@ -29,6 +30,7 @@
                     IsActive="True" />
                 <TextBlock
                     x:Name="StartupStatus"
+                    x:Uid="StartupStatus"
                     AutomationProperties.AutomationId="StartupStatusText"
                     AutomationProperties.LiveSetting="Assertive"
                     FontSize="18"
@@ -50,6 +52,7 @@
                     Visibility="Collapsed">
                     <Button
                         x:Name="RetryEditorButton"
+                        x:Uid="RetryEditorButton"
                         HorizontalAlignment="Stretch"
                         AutomationProperties.AutomationId="RetryEditorButton"
                         AutomationProperties.Name="Retry starting this editor"
@@ -57,6 +60,7 @@
                         Content="Retry" />
                     <Button
                         x:Name="WebView2HelpButton"
+                        x:Uid="WebView2HelpButton"
                         HorizontalAlignment="Stretch"
                         AutomationProperties.AutomationId="WebView2HelpButton"
                         AutomationProperties.Name="Open Microsoft WebView2 install and repair help"
@@ -64,6 +68,7 @@
                         Content="WebView2 help"
                         Visibility="Collapsed" />
                     <Button
+                        x:Uid="CloseFailedTabButton"
                         HorizontalAlignment="Stretch"
                         AutomationProperties.AutomationId="CloseFailedTabButton"
                         AutomationProperties.Name="Close this failed drawing tab"

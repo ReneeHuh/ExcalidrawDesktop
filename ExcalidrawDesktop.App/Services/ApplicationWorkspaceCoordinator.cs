@@ -11,14 +11,18 @@ internal sealed class ApplicationWorkspaceCoordinator
     private readonly Dictionary<MainWindow, WorkspaceWindowState> restoreStates = [];
     private readonly MultiWindowWorkspaceStateStore workspaceStateStore;
     private readonly RecoverySnapshotStore recoverySnapshotStore;
+    private readonly DesktopSettingsStore desktopSettingsStore = new();
     private readonly SemaphoreSlim persistenceGate = new(1, 1);
     private CancellationTokenSource? queuedPersistence;
     private MainWindow? mostRecentlyActiveWindow;
     private string? restoredLastActiveWindowId;
     private bool isExiting;
+    private bool startupRecoveryPruned;
     private Dictionary<string, WorkspaceWindowState>? exitWorkspace;
 
-    public ApplicationWorkspaceCoordinator(string? workspaceStatePath = null)
+    public ApplicationWorkspaceCoordinator(
+        string? workspaceStatePath = null,
+        DesktopPreferences? startupPreferences = null)
     {
         WorkspaceStatePath = workspaceStatePath ?? Path.Combine(
             ApplicationData.Current.LocalFolder.Path,
@@ -27,12 +31,33 @@ internal sealed class ApplicationWorkspaceCoordinator
         recoverySnapshotStore = new RecoverySnapshotStore(Path.Combine(
             Path.GetDirectoryName(WorkspaceStatePath)!,
             $"{Path.GetFileNameWithoutExtension(WorkspaceStatePath)}.recovery"));
+        Preferences = startupPreferences ?? desktopSettingsStore.Load();
+        StartupLanguagePreference = Preferences.Language;
+        EffectiveLanguage = DesktopLanguageStartup.ResolveEffective(
+            Preferences.Language);
     }
 
     public IReadOnlyList<MainWindow> Windows => windows;
     public List<string> RecentFiles { get; } = [];
     public string WorkspaceStatePath { get; }
     public IReadOnlyList<WorkspaceWindowState> RestoredWindows { get; private set; } = [];
+    public DesktopPreferences Preferences { get; private set; }
+    public DesktopLanguage EffectiveLanguage { get; }
+    public string StartupLanguagePreference { get; }
+
+    public void UpdatePreferences(DesktopPreferences preferences)
+    {
+        preferences = preferences with
+        {
+            Language = DesktopLanguages.NormalizePreference(preferences.Language),
+        };
+        Preferences = preferences;
+        desktopSettingsStore.Save(preferences);
+        foreach (var window in windows.ToArray())
+        {
+            window.ApplySharedPreferences(preferences);
+        }
+    }
 
     public async Task InitializeAsync()
     {
@@ -92,7 +117,10 @@ internal sealed class ApplicationWorkspaceCoordinator
         {
             restoreStates[window] = restoreState;
         }
-        mostRecentlyActiveWindow = window;
+        // Registration also happens for the hidden placeholder used by a tab
+        // tear-out. Only an activated window should become the activation
+        // target for subsequent app-instance redirects.
+        mostRecentlyActiveWindow ??= window;
     }
 
     public WorkspaceWindowState? GetRestoreState(MainWindow window) =>
@@ -111,14 +139,24 @@ internal sealed class ApplicationWorkspaceCoordinator
     {
         if (windows.Contains(window))
         {
+            if (ReferenceEquals(mostRecentlyActiveWindow, window))
+            {
+                return;
+            }
             mostRecentlyActiveWindow = window;
-            QueuePersistWorkspace();
+            if (window.IsReadyForActivation)
+            {
+                QueuePersistWorkspace();
+            }
         }
     }
 
     public void ActivateMostRecentWindow()
     {
-        (mostRecentlyActiveWindow ?? windows.LastOrDefault())?.Activate();
+        var target = mostRecentlyActiveWindow?.IsReadyForActivation == true
+            ? mostRecentlyActiveWindow
+            : windows.LastOrDefault(window => window.IsReadyForActivation);
+        target?.Activate();
     }
 
     public void UnregisterWindow(MainWindow window)
@@ -187,8 +225,15 @@ internal sealed class ApplicationWorkspaceCoordinator
         MainWindow? treatDirtyAsCleanInWindow = null)
     {
         var liveSnapshots = windows.Select(window =>
-            window.CaptureWorkspaceState(
-                ReferenceEquals(window, treatDirtyAsCleanInWindow))).ToArray();
+            window.IsReadyForActivation
+                ? window.CaptureWorkspaceState(
+                    ReferenceEquals(window, treatDirtyAsCleanInWindow))
+                : restoreStates.GetValueOrDefault(window) ??
+                    window.CaptureWorkspaceState(
+                        ReferenceEquals(window, treatDirtyAsCleanInWindow),
+                        capturePlacement: false))
+            .OfType<WorkspaceWindowState>()
+            .ToArray();
         if (isExiting && exitWorkspace is not null)
         {
             foreach (var liveSnapshot in liveSnapshots)
@@ -200,7 +245,11 @@ internal sealed class ApplicationWorkspaceCoordinator
             ? exitWorkspace.Values.ToArray()
             : liveSnapshots;
         var lastActiveId = mostRecentlyActiveWindow is not null &&
-            logicalWindowIds.TryGetValue(mostRecentlyActiveWindow, out var id)
+            logicalWindowIds.TryGetValue(mostRecentlyActiveWindow, out var id) &&
+            snapshotWindows.Any(window => string.Equals(
+                window.Id,
+                id,
+                StringComparison.OrdinalIgnoreCase))
                 ? id
                 : snapshotWindows.FirstOrDefault()?.Id;
         var state = new MultiWindowWorkspaceState(
@@ -226,6 +275,32 @@ internal sealed class ApplicationWorkspaceCoordinator
                 .SelectMany(window => window.OpenSessions)
                 .Where(session => session.IsDirty)
                 .Select(session => session.RecoveryId));
+
+    public async Task NotifyWindowReadyAsync(MainWindow window)
+    {
+        if (!windows.Contains(window))
+        {
+            return;
+        }
+
+        QueuePersistWorkspace();
+        if (startupRecoveryPruned || windows.Any(candidate =>
+                !candidate.IsReadyForActivation))
+        {
+            return;
+        }
+
+        startupRecoveryPruned = true;
+        try
+        {
+            await PruneRecoverySnapshotsAsync();
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Startup recovery snapshot cleanup failed: {exception}");
+        }
+    }
 
     public bool IsPathOwnedByAnotherSession(
         DocumentSession requester,
@@ -373,7 +448,8 @@ internal sealed class ApplicationWorkspaceCoordinator
         queuedPersistence = null;
         exitWorkspace = windows.ToDictionary(
             GetLogicalWindowId,
-            window => window.CaptureWorkspaceState());
+            window => window.CaptureWorkspaceState(
+                capturePlacement: window.IsReadyForActivation));
         try
         {
             await PersistWorkspaceAsync();
@@ -384,13 +460,14 @@ internal sealed class ApplicationWorkspaceCoordinator
                     continue;
                 }
 
-                window.Activate();
-                await Task.Delay(100);
+                if (!await window.ActivateForExitAsync())
+                {
+                    return;
+                }
                 if (!await window.RequestCloseAsync())
                 {
                     return;
                 }
-                await Task.Delay(200);
             }
             await PersistWorkspaceAsync();
         }

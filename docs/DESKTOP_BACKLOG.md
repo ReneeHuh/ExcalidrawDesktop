@@ -1,7 +1,7 @@
 # Excalidraw Desktop backlog
 
 Status: Active
-Last consolidated: September 2, 2026
+Last consolidated: September 3, 2026
 
 This is the canonical checklist for work that remains on Excalidraw Desktop.
 The detailed designs remain in:
@@ -83,21 +83,22 @@ Unloading 19 of 20 tabs reduced the measured process-tree working set from
 ### Document safety and packaged evidence
 
 The current packaged suite passes startup, unique tab origins and local-storage
-isolation, workspace restore, forced recovery, suspend/unload/recreate,
+isolation, workspace restore, real-edit forced recovery, suspend/unload/recreate,
 multi-window session transfer, clean coordinated exit, two-window dirty
-Discard All, and file activation. The narrower unchecked cases below still
-need purpose-built automation or manual evidence.
+Discard All, file activation, document safety, individual close decisions,
+localization, and whole-drawing PNG export. The narrower unchecked cases below
+still need purpose-built automation or manual evidence.
 
-- [ ] Prove with packaged tests that Save and Save As affect only the owning
+- [x] Prove with packaged tests that Save and Save As affect only the owning
   tab and file.
-- [ ] Prove that bridge messages and native file handles cannot cross session
+- [x] Prove that bridge messages and native file handles cannot cross session
   boundaries.
-- [ ] Validate dirty indicators and Save, Don't Save, and Cancel for individual
+- [x] Validate dirty indicators and Save, Don't Save, and Cancel for individual
   tab closes.
 - [ ] Validate Save All, Discard All, Review Tabs, and Cancel for window close.
-- [ ] Generate real edits, force termination during the recovery debounce
+- [x] Generate real edits, force termination during the recovery debounce
   interval, and verify exact recovery.
-- [ ] Add packaged tests for files modified, renamed, moved, and deleted by an
+- [x] Add packaged tests for files modified, renamed, moved, and deleted by an
   external process.
 - [ ] Test independent IndexedDB, undo history, viewport, zoom, and selection
   state across tabs.
@@ -129,6 +130,13 @@ need purpose-built automation or manual evidence.
 
 - [x] Add a native Settings page using Windows Community Toolkit SettingsCard
   controls for theme, startup restoration, and tab-lifetime preferences.
+- [x] Add restart-to-apply application localization for English, Spanish,
+  French, German, Brazilian Portuguese, Japanese, Simplified Chinese, and
+  Arabic across WinUI, manifest metadata, desktop web controls, and Excalidraw.
+- [x] Add catalog/source validation and packaged German LTR and Arabic RTL
+  localization smoke coverage.
+- [ ] Complete human translation review and the manual CJK, RTL, IME,
+  high-contrast, text-scaling, and offline localization matrix.
 - [x] Add retry and close actions for a tab whose editor fails to initialize.
 - [x] Add clear WebView2 Runtime missing, damaged, and repair guidance.
 - [ ] Improve loading, empty-workspace, recovery, conflict, sleeping-tab, and

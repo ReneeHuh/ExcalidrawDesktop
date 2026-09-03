@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><xsd:import namespace="http://www.w3.org/XML/1998/namespace" /><xsd:element name="root" msdata:IsDataSet="true"><xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /><xsd:element name="comment" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element><xsd:element name="resheader"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" type="xsd:string" use="required" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType></xsd:element></xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="AppDisplayName" xml:space="preserve"><value>Excalidraw Desktop</value></data>
+  <data name="PublisherDisplayName" xml:space="preserve"><value>Excalidraw Desktop 開発版</value></data>
+  <data name="AppDescription" xml:space="preserve"><value>ローカルファーストの Excalidraw デスクトップアプリ</value></data>
+  <data name="ExcalidrawFileTypeDisplayName" xml:space="preserve"><value>Excalidraw 図面</value></data>
+  <data name="DocumentTabs.AutomationProperties.Name" xml:space="preserve"><value>開いている図面</value></data>
+  <data name="ApplicationMenu.AutomationProperties.Name" xml:space="preserve"><value>アプリケーション メニュー</value></data>
+  <data name="FileMenu.Title" xml:space="preserve"><value>ファイル</value></data>
+  <data name="NewTabMenuItem.Text" xml:space="preserve"><value>新しいタブ</value></data>
+  <data name="NewWindowMenuItem.Text" xml:space="preserve"><value>新しいウィンドウ</value></data>
+  <data name="OpenMenuItem.Text" xml:space="preserve"><value>開く…</value></data>
+  <data name="RecentFilesMenu.Text" xml:space="preserve"><value>最近使った項目</value></data>
+  <data name="SaveMenuItem.Text" xml:space="preserve"><value>保存</value></data>
+  <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>名前を付けて保存…</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>すべて保存</value></data>
+  <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>図面全体を PNG としてエクスポート…</value></data>
+  <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>タブを閉じる</value></data>
+  <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>ウィンドウを閉じる</value></data>
+  <data name="SettingsMenuItem.Text" xml:space="preserve"><value>設定</value></data>
+  <data name="ExitMenuItem.Text" xml:space="preserve"><value>終了</value></data>
+  <data name="WindowDragRegion.AutomationProperties.Name" xml:space="preserve"><value>ウィンドウのドラッグ領域</value></data>
+  <data name="SettingsButton.AutomationProperties.Name" xml:space="preserve"><value>設定タブを表示</value></data>
+  <data name="StatusBar.AutomationProperties.Name" xml:space="preserve"><value>図面の状態</value></data>
+  <data name="StatusDocumentText.Text" xml:space="preserve"><value>無題</value></data>
+  <data name="StatusStateText.Text" xml:space="preserve"><value>新しい図面</value></data>
+  <data name="AppearanceSection.Text" xml:space="preserve"><value>外観</value></data>
+  <data name="ThemeSettingsCard.Header" xml:space="preserve"><value>アプリ フレームのテーマ</value></data>
+  <data name="ThemeSettingsCard.Description" xml:space="preserve"><value>タイトル バー、メニュー、設定ページの外観を選択します。</value></data>
+  <data name="ThemeSystemOption.Content" xml:space="preserve"><value>システム設定を使用</value></data>
+  <data name="ThemeLightOption.Content" xml:space="preserve"><value>ライト</value></data>
+  <data name="ThemeDarkOption.Content" xml:space="preserve"><value>ダーク</value></data>
+  <data name="LanguageSection.Text" xml:space="preserve"><value>言語</value></data>
+  <data name="LanguageSettingsCard.Header" xml:space="preserve"><value>アプリケーションの言語</value></data>
+  <data name="LanguageSettingsCard.Description" xml:space="preserve"><value>デスクトップとエディターで使用する言語を選択します。変更は再起動後に適用されます。</value></data>
+  <data name="LanguageRestartInfoBar.Title" xml:space="preserve"><value>再起動が必要です</value></data>
+  <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>言語を適用するには Excalidraw Desktop を再起動してください。未保存の図面が自動的に閉じられることはありません。</value></data>
+  <data name="StartupSection.Text" xml:space="preserve"><value>起動</value></data>
+  <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>保存済み図面のタブを再度開く</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>前回のセッションから保存済みタブを復元します。未保存の復旧データは常に保持されます。</value></data>
+  <data name="PerformanceSection.Text" xml:space="preserve"><value>パフォーマンス</value></data>
+  <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>非アクティブなタブをスリープ</value></data>
+  <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>安全で変更のないタブを 5 分間非アクティブになった後に一時停止します。</value></data>
+  <data name="UnloadTabsSettingsCard.Header" xml:space="preserve"><value>非アクティブなエディターをアンロード</value></data>
+  <data name="UnloadTabsSettingsCard.Description" xml:space="preserve"><value>安全な WebView を 15 分後に閉じます。タブを選択するとエディターが再作成され、元に戻す履歴はリセットされます。</value></data>
+  <data name="AboutSection.Text" xml:space="preserve"><value>バージョン情報</value></data>
+  <data name="AboutSettingsCard.Header" xml:space="preserve"><value>Excalidraw Desktop</value></data>
+  <data name="AboutSettingsCard.Description" xml:space="preserve"><value>ローカルファーストの Excalidraw 用 WinUI デスクトップアプリです。</value></data>
+  <data name="EditorWebView.AutomationProperties.Name" xml:space="preserve"><value>Excalidraw エディター</value></data>
+  <data name="StartupStatus.Text" xml:space="preserve"><value>Excalidraw Desktop を起動しています…</value></data>
+  <data name="RetryEditorButton.AutomationProperties.Name" xml:space="preserve"><value>このエディターの起動を再試行</value></data>
+  <data name="RetryEditorButton.Content" xml:space="preserve"><value>再試行</value></data>
+  <data name="WebView2HelpButton.AutomationProperties.Name" xml:space="preserve"><value>Microsoft WebView2 のインストールと修復のヘルプを開く</value></data>
+  <data name="WebView2HelpButton.Content" xml:space="preserve"><value>WebView2 ヘルプ</value></data>
+  <data name="CloseFailedTabButton.AutomationProperties.Name" xml:space="preserve"><value>起動できなかった図面タブを閉じる</value></data>
+  <data name="CloseFailedTabButton.Content" xml:space="preserve"><value>タブを閉じる</value></data>
+  <data name="SystemLanguageOption" xml:space="preserve"><value>システム言語を使用</value></data>
+  <data name="VersionFormat" xml:space="preserve"><value>バージョン {0}.{1}.{2}.{3}</value></data>
+  <data name="LanguageRestartMessageFormat" xml:space="preserve"><value>現在のアプリケーション言語は {0} です。選択した言語を適用するには Excalidraw Desktop を再起動してください。未保存の図面が自動的に閉じられることはありません。</value></data>
+  <data name="EditorAutomationName" xml:space="preserve"><value>Excalidraw エディター</value></data>
+  <data name="SleepingStatus" xml:space="preserve"><value>スリープ中 — このタブを選択して再開</value></data>
+  <data name="EditorFailureGuidance" xml:space="preserve"><value>エディターを再試行するか、このタブを閉じてください。保存済みの図面は変更されていません。</value></data>
+  <data name="DragOpenCaption" xml:space="preserve"><value>図面をタブで開く</value></data>
+  <data name="RecentFilesEmpty" xml:space="preserve"><value>最近使った図面はありません</value></data>
+  <data name="ClearRecentDrawings" xml:space="preserve"><value>最近使った図面を消去</value></data>
+  <data name="SettingsTabTitle" xml:space="preserve"><value>設定</value></data>
+  <data name="ContextNewTab" xml:space="preserve"><value>新しいタブ</value></data>
+  <data name="ContextCopyPath" xml:space="preserve"><value>パスをコピー</value></data>
+  <data name="ContextRevealInExplorer" xml:space="preserve"><value>エクスプローラーで表示</value></data>
+  <data name="ContextMoveToNewWindow" xml:space="preserve"><value>タブを新しいウィンドウに移動</value></data>
+  <data name="ContextCloseTab" xml:space="preserve"><value>タブを閉じる</value></data>
+  <data name="ContextCloseOtherTabs" xml:space="preserve"><value>他のタブを閉じる</value></data>
+  <data name="ContextCloseTabsRight" xml:space="preserve"><value>右側のタブを閉じる</value></data>
+  <data name="ActivatedDrawingOpenFailed" xml:space="preserve"><value>起動時に指定された図面を開けませんでした。</value></data>
+  <data name="ApplicationWindowTitleFormat" xml:space="preserve"><value>Excalidraw Desktop{0}</value></data>
+  <data name="CancelButton" xml:space="preserve"><value>キャンセル</value></data>
+  <data name="ChangedOnDiskTitleSuffix" xml:space="preserve"><value> — ディスク上で変更されました</value></data>
+  <data name="DiscardAllButton" xml:space="preserve"><value>すべて破棄</value></data>
+  <data name="DiscardAndCreate" xml:space="preserve"><value>破棄して作成</value></data>
+  <data name="DiscardAndOpen" xml:space="preserve"><value>破棄して開く</value></data>
+  <data name="DiscardButton" xml:space="preserve"><value>破棄</value></data>
+  <data name="DiscardUnsavedChangesTitle" xml:space="preserve"><value>未保存の変更を破棄しますか?</value></data>
+  <data name="DrawingChangedOutsideContent" xml:space="preserve"><value>ディスク上の版を再読み込みするか、このタブを別のファイルに保存するか、編集を続けてください。既存のファイルが自動的に上書きされることはありません。</value></data>
+  <data name="DrawingChangedOutsideTitle" xml:space="preserve"><value>アプリの外部で図面が変更されました</value></data>
+  <data name="DrawingFileMissingContent" xml:space="preserve"><value>元のファイルは移動または削除されました。ファイルを探すか、このタブを新しいファイルに保存するか、何も上書きせず編集を続けてください。</value></data>
+  <data name="DrawingFileMissingTitle" xml:space="preserve"><value>図面ファイルが見つかりません</value></data>
+  <data name="DrawingLoadFailedFormat" xml:space="preserve"><value>この図面を読み込めませんでした ({0})。</value></data>
+  <data name="DrawingLoadFailureGuidance" xml:space="preserve"><value>ローカルのアプリのインストールを確認して再試行してください。他の WebView2 アプリも失敗する場合は、WebView2 のヘルプからランタイムを修復してください。</value></data>
+  <data name="DrawingLocationMissing" xml:space="preserve"><value>図面は保存されていた場所にありません。</value></data>
+  <data name="DrawingPathCopyFailed" xml:space="preserve"><value>図面のパスをコピーできませんでした。</value></data>
+  <data name="DrawingResumeFailed" xml:space="preserve"><value>この図面を再開できませんでした。</value></data>
+  <data name="DrawingStartFailed" xml:space="preserve"><value>この図面を開始できませんでした。</value></data>
+  <data name="DrawingWindowTitleFormat" xml:space="preserve"><value>{0}{1} — Excalidraw Desktop</value></data>
+  <data name="DroppedDrawingsOpenFailed" xml:space="preserve"><value>ドロップされた図面を開けませんでした。</value></data>
+  <data name="EditorBridgeNotReady" xml:space="preserve"><value>エディターは読み込まれましたが、デスクトップとの接続を準備できませんでした。</value></data>
+  <data name="EditorBridgeRetryGuidance" xml:space="preserve"><value>エディターを再試行してください。問題が続く場合は、ローカル Web アセットとデスクトップ アプリを再ビルドしてください。</value></data>
+  <data name="EditorProcessFailedTitle" xml:space="preserve"><value>Excalidraw Desktop — エディター プロセスに失敗しました</value></data>
+  <data name="EditorProcessFailureGuidanceFormat" xml:space="preserve"><value>WebView2 から {0} が報告されました。エディターを再試行してください。失敗が続く場合は WebView2 Runtime を修復してください。</value></data>
+  <data name="EditorProcessStopped" xml:space="preserve"><value>エディター プロセスが予期せず停止しました。</value></data>
+  <data name="EditorRetryGuidance" xml:space="preserve"><value>エディターを再試行してください。問題が続く場合は、WebView2 を修復するかデスクトップ アプリを再ビルドしてください。保存済みの図面は変更されていません。</value></data>
+  <data name="EditorStartupFailedTitle" xml:space="preserve"><value>Excalidraw Desktop — エディターの起動に失敗しました</value></data>
+  <data name="EditorStoppedDuringExport" xml:space="preserve"><value>PNG の作成中にエディターが停止しました。</value></data>
+  <data name="ExcalidrawDrawingType" xml:space="preserve"><value>Excalidraw 図面</value></data>
+  <data name="ExplorerShowDrawingFailed" xml:space="preserve"><value>エクスプローラーでこの図面を表示できませんでした。</value></data>
+  <data name="ExportedFileFormat" xml:space="preserve"><value>{0} をエクスポートしました</value></data>
+  <data name="FileConflictResolutionFailed" xml:space="preserve"><value>ファイルの競合を解決できませんでした。</value></data>
+  <data name="FileLocationUnavailableTitle" xml:space="preserve"><value>ファイルの場所を利用できません</value></data>
+  <data name="InitializingEditorTitle" xml:space="preserve"><value>Excalidraw Desktop — エディターを初期化しています…</value></data>
+  <data name="InvalidPngExportData" xml:space="preserve"><value>エディターから無効な PNG エクスポート データが送信されました。</value></data>
+  <data name="KeepEditingButton" xml:space="preserve"><value>編集を続ける</value></data>
+  <data name="LocateFileButton" xml:space="preserve"><value>ファイルを探す</value></data>
+  <data name="NewDiscardContent" xml:space="preserve"><value>新しい図面を作成すると、現在の未保存の図面が置き換えられます。</value></data>
+  <data name="OkButton" xml:space="preserve"><value>OK</value></data>
+  <data name="OpenDiscardContent" xml:space="preserve"><value>別の図面を開くと、現在の未保存の図面が置き換えられます。</value></data>
+  <data name="OpenDrawingErrorTitle" xml:space="preserve"><value>図面を開けませんでした</value></data>
+  <data name="PngExportAccessDenied" xml:space="preserve"><value>Excalidraw Desktop には、選択した場所へ書き込む権限がありません。</value></data>
+  <data name="PngExportDestinationFailed" xml:space="preserve"><value>選択した場所に PNG を書き込めませんでした。</value></data>
+  <data name="PngExportErrorTitle" xml:space="preserve"><value>PNG をエクスポートできませんでした</value></data>
+  <data name="PngExportStartFailed" xml:space="preserve"><value>PNG エクスポートを開始できませんでした。</value></data>
+  <data name="PngExportTimeout" xml:space="preserve"><value>PNG エクスポートに時間がかかりすぎたためキャンセルされました。</value></data>
+  <data name="PngExportWriteFailed" xml:space="preserve"><value>PNG を書き込めませんでした。保存先とディスクの空き容量を確認してください。</value></data>
+  <data name="RecentDrawingOpenFailed" xml:space="preserve"><value>最近使用した図面を開けませんでした。</value></data>
+  <data name="ReloadButton" xml:space="preserve"><value>再読み込み</value></data>
+  <data name="ResumingDrawing" xml:space="preserve"><value>図面を再開しています…</value></data>
+  <data name="RetryingEditor" xml:space="preserve"><value>エディターを再試行しています…</value></data>
+  <data name="ReviewTabsAutomationName" xml:space="preserve"><value>未保存のタブを個別に確認</value></data>
+  <data name="ReviewTabsButton" xml:space="preserve"><value>タブを個別に確認</value></data>
+  <data name="SaveAllButton" xml:space="preserve"><value>すべて保存</value></data>
+  <data name="SaveAsButton" xml:space="preserve"><value>名前を付けて保存</value></data>
+  <data name="SaveButton" xml:space="preserve"><value>保存</value></data>
+  <data name="SaveChangesBeforeClosingContent" xml:space="preserve"><value>保存せずにこの図面を閉じると、変更内容は失われます。</value></data>
+  <data name="SaveChangesBeforeClosingTitle" xml:space="preserve"><value>閉じる前に変更を保存しますか?</value></data>
+  <data name="SelectedDrawingOpenFailed" xml:space="preserve"><value>選択した図面を開けませんでした。</value></data>
+  <data name="SettingsButtonToolTip" xml:space="preserve"><value>設定タブを表示</value></data>
+  <data name="SettingsWindowTitle" xml:space="preserve"><value>設定 — Excalidraw Desktop</value></data>
+  <data name="SleepingTabHeaderFormat" xml:space="preserve"><value>{0} — スリープ中</value></data>
+  <data name="StartingWindowTitle" xml:space="preserve"><value>Excalidraw Desktop — 起動しています…</value></data>
+  <data name="StatusChangedOnDisk" xml:space="preserve"><value>ディスク上で変更 — 解決</value></data>
+  <data name="StatusDrawingAutomationFormat" xml:space="preserve"><value>図面: {0}</value></data>
+  <data name="StatusExportingPng" xml:space="preserve"><value>PNG をエクスポートしています…</value></data>
+  <data name="StatusFileMissing" xml:space="preserve"><value>ファイルがありません — 解決</value></data>
+  <data name="StatusFileMoved" xml:space="preserve"><value>ファイルが移動されました — 解決</value></data>
+  <data name="StatusNewDrawing" xml:space="preserve"><value>新しい図面</value></data>
+  <data name="StatusResolveHelpText" xml:space="preserve"><value>ファイルの競合を解決するためのオプションを開きます。</value></data>
+  <data name="StatusResuming" xml:space="preserve"><value>再開中</value></data>
+  <data name="StatusSaved" xml:space="preserve"><value>保存済み</value></data>
+  <data name="StatusSleeping" xml:space="preserve"><value>スリープ中</value></data>
+  <data name="StatusUnsaved" xml:space="preserve"><value>未保存の変更</value></data>
+  <data name="StatusUnsavedRecoveredFormat" xml:space="preserve"><value>未保存 • {0} に復元</value></data>
+  <data name="TabAutomationNameFormat" xml:space="preserve"><value>{0}、{1}</value></data>
+  <data name="TabStateChangedOnDisk" xml:space="preserve"><value>ディスク上で変更済み</value></data>
+  <data name="TabStateNewDrawing" xml:space="preserve"><value>新しい図面</value></data>
+  <data name="TabStateSaved" xml:space="preserve"><value>保存済み</value></data>
+  <data name="TabStateSleeping" xml:space="preserve"><value>スリープ中</value></data>
+  <data name="TabStateUnsaved" xml:space="preserve"><value>未保存の変更</value></data>
+  <data name="UnsavedDrawingHelpText" xml:space="preserve"><value>未保存の図面</value></data>
+  <data name="UnsavedDrawingsCountFormat" xml:space="preserve"><value>{0} 個の図面に未保存の変更があります:&#xA;&#xA;{1}</value></data>
+  <data name="UnsavedDrawingsTitle" xml:space="preserve"><value>未保存の図面</value></data>
+  <data name="UntitledName" xml:space="preserve"><value>無題</value></data>
+  <data name="UntitledNumberedFormat" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="WaitForDrawingExport" xml:space="preserve"><value>この図面を閉じる前に、現在の PNG エクスポートが完了するまでお待ちください。</value></data>
+  <data name="WaitForWindowExports" xml:space="preserve"><value>このウィンドウを閉じる前に、PNG エクスポートが完了するまでお待ちください。</value></data>
+  <data name="WebView2RepairGuidance" xml:space="preserve"><value>Evergreen WebView2 Runtime をインストールまたは修復してから、[再試行] を選択してください。保存済みの図面は変更されていません。</value></data>
+  <data name="WebView2Required" xml:space="preserve"><value>Microsoft Edge WebView2 Runtime が必要です。</value></data>
+  <data name="DocumentNotFoundMessage" xml:space="preserve"><value>その場所に図面が存在しません。</value></data>
+  <data name="DocumentAccessDeniedMessage" xml:space="preserve"><value>Excalidraw Desktop にはこの図面にアクセスする権限がありません。</value></data>
+  <data name="DocumentReadFailedMessage" xml:space="preserve"><value>図面を読み取れませんでした。</value></data>
+  <data name="DocumentTooLargeMessage" xml:space="preserve"><value>選択した図面は 50 MB の制限を超えています。</value></data>
+  <data name="DocumentPathUnavailableMessage" xml:space="preserve"><value>選択した図面にはローカルファイルパスがありません。</value></data>
+  <data name="DocumentChangedExternallyMessage" xml:space="preserve"><value>図面が Excalidraw Desktop の外部で変更されました。保存前に競合を解決してください。</value></data>
+  <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>その図面は別のタブで既に開かれています。別のファイル名を選択してください。</value></data>
+  <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>図面をディスクに書き込めませんでした。</value></data>
+  <data name="DocumentInvalidMessage" xml:space="preserve"><value>選択したファイルは有効な Excalidraw 図面ではありません。</value></data>
+</root>

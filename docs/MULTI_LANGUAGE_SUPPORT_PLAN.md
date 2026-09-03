@@ -1,7 +1,8 @@
 # Multi-Language Support Plan
 
-Status: Proposed; implementation has not started
+Status: Implemented; manual release validation remains
 Created: September 2, 2026
+Last updated: September 3, 2026
 Tracked by: [`DESKTOP_BACKLOG.md`](DESKTOP_BACKLOG.md)
 
 ## Goal
@@ -19,20 +20,26 @@ window and editor tab, and fall back safely when a locale is unavailable.
 
 ## Current State
 
-The application has two separate localization surfaces:
+The restart-to-apply localization pipeline is implemented across the native
+WinUI shell and embedded editor. It includes:
 
-1. `ExcalidrawDesktop.App` contains native WinUI text in XAML and C#.
-2. `ExcalidrawDesktop.Web` embeds `@excalidraw/excalidraw` and adds custom menu,
-   status, error, and accessibility strings.
+- an application-owned persisted language preference with system-language,
+  regional, and English fallback resolution;
+- early `ApplicationLanguages.PrimaryLanguageOverride` initialization and an
+  explicit MRT resource context for runtime-generated native strings;
+- 171-key WinUI/manifest catalogs and complete desktop-web catalogs for English,
+  Spanish, French, German, Brazilian Portuguese, Japanese, Simplified Chinese,
+  and Arabic;
+- a typed `app.languageChanged` bridge event that reaches new, restored,
+  retried, resumed, and recreated editors;
+- explicit native and web direction changes for Arabic;
+- build-time resource-reference, XAML `x:Uid`, manifest, catalog-key, and
+  placeholder checks; and
+- packaged German and Arabic smoke coverage for XAML resources, dynamic
+  resources, editor locale/direction, new editors, and retried editors.
 
-Most desktop strings are currently hard-coded. The saved desktop preferences
-contain theme, startup, and tab-lifecycle settings, but no language preference.
-Each window also loads preferences independently, so preference changes are not
-currently broadcast application-wide.
-
-Excalidraw already accepts a `langCode` property and publishes its supported
-language list. The desktop host should select the locale and pass it into every
-editor rather than maintaining translations for Excalidraw's built-in UI.
+Automated results and the remaining manual matrix are recorded in
+[`validation/MULTI_LANGUAGE_VALIDATION.md`](validation/MULTI_LANGUAGE_VALIDATION.md).
 
 ## Product Decisions
 
@@ -45,20 +52,18 @@ editor rather than maintaining translations for Excalidraw's built-in UI.
 - Show language names in their native form, such as `Deutsch`, `Français`, and
   `日本語`.
 
-Recommended initial languages:
+Implemented initial languages and native-to-Excalidraw mappings:
 
-- English
-- Spanish
-- French
-- German
-- Brazilian Portuguese
-- Japanese
-- Simplified Chinese
-- Arabic
-
-Before implementation, verify the exact Excalidraw locale codes exposed by the
-pinned `@excalidraw/excalidraw` version. Do not assume that Windows and
-Excalidraw use identical tags.
+| Language | WinUI | Excalidraw |
+| --- | --- | --- |
+| English | `en-US` | `en` |
+| Spanish | `es-ES` | `es-ES` |
+| French | `fr-FR` | `fr-FR` |
+| German | `de-DE` | `de-DE` |
+| Brazilian Portuguese | `pt-BR` | `pt-BR` |
+| Japanese | `ja-JP` | `ja-JP` |
+| Simplified Chinese | `zh-CN` | `zh-CN` |
+| Arabic | `ar-SA` | `ar-SA` |
 
 ### Applying a changed language
 
@@ -117,7 +122,10 @@ loaded:
 1. Load and validate the saved language preference.
 2. Resolve it to a supported native locale.
 3. Set `ApplicationLanguages.PrimaryLanguageOverride` for an explicit choice.
-4. Clear or omit the override for **Use system language**.
+4. For **Use system language**, try to clear the override. Some Windows App SDK
+   runtime combinations reject an empty reset; in that case, resolve
+   `GlobalizationPreferences.Languages` on every launch and apply the first
+   supported locale for that launch.
 5. Continue startup with English fallback resources available.
 
 The override must only receive a language declared by the packaged application.
@@ -227,7 +235,7 @@ distinguishable until restart.
 
 - Format times, dates, and counts using the resolved culture.
 - Keep file names and serialized document data unchanged.
-- Allow WinUI to derive `FlowDirection` from the selected resource language.
+- Explicitly set the native root `FlowDirection` from the resolved language.
 - Explicitly set the web document direction for the wrapper UI.
 - Confirm that Excalidraw receives an RTL locale and handles its internal
   controls appropriately.
@@ -244,6 +252,22 @@ distinguishable until restart.
 6. Review translations in context; do not treat machine translation as final.
 7. Use pseudo-localization during development to expose clipping and hard-coded
    text before adding more production languages.
+
+### Adding another language
+
+1. Confirm that the pinned `@excalidraw/excalidraw` version exposes the intended
+   locale code.
+2. Add the BCP-47, WinUI, Excalidraw, native-name, and direction mapping to
+   `ExcalidrawDesktop.Core/DesktopLanguage.cs` and its resolver tests.
+3. Add the locale to `supportedLanguageCodes` and a complete catalog in
+   `ExcalidrawDesktop.Web/src/localization/DesktopStrings.ts`.
+4. Copy `Strings/en-US/Resources.resw` to the new locale folder, translate every
+   value without changing semantic keys or placeholders, and add the locale to
+   `tools/Test-Localization.ps1`.
+5. Add web catalog assertions and include the locale in packaged/manual
+   validation when it introduces a new script or layout direction.
+6. Run the localization check, web typecheck/tests, .NET tests, complete desktop
+   build, and relevant packaged smoke tests.
 
 ## Testing Plan
 
@@ -278,18 +302,18 @@ serialization and resolution logic into platform-independent units.
 
 ### Packaged smoke tests
 
-Add a debug-only localization smoke mode that starts the packaged application
-with a controlled locale without changing the user's normal preference.
-
-At minimum, verify:
+The debug-only localization smoke mode starts the packaged application with a
+controlled locale without changing the user's normal preference. It currently
+verifies:
 
 - one non-English left-to-right language;
 - one right-to-left language;
 - native menu, Settings page, tab accessibility, and title resources load;
 - the WebView reports the expected Excalidraw language and document direction;
-- creating, opening, saving, restoring, suspending, and recreating a tab does
-  not revert its editor to English;
-- all tests run without network access.
+- creating a tab and retrying/recreating an editor do not revert it to English.
+
+Opening, saving, recovery restoration, suspension, fully unloaded recreation,
+and explicit network-disconnection coverage remain part of the release matrix.
 
 ### Manual validation matrix
 
@@ -304,7 +328,7 @@ Exercise at least:
 
 ## Delivery Phases
 
-### Phase 1: Infrastructure and preferences
+### Phase 1: Infrastructure and preferences — complete
 
 - Add the language model, supported-language table, resolver, and persistence.
 - Establish application-level preference propagation.
@@ -312,26 +336,28 @@ Exercise at least:
 - Add the Language settings card and restart-required state.
 - Add resolver and persistence tests.
 
-### Phase 2: Native WinUI localization
+### Phase 2: Native WinUI localization — complete
 
 - Create English resources and migrate all native production strings.
 - Localize manifest metadata.
 - Add the first translated catalogs and key-parity validation.
 - Validate native LTR and RTL layouts.
 
-### Phase 3: Web and Excalidraw integration
+### Phase 3: Web and Excalidraw integration — complete
 
 - Add the language bridge event and pending-event handling.
 - Pass `langCode` into Excalidraw.
 - Add desktop-web translation catalogs and document language metadata.
 - Add bridge and React tests.
 
-### Phase 4: Packaged verification and rollout
+### Phase 4: Packaged verification and rollout — in progress
 
-- Add packaged localization smoke coverage.
-- Run the full existing test and smoke suite.
+- [x] Add packaged German LTR and Arabic RTL localization smoke coverage.
+- [x] Run localization checks, web checks/tests, .NET tests, and a complete
+  desktop build.
+- [x] Run the full existing packaged smoke suite.
 - Complete manual CJK, RTL, accessibility, and offline validation.
-- Document how to add and maintain future languages.
+- [x] Document how to add and maintain future languages.
 
 ## Acceptance Criteria
 

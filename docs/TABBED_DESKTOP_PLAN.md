@@ -1,7 +1,7 @@
 # Excalidraw Desktop Tabbed Workspace Plan
 
-Status: Core implementation complete; document-safety, compatibility,
-performance, and manual Windows validation remain
+Status: Core implementation complete; compatibility, performance-budget, and
+manual Windows validation remain
 Created: September 1, 2026
 Related plan: [`WINUI_DESKTOP_PLAN.md`](WINUI_DESKTOP_PLAN.md)
 Related implemented plan: [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md)
@@ -12,12 +12,12 @@ Related implemented plan: [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.m
 | --- | --- | --- |
 | Native tabs and per-tab WebView2 | Implemented | Packaged two-origin smoke coverage; broader interaction checks remain manual |
 | Unique exact per-tab origins | Implemented | Unit-tested exact matching and packaged `localStorage` isolation |
-| Per-tab open, save, Save As, dirty state, and close protection | Implemented | Unit/web coverage is partial; packaged cross-tab save-isolation coverage remains |
+| Per-tab open, save, Save As, dirty state, and close protection | Implemented | Packaged cross-tab save isolation and individual close-decision coverage pass |
 | Reorder, adjacent navigation, and close/close-others/close-right commands | Implemented | Core ordering helpers are unit tested |
 | Middle-click close, Copy Path, and Reveal in Explorer | Implemented | Packaged and manual interaction coverage remains |
 | Recent files and clean workspace restoration | Implemented | Packaged restore smoke coverage |
-| Per-tab recovery after forced termination | Implemented | Synthetic packaged snapshot/restore coverage; real-edit debounce validation remains |
-| External modification, move, and deletion protection | Implemented | File-stamp logic is unit tested; packaged conflict-flow coverage remains |
+| Per-tab recovery after forced termination | Implemented | Real editor edits recover after forced termination in packaged automation |
+| External modification, move, and deletion protection | Implemented | File-stamp logic and packaged external-change detection pass |
 | Consolidated window close | Save All, Discard All, Review Individually, or Cancel implemented | Per-document selection in one dialog is not implemented |
 | File association and existing-instance file activation | Implemented | Packaged cold-start and existing-instance automation passes |
 | Multi-file drag/drop and jump lists | Implemented | Jump-list selection still needs recorded validation |
@@ -79,13 +79,11 @@ Required interactions:
 - `Ctrl+Shift+S`: save the active tab as a new file.
 - `Ctrl+W`: close the active tab.
 - `Ctrl+Tab` and `Ctrl+Shift+Tab`: move between tabs.
-- Middle-click a tab to close it. *(Remaining.)*
+- Middle-click a tab to close it.
 - Drag tabs to reorder them.
 - Use a tab context menu to close, close others, close tabs to the right, copy
-  the path, or reveal the file in Explorer. *(Close commands are implemented;
-  Copy Path and Reveal remain.)*
+  the path, or reveal the file in Explorer.
 - Drop one or more `.excalidraw` files on the window to open them as tabs.
-  *(Remaining.)*
 - Opening a file that is already open focuses its existing tab.
 - Closing a dirty tab offers Save, Don't Save, and Cancel.
 - Closing the window resolves all dirty tabs without silently losing work.
@@ -398,8 +396,8 @@ Exit criteria:
 
 ### Phase T2: Complete per-tab file lifecycle
 
-Status: Functionally implemented September 1, 2026. Packaged cross-tab save,
-Save As, cancellation, and close-prompt automation remains to be added.
+Status: Implemented and covered by packaged cross-tab save and individual
+close-decision automation September 3, 2026.
 
 Tasks:
 
@@ -432,7 +430,7 @@ Tasks:
 - [x] Add per-tab crash recovery.
 - [x] Handle missing or externally changed files under the current skip/recover policy.
 - [x] Show per-tab path, save, recovery, and conflict state in a bottom status bar.
-- [ ] Add packaged external-conflict and real-edit recovery/debounce coverage.
+- [x] Add packaged external-conflict and real-edit recovery/debounce coverage.
 
 Exit criteria:
 
@@ -521,14 +519,14 @@ The lists below are the target coverage. Current automated evidence consists of:
   storage, and ordered-tab helpers.
 - Web tests for bridge correlation and document open/save/restore behavior.
 - Packaged smoke tests for startup, two-origin `localStorage` isolation, clean
-  workspace restoration, synthetic two-tab recovery after forced termination,
-  and Explorer activation into a single running instance.
+  workspace restoration, real-edit recovery after forced termination,
+  cross-tab file/bridge isolation, external file changes, close decisions, and
+  Explorer activation into a single running instance.
 
 Current automation does **not** yet prove IndexedDB isolation, independent undo
-and viewport state, cross-tab Save/Save As ownership, dirty-close decisions,
-real-edit recovery debounce, external-conflict dialogs, or taskbar jump-list
-selection. Keep those items open until a packaged test or a recorded manual
-validation provides evidence.
+and viewport state, the interactive conflict-dialog choices, or taskbar
+jump-list selection. Keep those items open until a packaged test or a recorded
+manual validation provides evidence.
 
 ### Unit tests
 
@@ -595,11 +593,11 @@ validation provides evidence.
 
 - [x] Users can create, open, reorder, switch, save, and close multiple drawing tabs.
 - [x] Every live tab has a unique exact origin and packaged `localStorage` isolation evidence.
-- [ ] Packaged evidence proves file operations and bridge messages cannot cross session boundaries.
-- [ ] Dirty indicators and Save/Don't Save/Cancel close paths have recorded end-to-end validation.
+- [x] Packaged evidence proves file operations and bridge messages cannot cross session boundaries.
+- [x] Dirty indicators and Save/Don't Save/Cancel close paths have recorded end-to-end validation.
 - [x] Duplicate file opens focus the existing tab.
-- [x] Synthetic multiple-dirty-tab recovery passes after forced termination.
-- [ ] Real edits recover within the agreed debounce interval after forced termination.
+- [x] Multiple-dirty-tab recovery passes after forced termination.
+- [x] Real edits recover within the agreed debounce interval after forced termination.
 - [x] Normal restart restores the previous clean workspace.
 - [x] The packaged x64 application passes the current multi-tab smoke tests offline.
 - [ ] The application remains responsive at an agreed supported tab count.
@@ -607,12 +605,9 @@ validation provides evidence.
 
 ## Next implementation slices
 
-1. Add packaged save-isolation, close-decision, external-conflict, and
-   real-edit recovery validation so existing behavior satisfies its exit
-   criteria with evidence.
-2. Record the remaining title-bar, accessibility, input, DPI, and jump-list
+1. Record the remaining title-bar, accessibility, input, DPI, and jump-list
    manual validation.
-3. Validate full unloading with realistic large drawings and embedded images,
+2. Validate full unloading with realistic large drawings and embedded images,
    then define the supported tab-count and memory budgets.
 4. Round-trip representative drawings with excalidraw.com and complete the
    remaining release gates in [`DESKTOP_BACKLOG.md`](DESKTOP_BACKLOG.md).

@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using ExcalidrawDesktop.App.Services;
 
 namespace ExcalidrawDesktop.App.Controls;
 
@@ -37,7 +38,9 @@ public sealed partial class DocumentTabContent : UserControl
         CloseEditor();
         editor = new WebView2();
         AutomationProperties.SetAutomationId(editor, "ExcalidrawEditorWebView");
-        AutomationProperties.SetName(editor, "Excalidraw editor");
+        AutomationProperties.SetName(
+            editor,
+            DesktopResources.Get("EditorAutomationName", "Excalidraw editor"));
         EditorContainer.Content = editor;
         StartupProgress.IsActive = true;
         StartupStatus.Text = message;
@@ -53,7 +56,9 @@ public sealed partial class DocumentTabContent : UserControl
     {
         CloseEditor();
         StartupProgress.IsActive = false;
-        StartupStatus.Text = "Sleeping — select this tab to resume";
+        StartupStatus.Text = DesktopResources.Get(
+            "SleepingStatus",
+            "Sleeping — select this tab to resume");
         StartupGuidance.Text = string.Empty;
         StartupGuidance.Visibility = Visibility.Collapsed;
         FailureActions.Visibility = Visibility.Collapsed;
@@ -82,12 +87,14 @@ public sealed partial class DocumentTabContent : UserControl
 
     public void ShowFailure(
         string message,
-        string guidance = "Retry the editor or close this tab. Your saved drawing is not changed.",
+        string? guidance = null,
         bool showWebView2Help = false)
     {
         StartupProgress.IsActive = false;
         StartupStatus.Text = message;
-        StartupGuidance.Text = guidance;
+        StartupGuidance.Text = guidance ?? DesktopResources.Get(
+            "EditorFailureGuidance",
+            "Retry the editor or close this tab. Your saved drawing is not changed.");
         StartupGuidance.Visibility = Visibility.Visible;
         FailureActions.Visibility = Visibility.Visible;
         WebView2HelpButton.Visibility = showWebView2Help

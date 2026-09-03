@@ -37,7 +37,6 @@ public sealed partial class MainWindow : Window
     private readonly List<string> recentFiles;
     private readonly Queue<string> pendingActivatedFiles = [];
     private readonly DispatcherTimer suspensionTimer = new();
-    private readonly DesktopSettingsStore desktopSettingsStore = new();
     private readonly ImageExportService imageExportService = new();
     private readonly RecoverySnapshotStore recoverySnapshotStore;
     private readonly bool runTabSmoke;
@@ -49,6 +48,10 @@ public sealed partial class MainWindow : Window
     private readonly bool runMultiWindowDirtyExitSmoke;
     private readonly bool runSuspensionSmoke;
     private readonly bool runImageExportSmoke;
+    private readonly bool runDocumentSafetySmoke;
+    private readonly bool runCloseDecisionsSmoke;
+    private readonly bool runLocalizationSmoke;
+    private readonly string? localizationSmokeLanguage;
     private readonly bool performanceSuspendInactive;
     private readonly bool performanceUnloadInactive;
     private readonly int performanceTabCount;
@@ -58,6 +61,7 @@ public sealed partial class MainWindow : Window
     private TabViewItem? settingsTabItem;
     private bool allowClose;
     private bool isWindowReady;
+    private bool isWindowActive;
     private bool tabSmokeStarted;
     private bool titleBarRegistered;
     private bool titleBarRootSubscribed;
@@ -68,6 +72,12 @@ public sealed partial class MainWindow : Window
     private bool performanceSmokeStarted;
     private bool suspensionSmokeStarted;
     private bool imageExportSmokeStarted;
+    private bool documentSafetySmokeStarted;
+    private bool closeDecisionsSmokeStarted;
+    private readonly HashSet<DocumentSession> localizationSmokeEditors = [];
+    private DocumentSession? localizationSmokeRetryTarget;
+    private bool localizationSmokeRetryStarted;
+    private bool localizationSmokeComplete;
     private string? imageExportSmokeOutputPath;
     private bool settingsPageVisible;
     private bool windowClosePromptOpen;
@@ -99,17 +109,33 @@ public sealed partial class MainWindow : Window
         bool runMultiWindowSmoke = false,
         bool runMultiWindowExitSmoke = false,
         bool runMultiWindowDirtyExitSmoke = false,
-        bool runImageExportSmoke = false)
+        bool runImageExportSmoke = false,
+        bool runDocumentSafetySmoke = false,
+        bool runCloseDecisionsSmoke = false,
+        bool runLocalizationSmoke = false,
+        string? localizationSmokeLanguage = null)
     {
         InitializeComponent();
+        Title = DesktopResources.Get(
+            "StartingWindowTitle",
+            "Excalidraw Desktop — Starting…");
         this.workspaceCoordinator = workspaceCoordinator;
         recentFiles = workspaceCoordinator.RecentFiles;
         this.restoreWorkspace = restoreWorkspace;
-        desktopPreferences = desktopSettingsStore.Load();
-        AppSettingsPage.LoadPreferences(desktopPreferences);
+        desktopPreferences = workspaceCoordinator.Preferences;
+        MainLayout.FlowDirection = workspaceCoordinator.EffectiveLanguage.IsRightToLeft
+            ? FlowDirection.RightToLeft
+            : FlowDirection.LeftToRight;
+        AppSettingsPage.LoadPreferences(
+            desktopPreferences,
+            workspaceCoordinator.EffectiveLanguage,
+            workspaceCoordinator.StartupLanguagePreference);
         AppSettingsPage.PreferencesChanged += OnPreferencesChanged;
         MainLayout.ActualThemeChanged += OnActualThemeChanged;
         ApplyDesktopTheme();
+        ToolTipService.SetToolTip(
+            SettingsButton,
+            DesktopResources.Get("SettingsButtonToolTip", "Show Settings tab"));
         InitializeTitleBar();
         var effectiveWorkspaceStatePath = workspaceStatePath ?? Path.Combine(
                 Windows.Storage.ApplicationData.Current.LocalFolder.Path,
@@ -125,6 +151,10 @@ public sealed partial class MainWindow : Window
         this.runMultiWindowExitSmoke = runMultiWindowExitSmoke;
         this.runMultiWindowDirtyExitSmoke = runMultiWindowDirtyExitSmoke;
         this.runImageExportSmoke = runImageExportSmoke;
+        this.runDocumentSafetySmoke = runDocumentSafetySmoke;
+        this.runCloseDecisionsSmoke = runCloseDecisionsSmoke;
+        this.runLocalizationSmoke = runLocalizationSmoke;
+        this.localizationSmokeLanguage = localizationSmokeLanguage;
         this.performanceTabCount = performanceTabCount;
         this.runSuspensionSmoke = runSuspensionSmoke;
         this.performanceSuspendInactive = performanceSuspendInactive;
@@ -134,7 +164,7 @@ public sealed partial class MainWindow : Window
         Closed += OnWindowClosed;
         AppWindow.Closing += OnAppWindowClosing;
         AppWindow.Changed += OnAppWindowChanged;
-        DocumentTabs.LayoutUpdated += OnTabLayoutUpdated;
+        DocumentTabs.TabItemsChanged += OnTabItemsChanged;
         suspensionTimer.Interval = TimeSpan.FromSeconds(30);
         suspensionTimer.Tick += OnSuspensionTimerTick;
         suspensionTimer.Start();
@@ -163,6 +193,14 @@ public sealed partial class MainWindow : Window
             CreateTab();
             CreateTab();
         }
+        if (runDocumentSafetySmoke)
+        {
+            CreateTab();
+        }
+        if (runCloseDecisionsSmoke)
+        {
+            CreateTab();
+        }
         for (var index = 1; index < performanceTabCount; index++)
         {
             CreateTab();
@@ -173,7 +211,7 @@ public sealed partial class MainWindow : Window
         object? sender,
         PreferencesChangedEventArgs args)
     {
-        ApplyDesktopPreferences(args.Preferences);
+        workspaceCoordinator.UpdatePreferences(args.Preferences);
     }
 
     private void InitializeTitleBar()
@@ -189,10 +227,13 @@ public sealed partial class MainWindow : Window
         ApplyTitleBarTheme();
     }
 
-    private void ApplyDesktopPreferences(DesktopPreferences preferences)
+    internal void ApplySharedPreferences(DesktopPreferences preferences)
     {
         desktopPreferences = preferences;
-        desktopSettingsStore.Save(preferences);
+        AppSettingsPage.LoadPreferences(
+            desktopPreferences,
+            workspaceCoordinator.EffectiveLanguage,
+            workspaceCoordinator.StartupLanguagePreference);
         ApplyDesktopTheme();
 
         if (!preferences.SuspendInactiveTabs)
@@ -250,6 +291,146 @@ public sealed partial class MainWindow : Window
                 new { theme = MainLayout.ActualTheme == ElementTheme.Dark ? "dark" : "light" }));
     }
 
+    private void SendEditorLanguage(DocumentSession session)
+    {
+        if (!session.IsReady || session.CoreWebView is null)
+        {
+            return;
+        }
+
+        var language = workspaceCoordinator.EffectiveLanguage;
+        session.CoreWebView.PostWebMessageAsJson(
+            BridgeEventJson.Create(
+                "app.languageChanged",
+                new
+                {
+                    langCode = language.ExcalidrawCode,
+                    direction = language.Direction,
+                }));
+    }
+
+    private void OnEditorLanguageApplied(
+        DocumentSession session,
+        string langCode,
+        string direction)
+    {
+#if DEBUG
+        if (!runLocalizationSmoke ||
+            localizationSmokeComplete ||
+            !session.IsReady ||
+            localizationSmokeLanguage is null)
+        {
+            return;
+        }
+
+        var expected = workspaceCoordinator.EffectiveLanguage;
+        var expectedFlowDirection = expected.IsRightToLeft
+            ? FlowDirection.RightToLeft
+            : FlowDirection.LeftToRight;
+        var nativeResourcesApplied = string.Equals(
+                SettingsMenuItem.Text,
+                DesktopResources.Get("SettingsTabTitle", "Settings"),
+                StringComparison.Ordinal) &&
+            string.Equals(
+                AutomationProperties.GetName(SettingsButton),
+                DesktopResources.Get(
+                    "SettingsButtonToolTip",
+                    "Show Settings tab"),
+                StringComparison.Ordinal) &&
+            !string.Equals(FileMenu.Title, "File", StringComparison.Ordinal);
+        var valid = string.Equals(
+                localizationSmokeLanguage,
+                expected.PreferenceTag,
+                StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(
+                langCode,
+                expected.ExcalidrawCode,
+                StringComparison.Ordinal) &&
+            string.Equals(direction, expected.Direction, StringComparison.Ordinal) &&
+            MainLayout.FlowDirection == expectedFlowDirection &&
+            nativeResourcesApplied;
+        if (!valid)
+        {
+            CompleteLocalizationSmoke(
+                passed: false,
+                langCode,
+                direction,
+                nativeResourcesApplied,
+                "The native or web locale did not match the requested language.");
+            return;
+        }
+
+        if (localizationSmokeRetryStarted &&
+            ReferenceEquals(localizationSmokeRetryTarget, session))
+        {
+            CompleteLocalizationSmoke(
+                passed: true,
+                langCode,
+                direction,
+                nativeResourcesApplied,
+                failure: null);
+            return;
+        }
+
+        if (!localizationSmokeEditors.Add(session))
+        {
+            return;
+        }
+
+        if (localizationSmokeEditors.Count == 1)
+        {
+            CreateTab();
+            return;
+        }
+
+        localizationSmokeRetryTarget = session;
+        localizationSmokeRetryStarted = true;
+        _ = RetrySessionAsync(session);
+#endif
+    }
+
+#if DEBUG
+    private void CompleteLocalizationSmoke(
+        bool passed,
+        string langCode,
+        string direction,
+        bool nativeResourcesApplied,
+        string? failure)
+    {
+        localizationSmokeComplete = true;
+        var resultPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "localization-smoke-result.json");
+        File.WriteAllText(
+            resultPath,
+            JsonSerializer.Serialize(new
+            {
+                Result = passed ? "Passed" : "Failed",
+                RequestedLanguage = localizationSmokeLanguage,
+                NativeLanguage = workspaceCoordinator.EffectiveLanguage.WinUiTag,
+                ExcalidrawLanguage = langCode,
+                Direction = direction,
+                NativeResourcesApplied = nativeResourcesApplied,
+                FileMenuTitle = FileMenu.Title,
+                SettingsMenuText = SettingsMenuItem.Text,
+                DynamicSettingsText = DesktopResources.Get(
+                    "SettingsTabTitle",
+                    "Settings"),
+                SettingsButtonName = AutomationProperties.GetName(SettingsButton),
+                ExpectedSettingsButtonName = DesktopResources.Get(
+                    "SettingsButtonToolTip",
+                    "Show Settings tab"),
+                NativeFlowDirection = MainLayout.FlowDirection.ToString(),
+                NewEditorValidated = localizationSmokeEditors.Count >= 2,
+                RetriedEditorValidated = localizationSmokeRetryStarted,
+                Failure = failure,
+            }));
+        Title = passed
+            ? $"Excalidraw Desktop — Localization smoke passed: {localizationSmokeLanguage}"
+            : $"Excalidraw Desktop — Localization smoke failed: {localizationSmokeLanguage}";
+    }
+#endif
+
     private void OnTitleBarLoaded(object sender, RoutedEventArgs args)
     {
         if (!titleBarRootSubscribed && MainLayout.XamlRoot is { } xamlRoot)
@@ -299,6 +480,7 @@ public sealed partial class MainWindow : Window
             PopulateRecentFilesMenu();
         }
         isWindowReady = true;
+        await workspaceCoordinator.NotifyWindowReadyAsync(this);
 #if DEBUG
         TryRunMultiWindowExitSmoke();
 #endif
@@ -352,7 +534,9 @@ public sealed partial class MainWindow : Window
         }
 
         args.AcceptedOperation = DataPackageOperation.Copy;
-        args.DragUIOverride.Caption = "Open drawing tabs";
+        args.DragUIOverride.Caption = DesktopResources.Get(
+            "DragOpenCaption",
+            "Open drawing tabs");
         args.DragUIOverride.IsCaptionVisible = true;
         args.Handled = true;
     }
@@ -375,7 +559,9 @@ public sealed partial class MainWindow : Window
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            await ShowOpenErrorAsync("The dropped drawings could not be opened.");
+            await ShowOpenErrorAsync(DesktopResources.Get(
+                "DroppedDrawingsOpenFailed",
+                "The dropped drawings could not be opened."));
         }
     }
 
@@ -425,12 +611,18 @@ public sealed partial class MainWindow : Window
         }
         catch (BridgeProtocolException exception)
         {
-            await ShowOpenErrorAsync(exception.Message);
+            await ShowOpenErrorAsync(GetLocalizedDocumentError(
+                exception,
+                DesktopResources.Get(
+                    "ActivatedDrawingOpenFailed",
+                    "The activated drawing could not be opened.")));
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            await ShowOpenErrorAsync("The activated drawing could not be opened.");
+            await ShowOpenErrorAsync(DesktopResources.Get(
+                "ActivatedDrawingOpenFailed",
+                "The activated drawing could not be opened."));
         }
     }
 
@@ -488,27 +680,25 @@ public sealed partial class MainWindow : Window
             () => OnCloseCancelled(session),
             () => CreateTab(),
             () => RequestOpenDocumentAsync(session),
-            () => _ = RequestCloseSessionAsync(session),
+            () => QueueCloseSession(session),
             next => SelectAdjacentTab(session, next),
             (exportId, message) =>
-                _ = FailImageExportAsync(session, exportId, message));
+                _ = FailImageExportAsync(session, exportId, message),
+            (langCode, direction) =>
+                OnEditorLanguageApplied(session, langCode, direction));
         EventHandler retryRequested = (_, _) => _ = RetrySessionAsync(session);
-        EventHandler closeRequested = (_, _) => _ = RequestCloseSessionAsync(session);
+        EventHandler closeRequested = (_, _) => QueueCloseSession(session);
         EventHandler webView2HelpRequested = (_, _) =>
             _ = OpenExternalUriAsync(WebView2HelpUri);
-        PointerEventHandler pointerPressed = (_, args) =>
-            OnTabPointerPressed(session, args);
         session.Content.RetryRequested += retryRequested;
         session.Content.CloseRequested += closeRequested;
         session.Content.WebView2HelpRequested += webView2HelpRequested;
-        session.TabItem.PointerPressed += pointerPressed;
         session.TabItem.ContextFlyout = CreateTabContextFlyout(session);
         session.DetachWindowHandlers = () =>
         {
             session.Content.RetryRequested -= retryRequested;
             session.Content.CloseRequested -= closeRequested;
             session.Content.WebView2HelpRequested -= webView2HelpRequested;
-            session.TabItem.PointerPressed -= pointerPressed;
             session.TabItem.ContextFlyout = null;
             session.DocumentService.IsPathOwnedByAnotherSession = null;
         };
@@ -541,20 +731,22 @@ public sealed partial class MainWindow : Window
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
     {
+        isWindowActive =
+            args.WindowActivationState != WindowActivationState.Deactivated;
         TitleBarContainer.Opacity =
-            args.WindowActivationState == WindowActivationState.Deactivated
+            !isWindowActive
                 ? 0.82
                 : 1;
         UpdateTitleBarInsets();
 
-        if (args.WindowActivationState != WindowActivationState.Deactivated)
+        if (isWindowActive)
         {
             workspaceCoordinator.NotifyWindowActivated(this);
         }
 
         if (isWindowReady &&
             !settingsPageVisible &&
-            args.WindowActivationState != WindowActivationState.Deactivated &&
+            isWindowActive &&
             ActiveSession is { } session)
         {
             if (session.IsUnloaded)
@@ -592,7 +784,7 @@ public sealed partial class MainWindow : Window
         Closed -= OnWindowClosed;
         AppWindow.Closing -= OnAppWindowClosing;
         AppWindow.Changed -= OnAppWindowChanged;
-        DocumentTabs.LayoutUpdated -= OnTabLayoutUpdated;
+        DocumentTabs.TabItemsChanged -= OnTabItemsChanged;
         pendingTearOutWindow?.CloseIfEmptyAfterMove();
         pendingTearOutWindow = null;
         AppSettingsPage.PreferencesChanged -= OnPreferencesChanged;
@@ -790,7 +982,9 @@ public sealed partial class MainWindow : Window
         session.IsInitializing = false;
         session.IsSuspended = false;
         session.CoreWebView = null;
-        var editor = session.Content.RecreateEditor("Resuming drawing…");
+        var editor = session.Content.RecreateEditor(DesktopResources.Get(
+            "ResumingDrawing",
+            "Resuming drawing…"));
         ConfigureEditorDropTarget(session, editor);
 
         if (session.HibernatedContent is { } content)
@@ -799,7 +993,9 @@ public sealed partial class MainWindow : Window
             {
                 session.IsRestoringFromHibernation = false;
                 session.IsResuming = false;
-                session.Content.ShowFailure("This drawing could not be resumed.");
+                session.Content.ShowFailure(DesktopResources.Get(
+                    "DrawingResumeFailed",
+                    "This drawing could not be resumed."));
                 return;
             }
 
@@ -925,7 +1121,9 @@ public sealed partial class MainWindow : Window
 
         session.IsInitializing = true;
         var webView = session.Content.Editor;
-        Title = "Excalidraw Desktop — Initializing editor…";
+        Title = DesktopResources.Get(
+            "InitializingEditorTitle",
+            "Excalidraw Desktop — Initializing editor…");
         try
         {
             var entryPointPath = Path.Combine(webAssetPath, "index.html");
@@ -938,7 +1136,11 @@ public sealed partial class MainWindow : Window
 
             await webView.EnsureCoreWebView2Async();
             ConfigureWebView(session, webView.CoreWebView2);
-            webView.CoreWebView2.Navigate(session.TabOrigin.EntryPoint);
+            var entryPoint = runRecoverySmoke || verifyRecoverySmoke ||
+                runDocumentSafetySmoke || runCloseDecisionsSmoke
+                    ? $"{session.TabOrigin.EntryPoint}?desktopSmoke=1"
+                    : session.TabOrigin.EntryPoint;
+            webView.CoreWebView2.Navigate(entryPoint);
         }
         catch (Exception exception)
         {
@@ -946,13 +1148,23 @@ public sealed partial class MainWindow : Window
             session.LastLifecycleFailure = exception.Message;
             session.Content.ShowFailure(
                 runtimeMissing
-                    ? "Microsoft Edge WebView2 Runtime is required."
-                    : "This drawing could not start.",
+                    ? DesktopResources.Get(
+                        "WebView2Required",
+                        "Microsoft Edge WebView2 Runtime is required.")
+                    : DesktopResources.Get(
+                        "DrawingStartFailed",
+                        "This drawing could not start."),
                 runtimeMissing
-                    ? "Install or repair the Evergreen WebView2 Runtime, then choose Retry. Your saved drawing is not changed."
-                    : "Retry the editor. If the problem continues, repair WebView2 or rebuild the desktop app. Your saved drawing is not changed.",
+                    ? DesktopResources.Get(
+                        "WebView2RepairGuidance",
+                        "Install or repair the Evergreen WebView2 Runtime, then choose Retry. Your saved drawing is not changed.")
+                    : DesktopResources.Get(
+                        "EditorRetryGuidance",
+                        "Retry the editor. If the problem continues, repair WebView2 or rebuild the desktop app. Your saved drawing is not changed."),
                 showWebView2Help: true);
-            Title = "Excalidraw Desktop — Editor startup failed";
+            Title = DesktopResources.Get(
+                "EditorStartupFailedTitle",
+                "Excalidraw Desktop — Editor startup failed");
             Debug.WriteLine(exception);
         }
         finally
@@ -1058,7 +1270,9 @@ public sealed partial class MainWindow : Window
         session.DetachEditorHandlers?.Invoke();
         session.DetachEditorHandlers = null;
         DetachWebView(session);
-        var editor = session.Content.RecreateEditor("Retrying editor…");
+        var editor = session.Content.RecreateEditor(DesktopResources.Get(
+            "RetryingEditor",
+            "Retrying editor…"));
         ConfigureEditorDropTarget(session, editor);
         UpdateTabHeader(session);
         UpdateStatusBar(session);
@@ -1094,10 +1308,17 @@ public sealed partial class MainWindow : Window
             session.IsReady = false;
             session.LastLifecycleFailure = args.WebErrorStatus.ToString();
             session.Content.ShowFailure(
-                $"This drawing could not load ({args.WebErrorStatus}).",
-                "Check the local app installation and retry. If other WebView2 apps also fail, use WebView2 help to repair the runtime.",
+                DesktopResources.Format(
+                    "DrawingLoadFailedFormat",
+                    "This drawing could not load ({0}).",
+                    args.WebErrorStatus),
+                DesktopResources.Get(
+                    "DrawingLoadFailureGuidance",
+                    "Check the local app installation and retry. If other WebView2 apps also fail, use WebView2 help to repair the runtime."),
                 showWebView2Help: true);
-            Title = "Excalidraw Desktop — Editor startup failed";
+            Title = DesktopResources.Get(
+                "EditorStartupFailedTitle",
+                "Excalidraw Desktop — Editor startup failed");
             return;
         }
 
@@ -1117,11 +1338,17 @@ public sealed partial class MainWindow : Window
             $"The editor loaded but its desktop bridge did not become ready. {diagnostics}");
 #else
         session.Content.ShowFailure(
-            "The editor loaded but its desktop bridge did not become ready.",
-            "Retry the editor. If the problem continues, rebuild the local web assets and desktop app.");
+            DesktopResources.Get(
+                "EditorBridgeNotReady",
+                "The editor loaded but its desktop bridge did not become ready."),
+            DesktopResources.Get(
+                "EditorBridgeRetryGuidance",
+                "Retry the editor. If the problem continues, rebuild the local web assets and desktop app."));
 #endif
         session.LastLifecycleFailure = "The desktop bridge did not become ready.";
-        Title = "Excalidraw Desktop — Editor startup failed";
+        Title = DesktopResources.Get(
+            "EditorStartupFailedTitle",
+            "Excalidraw Desktop — Editor startup failed");
     }
 
     private void OnWebViewProcessFailed(
@@ -1143,15 +1370,24 @@ public sealed partial class MainWindow : Window
             _ = FailImageExportAsync(
                 session,
                 pendingExport.ExportId,
-                "The editor stopped while creating the PNG.");
+                DesktopResources.Get(
+                    "EditorStoppedDuringExport",
+                    "The editor stopped while creating the PNG."));
         }
         session.Content.ShowFailure(
-            "The editor process stopped unexpectedly.",
-            $"WebView2 reported {args.ProcessFailedKind}. Retry the editor. If failures continue, repair the WebView2 Runtime.",
+            DesktopResources.Get(
+                "EditorProcessStopped",
+                "The editor process stopped unexpectedly."),
+            DesktopResources.Format(
+                "EditorProcessFailureGuidanceFormat",
+                "WebView2 reported {0}. Retry the editor. If failures continue, repair the WebView2 Runtime.",
+                args.ProcessFailedKind),
             showWebView2Help: true);
         UpdateTabHeader(session);
         UpdateStatusBar(session);
-        Title = "Excalidraw Desktop — Editor process failed";
+        Title = DesktopResources.Get(
+            "EditorProcessFailedTitle",
+            "Excalidraw Desktop — Editor process failed");
     }
 
     private async void OnNewWindowRequested(
@@ -1185,7 +1421,7 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            session.IsBridgeDispatching = true;
+            session.BridgeDispatchDepth++;
             var message = BridgeMessageParser.Parse(args.WebMessageAsJson);
             await session.Dispatcher.DispatchAsync(coreWebView, message);
         }
@@ -1195,7 +1431,7 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            session.IsBridgeDispatching = false;
+            session.BridgeDispatchDepth--;
         }
     }
 
@@ -1286,7 +1522,9 @@ public sealed partial class MainWindow : Window
             _ = FailImageExportAsync(
                 session,
                 pending.ExportId,
-                "The editor sent invalid PNG export data.");
+                DesktopResources.Get(
+                    "InvalidPngExportData",
+                    "The editor sent invalid PNG export data."));
             return;
         }
 
@@ -1369,6 +1607,7 @@ public sealed partial class MainWindow : Window
         session.LastLifecycleFailure = null;
         session.Content.ShowReady();
         SendEditorTheme(session);
+        SendEditorLanguage(session);
         UpdateWindowTitle();
         SendPendingDocumentLoad(session);
         if (session.IsRestoringFromHibernation &&
@@ -1384,6 +1623,8 @@ public sealed partial class MainWindow : Window
         TryRunPerformanceSmoke();
         TryRunSuspensionSmoke();
         TryRunImageExportSmoke();
+        TryRunDocumentSafetySmoke();
+        TryRunCloseDecisionsSmoke();
 #endif
 #if DEBUG
         TryRunRecoverySnapshotSmoke();
@@ -1424,12 +1665,18 @@ public sealed partial class MainWindow : Window
         }
         catch (BridgeProtocolException exception)
         {
-            await ShowOpenErrorAsync(exception.Message);
+            await ShowOpenErrorAsync(GetLocalizedDocumentError(
+                exception,
+                DesktopResources.Get(
+                    "SelectedDrawingOpenFailed",
+                    "The selected drawing could not be opened.")));
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            await ShowOpenErrorAsync("The selected drawing could not be opened.");
+            await ShowOpenErrorAsync(DesktopResources.Get(
+                "SelectedDrawingOpenFailed",
+                "The selected drawing could not be opened."));
         }
         finally
         {
@@ -1519,13 +1766,49 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             XamlRoot = DocumentTabs.XamlRoot,
-            Title = "Could not open drawing",
+            Title = DesktopResources.Get(
+                "OpenDrawingErrorTitle",
+                "Could not open drawing"),
             Content = message,
-            CloseButtonText = "OK",
+            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
             DefaultButton = ContentDialogButton.Close,
         };
         await dialog.ShowAsync();
     }
+
+    private static string GetLocalizedDocumentError(
+        BridgeProtocolException exception,
+        string fallback) => exception.Code switch
+        {
+            "DocumentNotFound" => DesktopResources.Get(
+                "DocumentNotFoundMessage",
+                "The drawing no longer exists at that location."),
+            "DocumentAccessDenied" => DesktopResources.Get(
+                "DocumentAccessDeniedMessage",
+                "Excalidraw Desktop does not have permission to access that drawing."),
+            "DocumentReadFailed" => DesktopResources.Get(
+                "DocumentReadFailedMessage",
+                "The drawing could not be read."),
+            "DocumentTooLarge" => DesktopResources.Get(
+                "DocumentTooLargeMessage",
+                "The selected drawing exceeds the 50 MB desktop document limit."),
+            "DocumentPathUnavailable" => DesktopResources.Get(
+                "DocumentPathUnavailableMessage",
+                "The selected drawing does not have a local file path."),
+            "DocumentChangedExternally" => DesktopResources.Get(
+                "DocumentChangedExternallyMessage",
+                "The drawing changed outside Excalidraw Desktop. Resolve the conflict before saving."),
+            "DocumentAlreadyOpen" => DesktopResources.Get(
+                "DocumentAlreadyOpenMessage",
+                "That drawing is already open in another tab. Choose a different file name."),
+            "DocumentWriteFailed" => DesktopResources.Get(
+                "DocumentWriteFailedMessage",
+                "The drawing could not be written to disk."),
+            "DocumentInvalid" => DesktopResources.Get(
+                "DocumentInvalidMessage",
+                "The selected file is not a valid Excalidraw drawing."),
+            _ => fallback,
+        };
 
     private async Task RestoreWorkspaceAsync()
     {
@@ -1705,12 +1988,18 @@ public sealed partial class MainWindow : Window
                 QueuePersistWorkspace();
                 QueueJumpListUpdate();
             }
-            await ShowOpenErrorAsync(exception.Message);
+            await ShowOpenErrorAsync(GetLocalizedDocumentError(
+                exception,
+                DesktopResources.Get(
+                    "RecentDrawingOpenFailed",
+                    "The recent drawing could not be opened.")));
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            await ShowOpenErrorAsync("The recent drawing could not be opened.");
+            await ShowOpenErrorAsync(DesktopResources.Get(
+                "RecentDrawingOpenFailed",
+                "The recent drawing could not be opened."));
         }
         finally
         {
@@ -1776,14 +2065,24 @@ public sealed partial class MainWindow : Window
             {
                 XamlRoot = DocumentTabs.XamlRoot,
                 Title = requiresLocate
-                    ? "Drawing file is missing"
-                    : "Drawing changed outside the app",
+                    ? DesktopResources.Get(
+                        "DrawingFileMissingTitle",
+                        "Drawing file is missing")
+                    : DesktopResources.Get(
+                        "DrawingChangedOutsideTitle",
+                        "Drawing changed outside the app"),
                 Content = requiresLocate
-                    ? "The backing file was moved or deleted. Locate it, save this tab to a new file, or keep editing without overwriting anything."
-                    : "Reload the disk version, save this tab to a different file, or keep editing. The existing file will not be overwritten automatically.",
-                PrimaryButtonText = requiresLocate ? "Locate file" : "Reload",
-                SecondaryButtonText = "Save As",
-                CloseButtonText = "Keep editing",
+                    ? DesktopResources.Get(
+                        "DrawingFileMissingContent",
+                        "The backing file was moved or deleted. Locate it, save this tab to a new file, or keep editing without overwriting anything.")
+                    : DesktopResources.Get(
+                        "DrawingChangedOutsideContent",
+                        "Reload the disk version, save this tab to a different file, or keep editing. The existing file will not be overwritten automatically."),
+                PrimaryButtonText = requiresLocate
+                    ? DesktopResources.Get("LocateFileButton", "Locate file")
+                    : DesktopResources.Get("ReloadButton", "Reload"),
+                SecondaryButtonText = DesktopResources.Get("SaveAsButton", "Save As"),
+                CloseButtonText = DesktopResources.Get("KeepEditingButton", "Keep editing"),
                 DefaultButton = ContentDialogButton.Close,
             };
             var result = await dialog.ShowAsync();
@@ -1809,7 +2108,9 @@ public sealed partial class MainWindow : Window
         catch (Exception exception)
         {
             Debug.WriteLine($"External conflict resolution failed: {exception}");
-            await ShowOpenErrorAsync("The file conflict could not be resolved.");
+            await ShowOpenErrorAsync(DesktopResources.Get(
+                "FileConflictResolutionFailed",
+                "The file conflict could not be resolved."));
         }
         finally
         {
@@ -1861,7 +2162,9 @@ public sealed partial class MainWindow : Window
         {
             RecentFilesMenu.Items.Add(new MenuFlyoutItem
             {
-                Text = "No recent drawings",
+                Text = DesktopResources.Get(
+                    "RecentFilesEmpty",
+                    "No recent drawings"),
                 IsEnabled = false,
             });
             return;
@@ -1877,7 +2180,12 @@ public sealed partial class MainWindow : Window
         }
 
         RecentFilesMenu.Items.Add(new MenuFlyoutSeparator());
-        var clear = new MenuFlyoutItem { Text = "Clear recent drawings" };
+        var clear = new MenuFlyoutItem
+        {
+            Text = DesktopResources.Get(
+                "ClearRecentDrawings",
+                "Clear recent drawings"),
+        };
         clear.Click += (_, _) =>
         {
             recentFiles.Clear();
@@ -2271,19 +2579,41 @@ public sealed partial class MainWindow : Window
                 Math.Abs(DocumentTabs.ActualHeight - 48) > 0.75 ||
                 !DocumentTabs.CanTearOutTabs ||
                 WindowDragRegion.ActualWidth <= 0 ||
-                !string.Equals(FileMenu.Title?.ToString(), "File", StringComparison.Ordinal) ||
+                !string.Equals(
+                    FileMenu.Title?.ToString(),
+                    DesktopResources.Get("FileMenu.Title", "File"),
+                    StringComparison.Ordinal) ||
                 RecentFilesMenu.Items.Count == 0 ||
-                !string.Equals(SaveMenuItem.Text, "Save", StringComparison.Ordinal) ||
-                !string.Equals(SaveAsMenuItem.Text, "Save as…", StringComparison.Ordinal) ||
+                !string.Equals(
+                    SaveMenuItem.Text,
+                    DesktopResources.Get("SaveMenuItem.Text", "Save"),
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    SaveAsMenuItem.Text,
+                    DesktopResources.Get("SaveAsMenuItem.Text", "Save as…"),
+                    StringComparison.Ordinal) ||
                 !string.Equals(
                     ExportPngMenuItem.Text,
-                    "Export whole drawing as PNG…",
+                    DesktopResources.Get(
+                        "ExportPngMenuItem.Text",
+                        "Export whole drawing as PNG…"),
                     StringComparison.Ordinal) ||
                 SettingsButton.ActualWidth <= 0 ||
                 sessions.Count != 2)
             {
                 throw new InvalidOperationException(
-                    "The title-bar layout was not initialized correctly.");
+                    $"The title-bar layout was not initialized correctly. " +
+                    $"Extends={ExtendsContentIntoTitleBar}; Registered={titleBarRegistered}; " +
+                    $"Scale={scale}; Insets={TitleBarLeftInset.Width.Value}/{expectedLeftInset}," +
+                    $"{TitleBarRightInset.Width.Value}/{expectedRightInset}; " +
+                    $"Heights={TitleBarContainer.ActualHeight}/{DocumentTabs.ActualHeight}; " +
+                    $"TearOut={DocumentTabs.CanTearOutTabs}; DragWidth={WindowDragRegion.ActualWidth}; " +
+                    $"File='{FileMenu.Title}'/'{DesktopResources.Get("FileMenu.Title", "File")}'; " +
+                    $"Recent={RecentFilesMenu.Items.Count}; " +
+                    $"Save='{SaveMenuItem.Text}'/'{DesktopResources.Get("SaveMenuItem.Text", "Save")}'; " +
+                    $"SaveAs='{SaveAsMenuItem.Text}'/'{DesktopResources.Get("SaveAsMenuItem.Text", "Save as…")}'; " +
+                    $"Export='{ExportPngMenuItem.Text}'/'{DesktopResources.Get("ExportPngMenuItem.Text", "Export whole drawing as PNG…")}'; " +
+                    $"SettingsWidth={SettingsButton.ActualWidth}; Sessions={sessions.Count}.");
             }
 
             var requiredAccelerators = new[]
@@ -2355,7 +2685,9 @@ public sealed partial class MainWindow : Window
                 StatusActionButton.Visibility != Visibility.Visible ||
                 !string.Equals(
                     StatusActionButton.Content?.ToString(),
-                    "Changed on disk — Resolve",
+                    DesktopResources.Get(
+                        "StatusChangedOnDisk",
+                        "Changed on disk — Resolve"),
                     StringComparison.Ordinal) ||
                 string.IsNullOrWhiteSpace(AutomationProperties.GetName(StatusActionButton)))
             {
@@ -2368,7 +2700,7 @@ public sealed partial class MainWindow : Window
             first.IsDirty = true;
             UpdateTabHeader(first);
             if (!AutomationProperties.GetName(first.TabItem).Contains(
-                "unsaved changes",
+                DesktopResources.Get("TabStateUnsaved", "unsaved changes"),
                 StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
@@ -2423,7 +2755,9 @@ public sealed partial class MainWindow : Window
                 AppSettingsPage.Visibility != Visibility.Visible ||
                 EditorHost.Visibility != Visibility.Collapsed ||
                 StatusBar.Visibility != Visibility.Collapsed ||
-                Title != "Settings — Excalidraw Desktop")
+                Title != DesktopResources.Get(
+                    "SettingsWindowTitle",
+                    "Settings — Excalidraw Desktop"))
             {
                 throw new InvalidOperationException(
                     "The native Settings tab did not replace the editor surface correctly.");
@@ -2468,8 +2802,21 @@ public sealed partial class MainWindow : Window
 
             if (sessions.Count != 2 ||
                 !ReferenceEquals(sessions[1], first) ||
-                !ReferenceEquals(ActiveSession, first) ||
-                !await RequestCloseSessionAsync(second) ||
+                !ReferenceEquals(ActiveSession, first))
+            {
+                throw new InvalidOperationException(
+                    "Tab ordering regressed in the custom title bar.");
+            }
+
+            QueueCloseSession(second);
+            var queuedCloseDeadline =
+                DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+            while (sessions.Contains(second) &&
+                DateTimeOffset.UtcNow < queuedCloseDeadline)
+            {
+                await Task.Delay(25);
+            }
+            if (sessions.Contains(second) ||
                 sessions.Count != 1 ||
                 second.CoreWebView is not null ||
                 second.DetachWebViewHandlers is not null ||
@@ -2497,11 +2844,33 @@ public sealed partial class MainWindow : Window
                     "Closing a tab did not delete its recovery snapshot.");
             }
 
+            QueueCloseSession(first);
+            var replacementDeadline =
+                DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
+            while ((sessions.Contains(first) ||
+                    sessions.Count != 1 ||
+                    !sessions[0].IsReady) &&
+                DateTimeOffset.UtcNow < replacementDeadline)
+            {
+                await Task.Delay(50);
+            }
+            if (sessions.Contains(first) ||
+                sessions.Count != 1 ||
+                ReferenceEquals(sessions[0], first) ||
+                !sessions[0].IsReady)
+            {
+                throw new InvalidOperationException(
+                    "Closing the final untitled tab did not create a ready replacement tab.");
+            }
+
             Title = "Excalidraw Desktop — Title bar smoke passed";
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
+            await File.WriteAllTextAsync(
+                Path.Combine(AppContext.BaseDirectory, "titlebar-smoke-error.txt"),
+                exception.ToString());
             Title = "Excalidraw Desktop — Title bar smoke failed";
         }
         finally
@@ -2997,19 +3366,11 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var dirtyMessage = BridgeEventJson.Create(
-            "document.dirtyChanged",
-            new { isDirty = true });
-        var snapshotMessage = BridgeEventJson.Create(
-            "document.recoverySnapshot",
-            new
-            {
-                content = "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[],\"appState\":{},\"files\":{}}",
-            });
-        await session.CoreWebView.ExecuteScriptAsync(
-            $"window.chrome.webview.postMessage({dirtyMessage})");
-        await session.CoreWebView.ExecuteScriptAsync(
-            $"window.chrome.webview.postMessage({snapshotMessage})");
+        session.CoreWebView.PostWebMessageAsJson(
+            BridgeEventJson.Create(
+                "app.automationEditRequested",
+                new { elementId = $"recovery-{session.RecoveryId}" }));
+        await Task.CompletedTask;
     }
 
     private void TryRunImageExportSmoke()
@@ -3030,6 +3391,384 @@ public sealed partial class MainWindow : Window
             imageExportSmokeStarted = true;
             _ = RunImageExportSmokeAsync(session);
         }
+    }
+
+    private void TryRunDocumentSafetySmoke()
+    {
+        if (!runDocumentSafetySmoke || documentSafetySmokeStarted)
+        {
+            return;
+        }
+
+        if (sessions.Count != 2)
+        {
+            return;
+        }
+
+        if (sessions.FirstOrDefault(candidate => !candidate.IsReady) is { } pending)
+        {
+            DocumentTabs.SelectedItem = pending.TabItem;
+            return;
+        }
+
+        documentSafetySmokeStarted = true;
+        _ = RunDocumentSafetySmokeAsync();
+    }
+
+    private async Task RunDocumentSafetySmokeAsync()
+    {
+        var paths = new List<string>();
+        try
+        {
+            var first = sessions[0];
+            var second = sessions[1];
+            var firstPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "document-safety-first.excalidraw");
+            var secondPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "document-safety-second.excalidraw");
+            var movedPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "document-safety-first-moved.excalidraw");
+            paths.Add(firstPath);
+            paths.Add(secondPath);
+            paths.Add(movedPath);
+
+            var firstInitial = CreateDocumentSafetyScene("first-initial", -200);
+            var secondInitial = CreateDocumentSafetyScene("second-initial", 200);
+            var firstEdited = CreateDocumentSafetyScene("first-edited", -250);
+            var secondEdited = CreateDocumentSafetyScene("second-edited", 250);
+            await File.WriteAllTextAsync(firstPath, firstInitial);
+            await File.WriteAllTextAsync(secondPath, secondInitial);
+
+            AttachDocumentToSession(
+                first,
+                await first.DocumentService.OpenPathAsync(firstPath),
+                select: true);
+            AttachDocumentToSession(
+                second,
+                await second.DocumentService.OpenPathAsync(secondPath),
+                select: false);
+            if (!await WaitUntilAsync(
+                    () => first.PendingDocumentLoad is null &&
+                        second.PendingDocumentLoad is null,
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The document-safety drawings did not finish loading.");
+            }
+
+            await LoadAutomationSceneAsync(first, firstEdited);
+            RequestSessionSave(first);
+            if (!await WaitUntilAsync(
+                    () => FileContains(firstPath, "first-edited"),
+                    TimeSpan.FromSeconds(10)) ||
+                !string.Equals(
+                    await File.ReadAllTextAsync(secondPath),
+                    secondInitial,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Saving the first tab changed the wrong document.");
+            }
+
+            await LoadAutomationSceneAsync(second, secondEdited);
+            RequestSessionSave(second);
+            if (!await WaitUntilAsync(
+                    () => FileContains(secondPath, "second-edited"),
+                    TimeSpan.FromSeconds(10)) ||
+                !FileContains(firstPath, "first-edited"))
+            {
+                throw new InvalidOperationException(
+                    "Saving the second tab changed the wrong document.");
+            }
+
+            if (DesktopDocumentPath.Equals(
+                    first.DocumentService.DocumentPath,
+                    second.DocumentService.DocumentPath) ||
+                first.TabOrigin == second.TabOrigin ||
+                ReferenceEquals(first.Dispatcher, second.Dispatcher))
+            {
+                throw new InvalidOperationException(
+                    "Document handles, origins, or bridge dispatchers crossed session boundaries.");
+            }
+
+            await File.WriteAllTextAsync(
+                firstPath,
+                CreateDocumentSafetyScene("first-external", -300));
+            if (!await WaitUntilAsync(
+                    () => first.ExternalFileState == ExternalFileState.Modified,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "An external file modification was not detected.");
+            }
+
+            var refreshedFirst = await first.DocumentService.OpenPathAsync(firstPath);
+            AttachDocumentToSession(first, refreshedFirst, select: true);
+            if (!await WaitUntilAsync(
+                    () => first.PendingDocumentLoad is null,
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The modified drawing could not be reloaded.");
+            }
+
+            File.Move(firstPath, movedPath, overwrite: true);
+            if (!await WaitUntilAsync(
+                    () => first.ExternalFileState is
+                        ExternalFileState.Moved or ExternalFileState.Deleted,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "An externally moved drawing was not detected.");
+            }
+
+            File.Delete(secondPath);
+            if (!await WaitUntilAsync(
+                    () => second.ExternalFileState == ExternalFileState.Deleted,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "An externally deleted drawing was not detected.");
+            }
+
+            Title = "Excalidraw Desktop — Document safety smoke passed";
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            Title = $"Excalidraw Desktop — Document safety smoke failed: {exception.Message}";
+        }
+        finally
+        {
+            foreach (var session in sessions)
+            {
+                session.DetachExternalFileWatcher();
+            }
+            foreach (var path in paths.Where(File.Exists))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    private async Task LoadAutomationSceneAsync(
+        DocumentSession session,
+        string content)
+    {
+        session.CoreWebView!.PostWebMessageAsJson(
+            BridgeEventJson.Create(
+                "document.loadRequested",
+                new
+                {
+                    fileName = session.DisplayName,
+                    content,
+                    isRecovery = false,
+                }));
+        await Task.Delay(500);
+    }
+
+    private static string CreateDocumentSafetyScene(string id, int x) =>
+        JsonSerializer.Serialize(new
+        {
+            type = "excalidraw",
+            version = 2,
+            source = "excalidraw-desktop-document-safety-smoke",
+            elements = new[]
+            {
+                new
+                {
+                    id,
+                    type = "rectangle",
+                    x,
+                    y = 0,
+                    width = 100,
+                    height = 80,
+                    angle = 0,
+                    strokeColor = "#1e1e1e",
+                    backgroundColor = "#a5d8ff",
+                    fillStyle = "solid",
+                    strokeWidth = 2,
+                    strokeStyle = "solid",
+                    roughness = 1,
+                    opacity = 100,
+                    groupIds = Array.Empty<string>(),
+                    frameId = (string?)null,
+                    roundness = new { type = 3 },
+                    seed = 101,
+                    version = 1,
+                    versionNonce = 201,
+                    isDeleted = false,
+                    boundElements = Array.Empty<object>(),
+                    updated = 1,
+                    link = (string?)null,
+                    locked = false,
+                },
+            },
+            appState = new { viewBackgroundColor = "#ffffff" },
+            files = new { },
+        });
+
+    private static bool FileContains(string path, string value)
+    {
+        try
+        {
+            return File.Exists(path) && File.ReadAllText(path).Contains(
+                value,
+                StringComparison.Ordinal);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    private void RequestSessionSave(DocumentSession session)
+    {
+        session.CoreWebView!.PostWebMessageAsJson(
+            BridgeEventJson.Create(
+                "document.saveRequested",
+                new { reason = "save" }));
+    }
+
+    private static async Task<bool> WaitUntilAsync(
+        Func<bool> condition,
+        TimeSpan timeout,
+        TimeSpan? pollInterval = null)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        do
+        {
+            if (condition())
+            {
+                return true;
+            }
+            await Task.Delay(pollInterval ?? TimeSpan.FromMilliseconds(50));
+        }
+        while (DateTimeOffset.UtcNow < deadline);
+        return condition();
+    }
+
+    private void TryRunCloseDecisionsSmoke()
+    {
+        if (!runCloseDecisionsSmoke || closeDecisionsSmokeStarted ||
+            sessions.Count != 2)
+        {
+            return;
+        }
+        if (sessions.FirstOrDefault(candidate => !candidate.IsReady) is { } pending)
+        {
+            DocumentTabs.SelectedItem = pending.TabItem;
+            return;
+        }
+
+        closeDecisionsSmokeStarted = true;
+        _ = RunCloseDecisionsSmokeAsync();
+    }
+
+    private async Task RunCloseDecisionsSmokeAsync()
+    {
+        var savedPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "close-decisions-save.excalidraw");
+        try
+        {
+            var cancelAndDiscardSession = sessions[0];
+            var saveSession = sessions[1];
+            var initialScene = CreateDocumentSafetyScene("close-save-initial", 0);
+            await File.WriteAllTextAsync(savedPath, initialScene);
+            AttachDocumentToSession(
+                saveSession,
+                await saveSession.DocumentService.OpenPathAsync(savedPath),
+                select: false);
+            if (!await WaitUntilAsync(
+                    () => saveSession.PendingDocumentLoad is null,
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The close-save drawing did not finish loading.");
+            }
+
+            RequestAutomationEdit(cancelAndDiscardSession, "close-cancel-discard");
+            if (!await WaitUntilAsync(
+                    () => cancelAndDiscardSession.IsDirty,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "The cancel/discard drawing did not become dirty.");
+            }
+
+            Title = "Excalidraw Desktop — Close decisions smoke: choose Cancel";
+            if (await RequestCloseSessionAsync(cancelAndDiscardSession) ||
+                !sessions.Contains(cancelAndDiscardSession) ||
+                !cancelAndDiscardSession.IsDirty)
+            {
+                throw new InvalidOperationException(
+                    "Cancel did not preserve the dirty drawing.");
+            }
+
+            Title = "Excalidraw Desktop — Close decisions smoke: choose Discard";
+            if (!await RequestCloseSessionAsync(cancelAndDiscardSession) ||
+                sessions.Contains(cancelAndDiscardSession))
+            {
+                throw new InvalidOperationException(
+                    "Discard did not close the dirty drawing.");
+            }
+
+            RequestAutomationEdit(saveSession, "close-save-edited");
+            if (!await WaitUntilAsync(
+                    () => saveSession.IsDirty,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException(
+                    "The close-save drawing did not become dirty.");
+            }
+
+            Title = "Excalidraw Desktop — Close decisions smoke: choose Save";
+            if (!await RequestCloseSessionAsync(saveSession) ||
+                sessions.Contains(saveSession) ||
+                !FileContains(savedPath, "close-save-edited"))
+            {
+                throw new InvalidOperationException(
+                    "Save did not write and close the owning drawing.");
+            }
+
+            Title = "Excalidraw Desktop — Close decisions smoke passed";
+            await File.WriteAllTextAsync(
+                Path.Combine(AppContext.BaseDirectory, "close-decisions-smoke.result"),
+                "passed");
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            Title = $"Excalidraw Desktop — Close decisions smoke failed: {exception.Message}";
+            await File.WriteAllTextAsync(
+                Path.Combine(AppContext.BaseDirectory, "close-decisions-smoke.result"),
+                $"failed:{exception.Message}");
+        }
+        finally
+        {
+            foreach (var session in sessions)
+            {
+                session.DetachExternalFileWatcher();
+            }
+            if (File.Exists(savedPath))
+            {
+                File.Delete(savedPath);
+            }
+        }
+    }
+
+    private static void RequestAutomationEdit(
+        DocumentSession session,
+        string elementId)
+    {
+        session.CoreWebView!.PostWebMessageAsJson(
+            BridgeEventJson.Create(
+                "app.automationEditRequested",
+                new { elementId }));
     }
 
     private async Task RunImageExportSmokeAsync(DocumentSession session)
@@ -3272,12 +4011,16 @@ public sealed partial class MainWindow : Window
                 await FailImageExportAsync(
                     session,
                     pending.ExportId,
-                    "The PNG export could not be started.");
+                    DesktopResources.Get(
+                        "PngExportStartFailed",
+                        "The PNG export could not be started."));
             }
             else
             {
                 await ShowImageExportErrorAsync(
-                    "The PNG export could not be started.");
+                    DesktopResources.Get(
+                        "PngExportStartFailed",
+                        "The PNG export could not be started."));
             }
         }
         finally
@@ -3297,7 +4040,6 @@ public sealed partial class MainWindow : Window
             exportId,
             destination,
             new CancellationTokenSource());
-        session.IsExporting = true;
         session.ExportStatusMessage = null;
         UpdateFileMenuState(session);
         UpdateStatusBar(session);
@@ -3314,7 +4056,10 @@ public sealed partial class MainWindow : Window
                     scale = ImageExportPolicy.Scale,
                     padding = ImageExportPolicy.Padding,
                 }));
-        _ = WatchImageExportTimeoutAsync(session, exportId);
+        _ = WatchImageExportTimeoutAsync(
+            session,
+            exportId,
+            session.PendingImageExport.Cancellation.Token);
     }
 
     private void CompleteImageExport(
@@ -3327,10 +4072,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        pending.Cancellation.Cancel();
         pending.Cancellation.Dispose();
         session.PendingImageExport = null;
-        session.IsExporting = false;
-        session.ExportStatusMessage = $"Exported {fileName}";
+        session.ExportStatusMessage = DesktopResources.Format(
+            "ExportedFileFormat",
+            "Exported {0}",
+            fileName);
         UpdateFileMenuState(ActiveSession);
         UpdateStatusBar(session);
 #if DEBUG
@@ -3346,16 +4094,26 @@ public sealed partial class MainWindow : Window
 
     private async Task WatchImageExportTimeoutAsync(
         DocumentSession session,
-        Guid exportId)
+        Guid exportId,
+        CancellationToken cancellationToken)
     {
-        await Task.Delay(TimeSpan.FromMinutes(2));
+        try
+        {
+            await Task.Delay(TimeSpan.FromMinutes(2), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
         if (sessions.Contains(session) &&
             session.PendingImageExport?.ExportId == exportId)
         {
             await FailImageExportAsync(
                 session,
                 exportId,
-                "The PNG export took too long and was cancelled.");
+                DesktopResources.Get(
+                    "PngExportTimeout",
+                    "The PNG export took too long and was cancelled."));
         }
     }
 
@@ -3389,7 +4147,6 @@ public sealed partial class MainWindow : Window
         pending.Cancellation.Cancel();
         pending.Cancellation.Dispose();
         session.PendingImageExport = null;
-        session.IsExporting = false;
         session.ExportStatusMessage = null;
         UpdateFileMenuState(ActiveSession);
         UpdateStatusBar(session);
@@ -3413,9 +4170,11 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             XamlRoot = DocumentTabs.XamlRoot,
-            Title = "Could not export PNG",
+            Title = DesktopResources.Get(
+                "PngExportErrorTitle",
+                "Could not export PNG"),
             Content = message,
-            CloseButtonText = "OK",
+            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
             DefaultButton = ContentDialogButton.Close,
         };
         await dialog.ShowAsync();
@@ -3426,10 +4185,16 @@ public sealed partial class MainWindow : Window
         {
             BridgeProtocolException => exception.Message,
             UnauthorizedAccessException =>
-                "Excalidraw Desktop does not have permission to write the selected location.",
+                DesktopResources.Get(
+                    "PngExportAccessDenied",
+                    "Excalidraw Desktop does not have permission to write the selected location."),
             IOException =>
-                "The PNG could not be written. Check the destination and available disk space.",
-            _ => "The PNG could not be written to the selected location.",
+                DesktopResources.Get(
+                    "PngExportWriteFailed",
+                    "The PNG could not be written. Check the destination and available disk space."),
+            _ => DesktopResources.Get(
+                "PngExportDestinationFailed",
+                "The PNG could not be written to the selected location."),
         };
 
     private void RequestSaveFromFileMenu(bool saveAs)
@@ -3473,13 +4238,13 @@ public sealed partial class MainWindow : Window
         if (settingsTabItem is not null &&
             ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem))
         {
-            HideSettingsPage();
+            QueueHideSettingsPage();
             return;
         }
 
         if (ActiveSession is { } session)
         {
-            _ = RequestCloseSessionAsync(session);
+            QueueCloseSession(session);
         }
     }
 
@@ -3491,6 +4256,40 @@ public sealed partial class MainWindow : Window
     private void OnFileExitClick(object sender, RoutedEventArgs args)
     {
         _ = workspaceCoordinator.RequestExitAsync();
+    }
+
+    internal async Task<bool> ActivateForExitAsync()
+    {
+        if (resourcesDisposed)
+        {
+            return false;
+        }
+        if (isWindowActive)
+        {
+            return true;
+        }
+
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        void ActivatedHandler(object sender, WindowActivatedEventArgs args)
+        {
+            if (args.WindowActivationState != WindowActivationState.Deactivated)
+            {
+                completion.TrySetResult();
+            }
+        }
+
+        Activated += ActivatedHandler;
+        try
+        {
+            Activate();
+            await completion.Task;
+            return !resourcesDisposed;
+        }
+        finally
+        {
+            Activated -= ActivatedHandler;
+        }
     }
 
     internal async Task<bool> RequestCloseAsync()
@@ -3513,7 +4312,20 @@ public sealed partial class MainWindow : Window
             }
 
             allowClose = true;
-            Close();
+            var completion = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            void ClosedHandler(object sender, WindowEventArgs args) =>
+                completion.TrySetResult();
+            Closed += ClosedHandler;
+            try
+            {
+                Close();
+                await completion.Task;
+            }
+            finally
+            {
+                Closed -= ClosedHandler;
+            }
             return true;
         }
         catch (Exception exception)
@@ -3539,7 +4351,10 @@ public sealed partial class MainWindow : Window
 
     private void ShowSettingsPage()
     {
-        AppSettingsPage.LoadPreferences(desktopPreferences);
+        AppSettingsPage.LoadPreferences(
+            desktopPreferences,
+            workspaceCoordinator.EffectiveLanguage,
+            workspaceCoordinator.StartupLanguagePreference);
         if (settingsTabItem is null)
         {
             var header = new StackPanel
@@ -3554,7 +4369,7 @@ public sealed partial class MainWindow : Window
             });
             header.Children.Add(new TextBlock
             {
-                Text = "Settings",
+                Text = DesktopResources.Get("SettingsTabTitle", "Settings"),
                 VerticalAlignment = VerticalAlignment.Center,
             });
             settingsTabItem = new TabViewItem
@@ -3563,7 +4378,9 @@ public sealed partial class MainWindow : Window
                 IsClosable = true,
                 CanDrag = false,
             };
-            AutomationProperties.SetName(settingsTabItem, "Settings");
+            AutomationProperties.SetName(
+                settingsTabItem,
+                DesktopResources.Get("SettingsTabTitle", "Settings"));
             AutomationProperties.SetAutomationId(settingsTabItem, "SettingsTab");
             DocumentTabs.TabItems.Add(settingsTabItem);
         }
@@ -3595,6 +4412,9 @@ public sealed partial class MainWindow : Window
         UpdateWindowTitle();
     }
 
+    private void QueueHideSettingsPage() =>
+        DispatcherQueue.TryEnqueue(HideSettingsPage);
+
     private void OnNewTabAcceleratorInvoked(
         KeyboardAccelerator sender,
         KeyboardAcceleratorInvokedEventArgs args)
@@ -3619,13 +4439,13 @@ public sealed partial class MainWindow : Window
         if (settingsTabItem is not null &&
             ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem))
         {
-            HideSettingsPage();
+            QueueHideSettingsPage();
             return;
         }
 
         if (ActiveSession is { } session)
         {
-            _ = RequestCloseSessionAsync(session);
+            QueueCloseSession(session);
         }
     }
 
@@ -3694,33 +4514,39 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void OnTabCloseRequested(
+    private void OnTabCloseRequested(
         TabView sender,
         TabViewTabCloseRequestedEventArgs args)
     {
         if (settingsTabItem is not null && ReferenceEquals(args.Tab, settingsTabItem))
         {
-            HideSettingsPage();
+            QueueHideSettingsPage();
             return;
         }
 
         if (FindSession(args.Tab) is { } session)
         {
-            await RequestCloseSessionAsync(session);
+            QueueCloseSession(session);
         }
     }
 
-    private void OnTabPointerPressed(
-        DocumentSession session,
-        PointerRoutedEventArgs args)
+    private void QueueCloseSession(DocumentSession session)
     {
-        if (!args.GetCurrentPoint(session.TabItem).Properties.IsMiddleButtonPressed)
-        {
-            return;
-        }
+        _ = RequestCloseSessionAndReportAsync(session);
+    }
 
-        args.Handled = true;
-        _ = RequestCloseSessionAsync(session);
+    private async Task<bool> RequestCloseSessionAndReportAsync(
+        DocumentSession session)
+    {
+        try
+        {
+            return await RequestCloseSessionAsync(session);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Tab close failed: {exception}");
+            return false;
+        }
     }
 
     private void OnTabTearOutWindowRequested(
@@ -3741,7 +4567,9 @@ public sealed partial class MainWindow : Window
         args.NewWindowId = pendingTearOutWindow.AppWindow.Id;
     }
 
-    private void OnTabLayoutUpdated(object? sender, object args)
+    private void OnTabItemsChanged(
+        TabView sender,
+        Windows.Foundation.Collections.IVectorChangedEventArgs args)
     {
         var orderedSessions = GetOrderedSessions();
         if (orderedSessions.Count == sessions.Count &&
@@ -3751,6 +4579,17 @@ public sealed partial class MainWindow : Window
             sessions.AddRange(orderedSessions);
             QueuePersistWorkspace();
         }
+    }
+
+    private void OnTabDragCompleted(
+        TabView sender,
+        TabViewTabDragCompletedEventArgs args)
+    {
+        // TabTearOutRequested consumes and clears a successful destination.
+        // If the drag ended without that event, discard the hidden placeholder
+        // so it cannot linger in the workspace or receive future activation.
+        pendingTearOutWindow?.CloseIfEmptyAfterMove();
+        pendingTearOutWindow = null;
     }
 
     private void OnTabTearOutRequested(
@@ -3865,6 +4704,15 @@ public sealed partial class MainWindow : Window
 
     private async Task<bool> RequestCloseSessionAsync(DocumentSession session)
     {
+        // Removing and disposing a TabViewItem while WinUI is routing the
+        // pointer/click event that targeted it can invalidate the input tree.
+        // Keep this deferral inside the shared close path so bulk and future
+        // callers receive the same protection.
+        if (!await YieldToDispatcherAsync())
+        {
+            return false;
+        }
+
         if (!sessions.Contains(session) || session.ClosePromptOpen)
         {
             return false;
@@ -3873,7 +4721,9 @@ public sealed partial class MainWindow : Window
         if (session.IsExporting)
         {
             await ShowImageExportErrorAsync(
-                "Wait for the current PNG export to finish before closing this drawing.");
+                DesktopResources.Get(
+                    "WaitForDrawingExport",
+                    "Wait for the current PNG export to finish before closing this drawing."));
             return false;
         }
 
@@ -3921,6 +4771,16 @@ public sealed partial class MainWindow : Window
         {
             session.ClosePromptOpen = false;
         }
+    }
+
+    private Task<bool> YieldToDispatcherAsync()
+    {
+        var completion = new TaskCompletionSource<bool>();
+        if (!DispatcherQueue.TryEnqueue(() => completion.TrySetResult(true)))
+        {
+            completion.TrySetResult(false);
+        }
+        return completion.Task;
     }
 
     internal DocumentSessionTransfer? DetachSessionForMove(
@@ -4083,20 +4943,33 @@ public sealed partial class MainWindow : Window
     private MenuFlyout CreateTabContextFlyout(DocumentSession session)
     {
         var flyout = new MenuFlyout();
-        var newTab = new MenuFlyoutItem { Text = "New Tab" };
+        var newTab = new MenuFlyoutItem
+        {
+            Text = DesktopResources.Get("ContextNewTab", "New Tab"),
+        };
         newTab.Click += (_, _) => CreateTab();
 
-        var copyPath = new MenuFlyoutItem { Text = "Copy Path" };
+        var copyPath = new MenuFlyoutItem
+        {
+            Text = DesktopResources.Get("ContextCopyPath", "Copy Path"),
+        };
         AutomationProperties.SetAutomationId(copyPath, "CopyTabPath");
         copyPath.Click += (_, _) => _ = CopyDocumentPathAsync(session);
 
-        var reveal = new MenuFlyoutItem { Text = "Reveal in Explorer" };
+        var reveal = new MenuFlyoutItem
+        {
+            Text = DesktopResources.Get(
+                "ContextRevealInExplorer",
+                "Reveal in Explorer"),
+        };
         AutomationProperties.SetAutomationId(reveal, "RevealTabInExplorer");
         reveal.Click += (_, _) => _ = RevealDocumentInExplorerAsync(session);
 
         var moveToNewWindow = new MenuFlyoutItem
         {
-            Text = "Move Tab to New Window",
+            Text = DesktopResources.Get(
+                "ContextMoveToNewWindow",
+                "Move Tab to New Window"),
         };
         AutomationProperties.SetAutomationId(
             moveToNewWindow,
@@ -4104,14 +4977,27 @@ public sealed partial class MainWindow : Window
         moveToNewWindow.Click += (_, _) =>
             workspaceCoordinator.MoveSessionToNewWindow(this, session);
 
-        var close = new MenuFlyoutItem { Text = "Close Tab" };
-        close.Click += (_, _) => _ = RequestCloseSessionAsync(session);
+        var close = new MenuFlyoutItem
+        {
+            Text = DesktopResources.Get("ContextCloseTab", "Close Tab"),
+        };
+        close.Click += (_, _) => QueueCloseSession(session);
 
-        var closeOthers = new MenuFlyoutItem { Text = "Close Other Tabs" };
+        var closeOthers = new MenuFlyoutItem
+        {
+            Text = DesktopResources.Get(
+                "ContextCloseOtherTabs",
+                "Close Other Tabs"),
+        };
         closeOthers.Click += (_, _) => _ = CloseSessionsAsync(
             WorkspaceTabOperations.OtherTabs(GetOrderedSessions(), session));
 
-        var closeRight = new MenuFlyoutItem { Text = "Close Tabs to the Right" };
+        var closeRight = new MenuFlyoutItem
+        {
+            Text = DesktopResources.Get(
+                "ContextCloseTabsRight",
+                "Close Tabs to the Right"),
+        };
         closeRight.Click += (_, _) => _ = CloseSessionsAsync(
             WorkspaceTabOperations.TabsToRight(GetOrderedSessions(), session));
 
@@ -4156,7 +5042,9 @@ public sealed partial class MainWindow : Window
         {
             Debug.WriteLine(exception);
             await ShowFileLocationErrorAsync(
-                "The drawing path could not be copied.");
+                DesktopResources.Get(
+                    "DrawingPathCopyFailed",
+                    "The drawing path could not be copied."));
         }
     }
 
@@ -4173,7 +5061,9 @@ public sealed partial class MainWindow : Window
             if (!File.Exists(path) || string.IsNullOrWhiteSpace(directory))
             {
                 await ShowFileLocationErrorAsync(
-                    "The drawing is no longer at its saved location.");
+                    DesktopResources.Get(
+                        "DrawingLocationMissing",
+                        "The drawing is no longer at its saved location."));
                 return;
             }
 
@@ -4184,14 +5074,18 @@ public sealed partial class MainWindow : Window
             if (!await Launcher.LaunchFolderAsync(folder, options))
             {
                 await ShowFileLocationErrorAsync(
-                    "File Explorer could not show this drawing.");
+                    DesktopResources.Get(
+                        "ExplorerShowDrawingFailed",
+                        "File Explorer could not show this drawing."));
             }
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
             await ShowFileLocationErrorAsync(
-                "The drawing is no longer at its saved location.");
+                DesktopResources.Get(
+                    "DrawingLocationMissing",
+                    "The drawing is no longer at its saved location."));
         }
     }
 
@@ -4200,9 +5094,11 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             XamlRoot = DocumentTabs.XamlRoot,
-            Title = "File location unavailable",
+            Title = DesktopResources.Get(
+                "FileLocationUnavailableTitle",
+                "File location unavailable"),
             Content = message,
-            CloseButtonText = "OK",
+            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
             DefaultButton = ContentDialogButton.Close,
         };
         await dialog.ShowAsync();
@@ -4279,7 +5175,9 @@ public sealed partial class MainWindow : Window
         if (sessions.Any(session => session.IsExporting))
         {
             await ShowImageExportErrorAsync(
-                "Wait for PNG exports to finish before closing this window.");
+                DesktopResources.Get(
+                    "WaitForWindowExports",
+                    "Wait for PNG exports to finish before closing this window."));
             return false;
         }
 
@@ -4297,27 +5195,37 @@ public sealed partial class MainWindow : Window
         var reviewRequested = false;
         var reviewButton = new Button
         {
-            Content = "Review tabs individually",
+            Content = DesktopResources.Get(
+                "ReviewTabsButton",
+                "Review tabs individually"),
             HorizontalAlignment = HorizontalAlignment.Left,
         };
         AutomationProperties.SetName(
             reviewButton,
-            "Review unsaved tabs individually");
+            DesktopResources.Get(
+                "ReviewTabsAutomationName",
+                "Review unsaved tabs individually"));
         var content = new StackPanel { Spacing = 16 };
         content.Children.Add(new TextBlock
         {
-            Text = $"{dirtySessions.Count} drawing(s) have unsaved changes:\n\n{names}",
+            Text = DesktopResources.Format(
+                "UnsavedDrawingsCountFormat",
+                "{0} drawing(s) have unsaved changes:\n\n{1}",
+                dirtySessions.Count,
+                names),
             TextWrapping = TextWrapping.Wrap,
         });
         content.Children.Add(reviewButton);
         var dialog = new ContentDialog
         {
             XamlRoot = DocumentTabs.XamlRoot,
-            Title = "Unsaved drawings",
+            Title = DesktopResources.Get("UnsavedDrawingsTitle", "Unsaved drawings"),
             Content = content,
-            PrimaryButtonText = "Save all",
-            SecondaryButtonText = "Discard all",
-            CloseButtonText = "Cancel",
+            PrimaryButtonText = DesktopResources.Get("SaveAllButton", "Save all"),
+            SecondaryButtonText = DesktopResources.Get(
+                "DiscardAllButton",
+                "Discard all"),
+            CloseButtonText = DesktopResources.Get("CancelButton", "Cancel"),
             DefaultButton = ContentDialogButton.Close,
         };
         reviewButton.Click += (_, _) =>
@@ -4464,7 +5372,8 @@ public sealed partial class MainWindow : Window
     }
 
     internal WorkspaceWindowState CaptureWorkspaceState(
-        bool treatDirtyAsClean = false)
+        bool treatDirtyAsClean = false,
+        bool capturePlacement = true)
     {
         var activeSession = ActiveSession ??
             (lastDocumentSession is not null && sessions.Contains(lastDocumentSession)
@@ -4474,15 +5383,18 @@ public sealed partial class MainWindow : Window
         var isMaximized = false;
         try
         {
-            var position = AppWindow.Position;
-            var size = AppWindow.Size;
-            bounds = new WorkspaceWindowBounds(
-                position.X,
-                position.Y,
-                size.Width,
-                size.Height);
-            isMaximized = AppWindow.Presenter is OverlappedPresenter presenter &&
-                presenter.State == OverlappedPresenterState.Maximized;
+            if (capturePlacement)
+            {
+                var position = AppWindow.Position;
+                var size = AppWindow.Size;
+                bounds = new WorkspaceWindowBounds(
+                    position.X,
+                    position.Y,
+                    size.Width,
+                    size.Height);
+                isMaximized = AppWindow.Presenter is OverlappedPresenter presenter &&
+                    presenter.State == OverlappedPresenterState.Maximized;
+            }
         }
         catch (Exception exception)
         {
@@ -4546,7 +5458,14 @@ public sealed partial class MainWindow : Window
     private string NextUntitledName()
     {
         untitledSequence++;
-        return untitledSequence == 1 ? "Untitled" : $"Untitled {untitledSequence}";
+        var untitled = DesktopResources.Get("UntitledName", "Untitled");
+        return untitledSequence == 1
+            ? untitled
+            : DesktopResources.Format(
+                "UntitledNumberedFormat",
+                "{0} {1}",
+                untitled,
+                untitledSequence);
     }
 
     private void UpdateTabHeader(DocumentSession session)
@@ -4556,24 +5475,38 @@ public sealed partial class MainWindow : Window
         var accessibilityStates = new List<string>();
         if (session.DocumentService.DocumentPath is null)
         {
-            accessibilityStates.Add("new drawing");
+            accessibilityStates.Add(DesktopResources.Get(
+                "TabStateNewDrawing",
+                "new drawing"));
         }
-        accessibilityStates.Add(session.IsDirty ? "unsaved changes" : "saved");
+        accessibilityStates.Add(session.IsDirty
+            ? DesktopResources.Get("TabStateUnsaved", "unsaved changes")
+            : DesktopResources.Get("TabStateSaved", "saved"));
         if (session.IsSuspended || session.IsUnloaded)
         {
-            accessibilityStates.Add("sleeping");
+            accessibilityStates.Add(DesktopResources.Get(
+                "TabStateSleeping",
+                "sleeping"));
         }
         if (session.ExternalFileState is not ExternalFileState.None)
         {
-            accessibilityStates.Add("changed on disk");
+            accessibilityStates.Add(DesktopResources.Get(
+                "TabStateChangedOnDisk",
+                "changed on disk"));
         }
 
         AutomationProperties.SetName(
             session.TabItem,
-            $"{session.DisplayName}, {string.Join(", ", accessibilityStates)}");
+            DesktopResources.Format(
+                "TabAutomationNameFormat",
+                "{0}, {1}",
+                session.DisplayName,
+                string.Join(", ", accessibilityStates)));
         AutomationProperties.SetHelpText(
             session.TabItem,
-            session.DocumentService.DocumentPath ?? "Unsaved drawing");
+            session.DocumentService.DocumentPath ?? DesktopResources.Get(
+                "UnsavedDrawingHelpText",
+                "Unsaved drawing"));
     }
 
     private void UpdateWindowTitle()
@@ -4583,22 +5516,35 @@ public sealed partial class MainWindow : Window
         UpdateStatusBar(active);
         if (settingsPageVisible)
         {
-            Title = "Settings — Excalidraw Desktop";
+            Title = DesktopResources.Get(
+                "SettingsWindowTitle",
+                "Settings — Excalidraw Desktop");
             return;
         }
         if (active is null || !active.IsReady)
         {
-            Title = "Excalidraw Desktop — Starting…";
+            Title = DesktopResources.Get(
+                "StartingWindowTitle",
+                "Excalidraw Desktop — Starting…");
             return;
         }
 
         var dirtyMarker = active.IsDirty ? " ●" : string.Empty;
-        Title = active.DisplayName == "Untitled"
-            ? $"Excalidraw Desktop{dirtyMarker}"
-            : $"{active.DisplayName}{dirtyMarker} — Excalidraw Desktop";
+        Title = active.DocumentService.DocumentPath is null
+            ? DesktopResources.Format(
+                "ApplicationWindowTitleFormat",
+                "Excalidraw Desktop{0}",
+                dirtyMarker)
+            : DesktopResources.Format(
+                "DrawingWindowTitleFormat",
+                "{0}{1} — Excalidraw Desktop",
+                active.DisplayName,
+                dirtyMarker);
         if (active.ExternalFileState is not ExternalFileState.None)
         {
-            Title += " — Changed on disk";
+            Title += DesktopResources.Get(
+                "ChangedOnDiskTitleSuffix",
+                " — Changed on disk");
         }
     }
 
@@ -4648,7 +5594,7 @@ public sealed partial class MainWindow : Window
         var actionable = false;
         if (session.IsExporting)
         {
-            status = "Exporting PNG…";
+            status = DesktopResources.Get("StatusExportingPng", "Exporting PNG…");
         }
         else if (session.ExportStatusMessage is { } exportStatus)
         {
@@ -4656,43 +5602,59 @@ public sealed partial class MainWindow : Window
         }
         else if (session.IsResuming)
         {
-            status = "Resuming";
+            status = DesktopResources.Get("StatusResuming", "Resuming");
         }
         else if (session.IsUnloaded || session.IsUnloading ||
             session.IsSuspended || session.IsSuspensionChanging)
         {
-            status = "Sleeping";
+            status = DesktopResources.Get("StatusSleeping", "Sleeping");
         }
         else if (session.ExternalFileState == ExternalFileState.Modified)
         {
-            status = "Changed on disk — Resolve";
+            status = DesktopResources.Get(
+                "StatusChangedOnDisk",
+                "Changed on disk — Resolve");
             actionable = true;
         }
         else if (session.ExternalFileState == ExternalFileState.Deleted)
         {
-            status = "File missing — Resolve";
+            status = DesktopResources.Get(
+                "StatusFileMissing",
+                "File missing — Resolve");
             actionable = true;
         }
         else if (session.ExternalFileState == ExternalFileState.Moved)
         {
-            status = "File moved — Resolve";
+            status = DesktopResources.Get(
+                "StatusFileMoved",
+                "File moved — Resolve");
             actionable = true;
         }
         else if (session.IsDirty)
         {
             status = session.RecoveryUpdatedAt is { } recoveredAt
-                ? $"Unsaved • recovered {recoveredAt.ToLocalTime():t}"
-                : "Unsaved changes";
+                ? DesktopResources.Format(
+                    "StatusUnsavedRecoveredFormat",
+                    "Unsaved • recovered {0}",
+                    recoveredAt.ToLocalTime().ToString("t"))
+                : DesktopResources.Get("StatusUnsaved", "Unsaved changes");
         }
         else
         {
-            status = path is null ? "New drawing" : "Saved";
+            status = path is null
+                ? DesktopResources.Get("StatusNewDrawing", "New drawing")
+                : DesktopResources.Get("StatusSaved", "Saved");
         }
 
         var document = path ?? session.DisplayName;
         StatusDocumentText.Text = document;
         ToolTipService.SetToolTip(StatusDocumentText, document);
-        AutomationProperties.SetName(StatusDocumentText, $"Drawing: {document}");
+        AutomationProperties.SetName(
+            StatusDocumentText,
+            DesktopResources.Format(
+                "StatusDrawingAutomationFormat",
+                "Drawing: {0}",
+                document));
 
         StatusStateText.Text = status;
         StatusStateText.Visibility = actionable
@@ -4705,7 +5667,11 @@ public sealed partial class MainWindow : Window
         AutomationProperties.SetName(StatusActionButton, status);
         AutomationProperties.SetHelpText(
             StatusActionButton,
-            actionable ? "Open options for resolving the file conflict." : string.Empty);
+            actionable
+                ? DesktopResources.Get(
+                    "StatusResolveHelpText",
+                    "Open options for resolving the file conflict.")
+                : string.Empty);
     }
 
     private async void OnStatusActionClick(object sender, RoutedEventArgs args)

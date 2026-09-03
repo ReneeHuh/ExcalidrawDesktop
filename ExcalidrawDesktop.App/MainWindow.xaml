@@ -3,8 +3,7 @@
     x:Class="ExcalidrawDesktop.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:pages="using:ExcalidrawDesktop.App.Pages"
-    Title="Excalidraw Desktop — Starting…">
+    xmlns:pages="using:ExcalidrawDesktop.App.Pages">
     <Grid
         x:Name="MainLayout"
         Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
@@ -34,6 +33,7 @@
 
             <TabView
                 x:Name="DocumentTabs"
+                x:Uid="DocumentTabs"
                 Grid.Column="1"
                 Height="48"
                 VerticalAlignment="Top"
@@ -45,6 +45,7 @@
                 CloseButtonOverlayMode="Auto"
                 IsAddTabButtonVisible="True"
                 SelectionChanged="OnTabSelectionChanged"
+                TabDragCompleted="OnTabDragCompleted"
                 TabTearOutWindowRequested="OnTabTearOutWindowRequested"
                 TabTearOutRequested="OnTabTearOutRequested"
                 ExternalTornOutTabsDropping="OnExternalTornOutTabsDropping"
@@ -52,65 +53,80 @@
                 TabCloseRequested="OnTabCloseRequested">
                 <TabView.TabStripHeader>
                     <MenuBar
+                        x:Uid="ApplicationMenu"
                         Padding="0"
                         Background="Transparent"
                         AutomationProperties.AutomationId="ApplicationMenu"
                         AutomationProperties.Name="Application menu">
                         <MenuBarItem
                             x:Name="FileMenu"
+                            x:Uid="FileMenu"
                             Title="File"
                             AutomationProperties.AutomationId="FileMenu">
                             <MenuFlyoutItem
+                                x:Uid="NewTabMenuItem"
                                 Text="New tab"
                                 KeyboardAcceleratorTextOverride="Ctrl+N"
                                 Click="OnFileNewTabClick" />
                             <MenuFlyoutItem
+                                x:Uid="NewWindowMenuItem"
                                 Text="New window"
                                 KeyboardAcceleratorTextOverride="Ctrl+Shift+N"
                                 Click="OnFileNewWindowClick" />
                             <MenuFlyoutItem
+                                x:Uid="OpenMenuItem"
                                 Text="Open…"
                                 KeyboardAcceleratorTextOverride="Ctrl+O"
                                 Click="OnFileOpenClick" />
                             <MenuFlyoutSubItem
                                 x:Name="RecentFilesMenu"
+                                x:Uid="RecentFilesMenu"
                                 Text="Recent" />
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem
                                 x:Name="SaveMenuItem"
+                                x:Uid="SaveMenuItem"
                                 Text="Save"
                                 KeyboardAcceleratorTextOverride="Ctrl+S"
                                 Click="OnFileSaveClick" />
                             <MenuFlyoutItem
                                 x:Name="SaveAsMenuItem"
+                                x:Uid="SaveAsMenuItem"
                                 Text="Save as…"
                                 KeyboardAcceleratorTextOverride="Ctrl+Shift+S"
                                 Click="OnFileSaveAsClick" />
                             <MenuFlyoutItem
                                 x:Name="SaveAllMenuItem"
+                                x:Uid="SaveAllMenuItem"
                                 Text="Save all"
                                 KeyboardAcceleratorTextOverride="Ctrl+Alt+S"
                                 Click="OnFileSaveAllClick" />
                             <MenuFlyoutItem
                                 x:Name="ExportPngMenuItem"
+                                x:Uid="ExportPngMenuItem"
                                 Text="Export whole drawing as PNG…"
                                 AutomationProperties.AutomationId="ExportPngMenuItem"
                                 Click="OnFileExportPngClick" />
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem
                                 x:Name="CloseTabMenuItem"
+                                x:Uid="CloseTabMenuItem"
                                 Text="Close tab"
                                 KeyboardAcceleratorTextOverride="Ctrl+W"
                                 Click="OnFileCloseTabClick" />
                             <MenuFlyoutItem
+                                x:Uid="CloseWindowMenuItem"
                                 Text="Close window"
                                 KeyboardAcceleratorTextOverride="Ctrl+Shift+W"
                                 Click="OnFileCloseWindowClick" />
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem
+                                x:Name="SettingsMenuItem"
+                                x:Uid="SettingsMenuItem"
                                 Text="Settings"
                                 Click="OnSettingsClick" />
                             <MenuFlyoutItem
+                                x:Uid="ExitMenuItem"
                                 Text="Exit"
                                 Click="OnFileExitClick" />
                         </MenuBarItem>
@@ -119,6 +135,7 @@
                 <TabView.TabStripFooter>
                     <Grid
                         x:Name="WindowDragRegion"
+                        x:Uid="WindowDragRegion"
                         MinWidth="188"
                         Background="Transparent"
                         AutomationProperties.AutomationId="WindowDragRegion"
@@ -174,6 +191,7 @@
 
             <Button
                 x:Name="SettingsButton"
+                x:Uid="SettingsButton"
                 Grid.Column="2"
                 Width="36"
                 Height="32"
@@ -185,8 +203,7 @@
                 VerticalAlignment="Center"
                 AutomationProperties.AutomationId="SettingsButton"
                 AutomationProperties.Name="Show Settings tab"
-                Click="OnSettingsButtonClick"
-                ToolTipService.ToolTip="Show Settings tab">
+                Click="OnSettingsButtonClick">
                 <FontIcon
                     FontSize="16"
                     Glyph="&#xE713;" />
@@ -205,6 +222,7 @@
 
         <Border
             x:Name="StatusBar"
+            x:Uid="StatusBar"
             Grid.Row="2"
             Height="32"
             Padding="10,0"
@@ -222,6 +240,7 @@
 
                 <TextBlock
                     x:Name="StatusDocumentText"
+                    x:Uid="StatusDocumentText"
                     VerticalAlignment="Center"
                     FontSize="12"
                     Text="Untitled"
@@ -231,6 +250,7 @@
 
                 <TextBlock
                     x:Name="StatusStateText"
+                    x:Uid="StatusStateText"
                     Grid.Column="1"
                     VerticalAlignment="Center"
                     FontSize="12"

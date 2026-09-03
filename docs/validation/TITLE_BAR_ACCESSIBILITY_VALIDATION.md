@@ -1,6 +1,6 @@
 # Title bar, keyboard, DPI, theme, and accessibility validation
 
-Date: September 2, 2026
+Date: September 3, 2026
 
 Status: Automated validation passed; hardware- and assistive-technology matrix
 still requires manual execution.
@@ -36,8 +36,7 @@ The packaged test verifies:
 - both explicit light and dark app-frame themes reach the native title bar;
 - the tab strip, File menu, Settings button, editor, and system minimize,
   maximize, and close buttons are present in the UI Automation tree;
-- drawing-tab accessible names include a readable document state such as
-  `saved`, `new drawing`, or `unsaved changes`;
+- drawing-tab accessible names include a localized readable document state;
 - the native status bar follows the active drawing, exposes accessible names,
   switches to a native conflict action, and hides on Settings;
 - editor startup failures expose Retry, Close tab, and optional WebView2 help

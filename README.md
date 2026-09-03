@@ -36,6 +36,8 @@ saving a drawing does not require an internet connection or an account.
   it is overwritten.
 - Suspend or unload safe inactive tabs to reduce background resource use.
 - Follow the Windows light or dark theme, or choose a theme for the app frame.
+- Follow the Windows display language or choose English, Spanish, French,
+  German, Brazilian Portuguese, Japanese, Simplified Chinese, or Arabic.
 - Keep each drawing isolated in its own editor session.
 
 ### Everyday use
@@ -66,7 +68,9 @@ before closing it.
 ### Settings
 
 Settings are displayed in a native tab alongside drawings. They control the
-app-frame theme, startup tab restoration, and inactive-tab resource use.
+app-frame theme, application language, startup tab restoration, and inactive-tab
+resource use. Language changes are saved immediately and apply after restarting
+the app so the native shell and every editor stay in the same language.
 
 ![Excalidraw Desktop native Settings tab](docs/images/excalidraw-desktop-settings.png)
 
@@ -182,6 +186,13 @@ Run the native protocol, persistence, and document tests:
 dotnet test .\ExcalidrawDesktop.sln -p:Platform=x64
 ```
 
+Validate native localization catalogs, XAML resource references, manifest
+resources, and format placeholders:
+
+```powershell
+.\tools\Test-Localization.ps1
+```
+
 Run the packaged startup and bridge-readiness smoke test:
 
 ```powershell
@@ -200,6 +211,7 @@ file activation:
 .\SmokeTests\Invoke-TabSuspensionSmokeTest.ps1 -SkipBuild
 .\SmokeTests\Invoke-TabPerformanceTest.ps1 -SkipBuild
 .\SmokeTests\Invoke-FileActivationSmokeTest.ps1 -SkipBuild
+.\SmokeTests\Invoke-LocalizationSmokeTest.ps1 -SkipBuild
 ```
 
 Use `-SkipBuild` to test the registered output or `-KeepRunning` to leave a

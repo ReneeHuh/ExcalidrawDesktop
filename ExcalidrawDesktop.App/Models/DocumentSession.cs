@@ -72,9 +72,11 @@ internal sealed class DocumentSession : IDisposable
 
     public bool IsMoving { get; set; }
 
-    public bool IsBridgeDispatching { get; set; }
+    public int BridgeDispatchDepth { get; set; }
 
-    public bool IsExporting { get; set; }
+    public bool IsBridgeDispatching => BridgeDispatchDepth > 0;
+
+    public bool IsExporting => PendingImageExport is not null;
 
     public PendingImageExport? PendingImageExport { get; set; }
 
@@ -115,7 +117,12 @@ internal sealed class DocumentSession : IDisposable
         get
         {
             var text = IsDirty ? $"{DisplayName} ●" : DisplayName;
-            return IsSuspended || IsUnloaded ? $"{text} — Sleeping" : text;
+            return IsSuspended || IsUnloaded
+                ? DesktopResources.Format(
+                    "SleepingTabHeaderFormat",
+                    "{0} — Sleeping",
+                    text)
+                : text;
         }
     }
 
@@ -124,7 +131,6 @@ internal sealed class DocumentSession : IDisposable
         PendingImageExport?.Cancellation.Cancel();
         PendingImageExport?.Cancellation.Dispose();
         PendingImageExport = null;
-        IsExporting = false;
 
         try
         {

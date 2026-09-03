@@ -11,6 +11,7 @@ import {
   parseBridgeResponse,
   type PingResponse,
 } from "./BridgeProtocol";
+import { isSupportedLanguageCode } from "../localization/DesktopStrings";
 
 export type WebViewTransport = {
   postMessage(message: BridgeMessage): void;
@@ -55,10 +56,17 @@ export class DesktopBridge {
   private readonly themeChangedListeners = new Set<
     (payload: HostEventMap["app.themeChanged"]) => void
   >();
+  private readonly languageChangedListeners = new Set<
+    (payload: HostEventMap["app.languageChanged"]) => void
+  >();
+  private readonly automationEditRequestedListeners = new Set<
+    (payload: HostEventMap["app.automationEditRequested"]) => void
+  >();
   private readonly imageExportRequestedListeners = new Set<
     (payload: HostEventMap["image.exportRequested"]) => void
   >();
   private pendingTheme?: HostEventMap["app.themeChanged"];
+  private pendingLanguage?: HostEventMap["app.languageChanged"];
   private pendingDocumentLoad?: HostEventMap["document.loadRequested"];
   private pendingImageExport?: HostEventMap["image.exportRequested"];
 
@@ -71,6 +79,13 @@ export class DesktopBridge {
 
   public notifyReady() {
     this.notify("app.ready", undefined);
+  }
+
+  public notifyLanguageApplied(
+    langCode: string,
+    direction: "ltr" | "rtl",
+  ) {
+    this.notify("app.languageApplied", { langCode, direction });
   }
 
   public notifyCloseReady() {
@@ -132,6 +147,20 @@ export class DesktopBridge {
     }
     return () => {
       this.themeChangedListeners.delete(listener);
+    };
+  }
+
+  public onLanguageChanged(
+    listener: (payload: HostEventMap["app.languageChanged"]) => void,
+  ) {
+    this.languageChangedListeners.add(listener);
+    if (this.pendingLanguage) {
+      const pending = this.pendingLanguage;
+      this.pendingLanguage = undefined;
+      listener(pending);
+    }
+    return () => {
+      this.languageChangedListeners.delete(listener);
     };
   }
 
@@ -211,6 +240,15 @@ export class DesktopBridge {
     }
     return () => {
       this.loadRequestedListeners.delete(listener);
+    };
+  }
+
+  public onAutomationEditRequested(
+    listener: (payload: HostEventMap["app.automationEditRequested"]) => void,
+  ) {
+    this.automationEditRequestedListeners.add(listener);
+    return () => {
+      this.automationEditRequestedListeners.delete(listener);
     };
   }
 
@@ -302,6 +340,45 @@ export class DesktopBridge {
             listener(themeUpdate),
           );
         }
+        return;
+      }
+
+      if (
+        message.method === "app.languageChanged" &&
+        typeof eventPayload === "object" &&
+        eventPayload !== null &&
+        "langCode" in eventPayload &&
+        typeof eventPayload.langCode === "string" &&
+        isSupportedLanguageCode(eventPayload.langCode) &&
+        "direction" in eventPayload &&
+        (eventPayload.direction === "ltr" || eventPayload.direction === "rtl")
+      ) {
+        const languageUpdate: HostEventMap["app.languageChanged"] = {
+          langCode: eventPayload.langCode,
+          direction: eventPayload.direction,
+        };
+        if (this.languageChangedListeners.size === 0) {
+          this.pendingLanguage = languageUpdate;
+        } else {
+          this.languageChangedListeners.forEach((listener) =>
+            listener(languageUpdate),
+          );
+        }
+        return;
+      }
+
+      if (
+        message.method === "app.automationEditRequested" &&
+        typeof message.payload === "object" &&
+        message.payload !== null &&
+        "elementId" in message.payload &&
+        typeof message.payload.elementId === "string" &&
+        /^[a-z0-9-]{1,64}$/i.test(message.payload.elementId)
+      ) {
+        const elementId = message.payload.elementId;
+        this.automationEditRequestedListeners.forEach((listener) =>
+          listener({ elementId }),
+        );
         return;
       }
 

@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><xsd:import namespace="http://www.w3.org/XML/1998/namespace" /><xsd:element name="root" msdata:IsDataSet="true"><xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /><xsd:element name="comment" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element><xsd:element name="resheader"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" type="xsd:string" use="required" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType></xsd:element></xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="AppDisplayName" xml:space="preserve"><value>Excalidraw Desktop</value></data>
+  <data name="PublisherDisplayName" xml:space="preserve"><value>Excalidraw-Desktop-Entwicklung</value></data>
+  <data name="AppDescription" xml:space="preserve"><value>Eine lokale Desktop-App für Excalidraw</value></data>
+  <data name="ExcalidrawFileTypeDisplayName" xml:space="preserve"><value>Excalidraw-Zeichnung</value></data>
+  <data name="DocumentTabs.AutomationProperties.Name" xml:space="preserve"><value>Geöffnete Zeichnungen</value></data>
+  <data name="ApplicationMenu.AutomationProperties.Name" xml:space="preserve"><value>Anwendungsmenü</value></data>
+  <data name="FileMenu.Title" xml:space="preserve"><value>Datei</value></data>
+  <data name="NewTabMenuItem.Text" xml:space="preserve"><value>Neuer Tab</value></data>
+  <data name="NewWindowMenuItem.Text" xml:space="preserve"><value>Neues Fenster</value></data>
+  <data name="OpenMenuItem.Text" xml:space="preserve"><value>Öffnen…</value></data>
+  <data name="RecentFilesMenu.Text" xml:space="preserve"><value>Zuletzt verwendet</value></data>
+  <data name="SaveMenuItem.Text" xml:space="preserve"><value>Speichern</value></data>
+  <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>Speichern unter…</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Alle speichern</value></data>
+  <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>Gesamte Zeichnung als PNG exportieren…</value></data>
+  <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>Tab schließen</value></data>
+  <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>Fenster schließen</value></data>
+  <data name="SettingsMenuItem.Text" xml:space="preserve"><value>Einstellungen</value></data>
+  <data name="ExitMenuItem.Text" xml:space="preserve"><value>Beenden</value></data>
+  <data name="WindowDragRegion.AutomationProperties.Name" xml:space="preserve"><value>Ziehbereich des Fensters</value></data>
+  <data name="SettingsButton.AutomationProperties.Name" xml:space="preserve"><value>Tab „Einstellungen“ anzeigen</value></data>
+  <data name="StatusBar.AutomationProperties.Name" xml:space="preserve"><value>Zeichnungsstatus</value></data>
+  <data name="StatusDocumentText.Text" xml:space="preserve"><value>Unbenannt</value></data>
+  <data name="StatusStateText.Text" xml:space="preserve"><value>Neue Zeichnung</value></data>
+  <data name="AppearanceSection.Text" xml:space="preserve"><value>Darstellung</value></data>
+  <data name="ThemeSettingsCard.Header" xml:space="preserve"><value>Design des App-Rahmens</value></data>
+  <data name="ThemeSettingsCard.Description" xml:space="preserve"><value>Darstellung von Titelleiste, Menüs und Einstellungen auswählen.</value></data>
+  <data name="ThemeSystemOption.Content" xml:space="preserve"><value>Systemeinstellung verwenden</value></data>
+  <data name="ThemeLightOption.Content" xml:space="preserve"><value>Hell</value></data>
+  <data name="ThemeDarkOption.Content" xml:space="preserve"><value>Dunkel</value></data>
+  <data name="LanguageSection.Text" xml:space="preserve"><value>Sprache</value></data>
+  <data name="LanguageSettingsCard.Header" xml:space="preserve"><value>Anwendungssprache</value></data>
+  <data name="LanguageSettingsCard.Description" xml:space="preserve"><value>Sprache für Desktop und Editor auswählen. Änderungen gelten nach einem Neustart.</value></data>
+  <data name="LanguageRestartInfoBar.Title" xml:space="preserve"><value>Neustart erforderlich</value></data>
+  <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>Starten Sie Excalidraw Desktop neu, um die Sprache anzuwenden. Nicht gespeicherte Zeichnungen werden nicht automatisch geschlossen.</value></data>
+  <data name="StartupSection.Text" xml:space="preserve"><value>Start</value></data>
+  <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Gespeicherte Zeichnungstabs erneut öffnen</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Saubere dateibasierte Tabs der vorherigen Sitzung wiederherstellen. Ungesicherte Wiederherstellungen bleiben erhalten.</value></data>
+  <data name="PerformanceSection.Text" xml:space="preserve"><value>Leistung</value></data>
+  <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>Inaktive Tabs in den Ruhezustand versetzen</value></data>
+  <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>Sichere, unveränderte Tabs nach fünf Minuten Inaktivität anhalten.</value></data>
+  <data name="UnloadTabsSettingsCard.Header" xml:space="preserve"><value>Inaktive Editoren entladen</value></data>
+  <data name="UnloadTabsSettingsCard.Description" xml:space="preserve"><value>Sichere WebViews nach fünfzehn Minuten schließen. Beim Auswählen wird der Editor ohne Rückgängig-Verlauf neu erstellt.</value></data>
+  <data name="AboutSection.Text" xml:space="preserve"><value>Info</value></data>
+  <data name="AboutSettingsCard.Header" xml:space="preserve"><value>Excalidraw Desktop</value></data>
+  <data name="AboutSettingsCard.Description" xml:space="preserve"><value>Eine lokale WinUI-Desktop-App für Excalidraw.</value></data>
+  <data name="EditorWebView.AutomationProperties.Name" xml:space="preserve"><value>Excalidraw-Editor</value></data>
+  <data name="StartupStatus.Text" xml:space="preserve"><value>Excalidraw Desktop wird gestartet…</value></data>
+  <data name="RetryEditorButton.AutomationProperties.Name" xml:space="preserve"><value>Start dieses Editors wiederholen</value></data>
+  <data name="RetryEditorButton.Content" xml:space="preserve"><value>Wiederholen</value></data>
+  <data name="WebView2HelpButton.AutomationProperties.Name" xml:space="preserve"><value>Hilfe zur Installation und Reparatur von Microsoft WebView2 öffnen</value></data>
+  <data name="WebView2HelpButton.Content" xml:space="preserve"><value>WebView2-Hilfe</value></data>
+  <data name="CloseFailedTabButton.AutomationProperties.Name" xml:space="preserve"><value>Diesen fehlerhaften Zeichnungstab schließen</value></data>
+  <data name="CloseFailedTabButton.Content" xml:space="preserve"><value>Tab schließen</value></data>
+  <data name="SystemLanguageOption" xml:space="preserve"><value>Systemsprache verwenden</value></data>
+  <data name="VersionFormat" xml:space="preserve"><value>Version {0}.{1}.{2}.{3}</value></data>
+  <data name="LanguageRestartMessageFormat" xml:space="preserve"><value>Die Anwendung verwendet derzeit {0}. Starten Sie Excalidraw Desktop neu, um die ausgewählte Sprache anzuwenden. Nicht gespeicherte Zeichnungen werden nicht automatisch geschlossen.</value></data>
+  <data name="EditorAutomationName" xml:space="preserve"><value>Excalidraw-Editor</value></data>
+  <data name="SleepingStatus" xml:space="preserve"><value>Ruhezustand — Tab zum Fortsetzen auswählen</value></data>
+  <data name="EditorFailureGuidance" xml:space="preserve"><value>Starten Sie den Editor erneut oder schließen Sie diesen Tab. Die gespeicherte Zeichnung bleibt unverändert.</value></data>
+  <data name="DragOpenCaption" xml:space="preserve"><value>Zeichnungen in Tabs öffnen</value></data>
+  <data name="RecentFilesEmpty" xml:space="preserve"><value>Keine zuletzt verwendeten Zeichnungen</value></data>
+  <data name="ClearRecentDrawings" xml:space="preserve"><value>Zuletzt verwendete Zeichnungen löschen</value></data>
+  <data name="SettingsTabTitle" xml:space="preserve"><value>Einstellungen</value></data>
+  <data name="ContextNewTab" xml:space="preserve"><value>Neuer Tab</value></data>
+  <data name="ContextCopyPath" xml:space="preserve"><value>Pfad kopieren</value></data>
+  <data name="ContextRevealInExplorer" xml:space="preserve"><value>Im Explorer anzeigen</value></data>
+  <data name="ContextMoveToNewWindow" xml:space="preserve"><value>Tab in neues Fenster verschieben</value></data>
+  <data name="ContextCloseTab" xml:space="preserve"><value>Tab schließen</value></data>
+  <data name="ContextCloseOtherTabs" xml:space="preserve"><value>Andere Tabs schließen</value></data>
+  <data name="ContextCloseTabsRight" xml:space="preserve"><value>Tabs rechts schließen</value></data>
+  <data name="ActivatedDrawingOpenFailed" xml:space="preserve"><value>Die aktivierte Zeichnung konnte nicht geöffnet werden.</value></data>
+  <data name="ApplicationWindowTitleFormat" xml:space="preserve"><value>Excalidraw Desktop{0}</value></data>
+  <data name="CancelButton" xml:space="preserve"><value>Abbrechen</value></data>
+  <data name="ChangedOnDiskTitleSuffix" xml:space="preserve"><value> — Auf Datenträger geändert</value></data>
+  <data name="DiscardAllButton" xml:space="preserve"><value>Alle verwerfen</value></data>
+  <data name="DiscardAndCreate" xml:space="preserve"><value>Verwerfen und erstellen</value></data>
+  <data name="DiscardAndOpen" xml:space="preserve"><value>Verwerfen und öffnen</value></data>
+  <data name="DiscardButton" xml:space="preserve"><value>Verwerfen</value></data>
+  <data name="DiscardUnsavedChangesTitle" xml:space="preserve"><value>Nicht gespeicherte Änderungen verwerfen?</value></data>
+  <data name="DrawingChangedOutsideContent" xml:space="preserve"><value>Lade die Version vom Datenträger neu, speichere diesen Tab in einer anderen Datei oder bearbeite ihn weiter. Die vorhandene Datei wird nicht automatisch überschrieben.</value></data>
+  <data name="DrawingChangedOutsideTitle" xml:space="preserve"><value>Zeichnung außerhalb der App geändert</value></data>
+  <data name="DrawingFileMissingContent" xml:space="preserve"><value>Die Datei wurde verschoben oder gelöscht. Suche sie, speichere diesen Tab in einer neuen Datei oder bearbeite ihn weiter, ohne etwas zu überschreiben.</value></data>
+  <data name="DrawingFileMissingTitle" xml:space="preserve"><value>Zeichnungsdatei fehlt</value></data>
+  <data name="DrawingLoadFailedFormat" xml:space="preserve"><value>Diese Zeichnung konnte nicht geladen werden ({0}).</value></data>
+  <data name="DrawingLoadFailureGuidance" xml:space="preserve"><value>Überprüfe die lokale App-Installation und versuche es erneut. Falls auch andere WebView2-Apps fehlschlagen, verwende die WebView2-Hilfe, um die Runtime zu reparieren.</value></data>
+  <data name="DrawingLocationMissing" xml:space="preserve"><value>Die Zeichnung befindet sich nicht mehr am gespeicherten Ort.</value></data>
+  <data name="DrawingPathCopyFailed" xml:space="preserve"><value>Der Pfad der Zeichnung konnte nicht kopiert werden.</value></data>
+  <data name="DrawingResumeFailed" xml:space="preserve"><value>Diese Zeichnung konnte nicht fortgesetzt werden.</value></data>
+  <data name="DrawingStartFailed" xml:space="preserve"><value>Diese Zeichnung konnte nicht gestartet werden.</value></data>
+  <data name="DrawingWindowTitleFormat" xml:space="preserve"><value>{0}{1} — Excalidraw Desktop</value></data>
+  <data name="DroppedDrawingsOpenFailed" xml:space="preserve"><value>Die abgelegten Zeichnungen konnten nicht geöffnet werden.</value></data>
+  <data name="EditorBridgeNotReady" xml:space="preserve"><value>Der Editor wurde geladen, aber seine Desktop-Verbindung wurde nicht bereit.</value></data>
+  <data name="EditorBridgeRetryGuidance" xml:space="preserve"><value>Starte den Editor erneut. Falls das Problem weiterhin besteht, erstelle die lokalen Webressourcen und die Desktop-App neu.</value></data>
+  <data name="EditorProcessFailedTitle" xml:space="preserve"><value>Excalidraw Desktop — Editorprozess fehlgeschlagen</value></data>
+  <data name="EditorProcessFailureGuidanceFormat" xml:space="preserve"><value>WebView2 hat {0} gemeldet. Starte den Editor erneut. Falls weitere Fehler auftreten, repariere die WebView2 Runtime.</value></data>
+  <data name="EditorProcessStopped" xml:space="preserve"><value>Der Editorprozess wurde unerwartet beendet.</value></data>
+  <data name="EditorRetryGuidance" xml:space="preserve"><value>Starte den Editor erneut. Falls das Problem weiterhin besteht, repariere WebView2 oder erstelle die Desktop-App neu. Deine gespeicherte Zeichnung bleibt unverändert.</value></data>
+  <data name="EditorStartupFailedTitle" xml:space="preserve"><value>Excalidraw Desktop — Editorstart fehlgeschlagen</value></data>
+  <data name="EditorStoppedDuringExport" xml:space="preserve"><value>Der Editor wurde beim Erstellen der PNG-Datei beendet.</value></data>
+  <data name="ExcalidrawDrawingType" xml:space="preserve"><value>Excalidraw-Zeichnung</value></data>
+  <data name="ExplorerShowDrawingFailed" xml:space="preserve"><value>Der Datei-Explorer konnte diese Zeichnung nicht anzeigen.</value></data>
+  <data name="ExportedFileFormat" xml:space="preserve"><value>{0} exportiert</value></data>
+  <data name="FileConflictResolutionFailed" xml:space="preserve"><value>Der Dateikonflikt konnte nicht behoben werden.</value></data>
+  <data name="FileLocationUnavailableTitle" xml:space="preserve"><value>Dateispeicherort nicht verfügbar</value></data>
+  <data name="InitializingEditorTitle" xml:space="preserve"><value>Excalidraw Desktop — Editor wird initialisiert…</value></data>
+  <data name="InvalidPngExportData" xml:space="preserve"><value>Der Editor hat ungültige PNG-Exportdaten gesendet.</value></data>
+  <data name="KeepEditingButton" xml:space="preserve"><value>Weiter bearbeiten</value></data>
+  <data name="LocateFileButton" xml:space="preserve"><value>Datei suchen</value></data>
+  <data name="NewDiscardContent" xml:space="preserve"><value>Beim Erstellen einer neuen Zeichnung wird die aktuelle nicht gespeicherte Zeichnung ersetzt.</value></data>
+  <data name="OkButton" xml:space="preserve"><value>OK</value></data>
+  <data name="OpenDiscardContent" xml:space="preserve"><value>Beim Öffnen einer anderen Zeichnung wird die aktuelle nicht gespeicherte Zeichnung ersetzt.</value></data>
+  <data name="OpenDrawingErrorTitle" xml:space="preserve"><value>Zeichnung konnte nicht geöffnet werden</value></data>
+  <data name="PngExportAccessDenied" xml:space="preserve"><value>Excalidraw Desktop darf nicht am ausgewählten Speicherort schreiben.</value></data>
+  <data name="PngExportDestinationFailed" xml:space="preserve"><value>Die PNG-Datei konnte nicht am ausgewählten Speicherort geschrieben werden.</value></data>
+  <data name="PngExportErrorTitle" xml:space="preserve"><value>PNG konnte nicht exportiert werden</value></data>
+  <data name="PngExportStartFailed" xml:space="preserve"><value>Der PNG-Export konnte nicht gestartet werden.</value></data>
+  <data name="PngExportTimeout" xml:space="preserve"><value>Der PNG-Export dauerte zu lange und wurde abgebrochen.</value></data>
+  <data name="PngExportWriteFailed" xml:space="preserve"><value>Die PNG-Datei konnte nicht geschrieben werden. Überprüfe das Ziel und den verfügbaren Speicherplatz.</value></data>
+  <data name="RecentDrawingOpenFailed" xml:space="preserve"><value>Die zuletzt verwendete Zeichnung konnte nicht geöffnet werden.</value></data>
+  <data name="ReloadButton" xml:space="preserve"><value>Neu laden</value></data>
+  <data name="ResumingDrawing" xml:space="preserve"><value>Zeichnung wird fortgesetzt…</value></data>
+  <data name="RetryingEditor" xml:space="preserve"><value>Editor wird erneut gestartet…</value></data>
+  <data name="ReviewTabsAutomationName" xml:space="preserve"><value>Nicht gespeicherte Tabs einzeln überprüfen</value></data>
+  <data name="ReviewTabsButton" xml:space="preserve"><value>Tabs einzeln überprüfen</value></data>
+  <data name="SaveAllButton" xml:space="preserve"><value>Alle speichern</value></data>
+  <data name="SaveAsButton" xml:space="preserve"><value>Speichern unter</value></data>
+  <data name="SaveButton" xml:space="preserve"><value>Speichern</value></data>
+  <data name="SaveChangesBeforeClosingContent" xml:space="preserve"><value>Deine Änderungen gehen verloren, wenn du diese Zeichnung schließt, ohne sie zu speichern.</value></data>
+  <data name="SaveChangesBeforeClosingTitle" xml:space="preserve"><value>Änderungen vor dem Schließen speichern?</value></data>
+  <data name="SelectedDrawingOpenFailed" xml:space="preserve"><value>Die ausgewählte Zeichnung konnte nicht geöffnet werden.</value></data>
+  <data name="SettingsButtonToolTip" xml:space="preserve"><value>Tab „Einstellungen“ anzeigen</value></data>
+  <data name="SettingsWindowTitle" xml:space="preserve"><value>Einstellungen — Excalidraw Desktop</value></data>
+  <data name="SleepingTabHeaderFormat" xml:space="preserve"><value>{0} — Im Ruhezustand</value></data>
+  <data name="StartingWindowTitle" xml:space="preserve"><value>Excalidraw Desktop — Wird gestartet…</value></data>
+  <data name="StatusChangedOnDisk" xml:space="preserve"><value>Auf Datenträger geändert — Beheben</value></data>
+  <data name="StatusDrawingAutomationFormat" xml:space="preserve"><value>Zeichnung: {0}</value></data>
+  <data name="StatusExportingPng" xml:space="preserve"><value>PNG wird exportiert…</value></data>
+  <data name="StatusFileMissing" xml:space="preserve"><value>Datei fehlt — Beheben</value></data>
+  <data name="StatusFileMoved" xml:space="preserve"><value>Datei verschoben — Beheben</value></data>
+  <data name="StatusNewDrawing" xml:space="preserve"><value>Neue Zeichnung</value></data>
+  <data name="StatusResolveHelpText" xml:space="preserve"><value>Optionen zum Beheben des Dateikonflikts öffnen.</value></data>
+  <data name="StatusResuming" xml:space="preserve"><value>Wird fortgesetzt</value></data>
+  <data name="StatusSaved" xml:space="preserve"><value>Gespeichert</value></data>
+  <data name="StatusSleeping" xml:space="preserve"><value>Im Ruhezustand</value></data>
+  <data name="StatusUnsaved" xml:space="preserve"><value>Nicht gespeicherte Änderungen</value></data>
+  <data name="StatusUnsavedRecoveredFormat" xml:space="preserve"><value>Nicht gespeichert • um {0} wiederhergestellt</value></data>
+  <data name="TabAutomationNameFormat" xml:space="preserve"><value>{0}, {1}</value></data>
+  <data name="TabStateChangedOnDisk" xml:space="preserve"><value>auf Datenträger geändert</value></data>
+  <data name="TabStateNewDrawing" xml:space="preserve"><value>neue Zeichnung</value></data>
+  <data name="TabStateSaved" xml:space="preserve"><value>gespeichert</value></data>
+  <data name="TabStateSleeping" xml:space="preserve"><value>im Ruhezustand</value></data>
+  <data name="TabStateUnsaved" xml:space="preserve"><value>nicht gespeicherte Änderungen</value></data>
+  <data name="UnsavedDrawingHelpText" xml:space="preserve"><value>Nicht gespeicherte Zeichnung</value></data>
+  <data name="UnsavedDrawingsCountFormat" xml:space="preserve"><value>{0} Zeichnung(en) enthalten nicht gespeicherte Änderungen:&#xA;&#xA;{1}</value></data>
+  <data name="UnsavedDrawingsTitle" xml:space="preserve"><value>Nicht gespeicherte Zeichnungen</value></data>
+  <data name="UntitledName" xml:space="preserve"><value>Unbenannt</value></data>
+  <data name="UntitledNumberedFormat" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="WaitForDrawingExport" xml:space="preserve"><value>Warte, bis der aktuelle PNG-Export abgeschlossen ist, bevor du diese Zeichnung schließt.</value></data>
+  <data name="WaitForWindowExports" xml:space="preserve"><value>Warte, bis die PNG-Exporte abgeschlossen sind, bevor du dieses Fenster schließt.</value></data>
+  <data name="WebView2RepairGuidance" xml:space="preserve"><value>Installiere oder repariere die Evergreen WebView2 Runtime und wähle dann „Erneut versuchen“. Deine gespeicherte Zeichnung bleibt unverändert.</value></data>
+  <data name="WebView2Required" xml:space="preserve"><value>Microsoft Edge WebView2 Runtime ist erforderlich.</value></data>
+  <data name="DocumentNotFoundMessage" xml:space="preserve"><value>Die Zeichnung ist an diesem Speicherort nicht mehr vorhanden.</value></data>
+  <data name="DocumentAccessDeniedMessage" xml:space="preserve"><value>Excalidraw Desktop darf nicht auf diese Zeichnung zugreifen.</value></data>
+  <data name="DocumentReadFailedMessage" xml:space="preserve"><value>Die Zeichnung konnte nicht gelesen werden.</value></data>
+  <data name="DocumentTooLargeMessage" xml:space="preserve"><value>Die ausgewählte Zeichnung überschreitet das Limit von 50 MB.</value></data>
+  <data name="DocumentPathUnavailableMessage" xml:space="preserve"><value>Die ausgewählte Zeichnung hat keinen lokalen Dateipfad.</value></data>
+  <data name="DocumentChangedExternallyMessage" xml:space="preserve"><value>Die Zeichnung wurde außerhalb von Excalidraw Desktop geändert. Löse den Konflikt vor dem Speichern.</value></data>
+  <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>Diese Zeichnung ist bereits in einem anderen Tab geöffnet. Wähle einen anderen Dateinamen.</value></data>
+  <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>Die Zeichnung konnte nicht auf den Datenträger geschrieben werden.</value></data>
+  <data name="DocumentInvalidMessage" xml:space="preserve"><value>Die ausgewählte Datei ist keine gültige Excalidraw-Zeichnung.</value></data>
+</root>

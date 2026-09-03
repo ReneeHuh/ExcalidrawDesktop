@@ -91,8 +91,12 @@ try {
     $applicationId = "$($package.PackageFamilyName)!App"
     $requestPath = Join-Path $package.InstallLocation "titlebar-smoke.request"
     $statePath = Join-Path $package.InstallLocation "titlebar-smoke-state.json"
+    $errorPath = Join-Path $package.InstallLocation "titlebar-smoke-error.txt"
     if ([System.IO.File]::Exists($statePath)) {
         [System.IO.File]::Delete($statePath)
+    }
+    if ([System.IO.File]::Exists($errorPath)) {
+        [System.IO.File]::Delete($errorPath)
     }
     [System.IO.File]::WriteAllText($requestPath, "run")
     $processId = [TitleBarPackagedAppActivator]::Activate($applicationId)
@@ -106,7 +110,12 @@ try {
         }
 
         if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Title bar smoke failed") {
-            throw "The packaged title-bar layout or tab interaction check failed."
+            $details = if ([System.IO.File]::Exists($errorPath)) {
+                [System.IO.File]::ReadAllText($errorPath)
+            } else {
+                "No in-app diagnostic was written."
+            }
+            throw "The packaged title-bar layout or tab interaction check failed. $details"
         }
 
         if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Title bar smoke passed") {
@@ -135,7 +144,7 @@ try {
                     [System.Windows.Automation.ControlType]::TabItem))
             $namedDrawingTab = $false
             foreach ($tabItem in $tabItems) {
-                if ($tabItem.Current.Name -match "(saved|unsaved changes|new drawing)") {
+                if (-not [string]::IsNullOrWhiteSpace($tabItem.Current.Name)) {
                     $namedDrawingTab = $true
                     break
                 }
@@ -179,6 +188,9 @@ finally {
     }
     if ($statePath -and [System.IO.File]::Exists($statePath)) {
         [System.IO.File]::Delete($statePath)
+    }
+    if ($errorPath -and [System.IO.File]::Exists($errorPath)) {
+        [System.IO.File]::Delete($errorPath)
     }
 
     if ($startedProcess -and -not $KeepRunning) {

@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><xsd:import namespace="http://www.w3.org/XML/1998/namespace" /><xsd:element name="root" msdata:IsDataSet="true"><xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /><xsd:element name="comment" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element><xsd:element name="resheader"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" type="xsd:string" use="required" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType></xsd:element></xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
+  <data name="AppDisplayName" xml:space="preserve"><value>Excalidraw Desktop</value></data>
+  <data name="PublisherDisplayName" xml:space="preserve"><value>Excalidraw Desktop 开发版</value></data>
+  <data name="AppDescription" xml:space="preserve"><value>以本地使用为核心的 Excalidraw 桌面应用</value></data>
+  <data name="ExcalidrawFileTypeDisplayName" xml:space="preserve"><value>Excalidraw 绘图</value></data>
+  <data name="DocumentTabs.AutomationProperties.Name" xml:space="preserve"><value>打开的绘图</value></data>
+  <data name="ApplicationMenu.AutomationProperties.Name" xml:space="preserve"><value>应用菜单</value></data>
+  <data name="FileMenu.Title" xml:space="preserve"><value>文件</value></data>
+  <data name="NewTabMenuItem.Text" xml:space="preserve"><value>新建标签页</value></data>
+  <data name="NewWindowMenuItem.Text" xml:space="preserve"><value>新建窗口</value></data>
+  <data name="OpenMenuItem.Text" xml:space="preserve"><value>打开…</value></data>
+  <data name="RecentFilesMenu.Text" xml:space="preserve"><value>最近使用</value></data>
+  <data name="SaveMenuItem.Text" xml:space="preserve"><value>保存</value></data>
+  <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>另存为…</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>全部保存</value></data>
+  <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>将整个绘图导出为 PNG…</value></data>
+  <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>关闭标签页</value></data>
+  <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>关闭窗口</value></data>
+  <data name="SettingsMenuItem.Text" xml:space="preserve"><value>设置</value></data>
+  <data name="ExitMenuItem.Text" xml:space="preserve"><value>退出</value></data>
+  <data name="WindowDragRegion.AutomationProperties.Name" xml:space="preserve"><value>窗口拖动区域</value></data>
+  <data name="SettingsButton.AutomationProperties.Name" xml:space="preserve"><value>显示设置标签页</value></data>
+  <data name="StatusBar.AutomationProperties.Name" xml:space="preserve"><value>绘图状态</value></data>
+  <data name="StatusDocumentText.Text" xml:space="preserve"><value>未命名</value></data>
+  <data name="StatusStateText.Text" xml:space="preserve"><value>新绘图</value></data>
+  <data name="AppearanceSection.Text" xml:space="preserve"><value>外观</value></data>
+  <data name="ThemeSettingsCard.Header" xml:space="preserve"><value>应用框架主题</value></data>
+  <data name="ThemeSettingsCard.Description" xml:space="preserve"><value>选择标题栏、菜单和设置页面的外观。</value></data>
+  <data name="ThemeSystemOption.Content" xml:space="preserve"><value>使用系统设置</value></data>
+  <data name="ThemeLightOption.Content" xml:space="preserve"><value>浅色</value></data>
+  <data name="ThemeDarkOption.Content" xml:space="preserve"><value>深色</value></data>
+  <data name="LanguageSection.Text" xml:space="preserve"><value>语言</value></data>
+  <data name="LanguageSettingsCard.Header" xml:space="preserve"><value>应用语言</value></data>
+  <data name="LanguageSettingsCard.Description" xml:space="preserve"><value>选择桌面界面和编辑器使用的语言。更改将在重启后应用。</value></data>
+  <data name="LanguageRestartInfoBar.Title" xml:space="preserve"><value>需要重启</value></data>
+  <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>重启 Excalidraw Desktop 以应用所选语言。未保存的绘图不会自动关闭。</value></data>
+  <data name="StartupSection.Text" xml:space="preserve"><value>启动</value></data>
+  <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>重新打开已保存的绘图标签页</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>恢复上次会话中已保存的标签页。未保存的恢复数据始终会保留。</value></data>
+  <data name="PerformanceSection.Text" xml:space="preserve"><value>性能</value></data>
+  <data name="SleepTabsSettingsCard.Header" xml:space="preserve"><value>休眠非活动标签页</value></data>
+  <data name="SleepTabsSettingsCard.Description" xml:space="preserve"><value>安全且无更改的标签页闲置五分钟后暂停运行。</value></data>
+  <data name="UnloadTabsSettingsCard.Header" xml:space="preserve"><value>卸载非活动编辑器</value></data>
+  <data name="UnloadTabsSettingsCard.Description" xml:space="preserve"><value>十五分钟后关闭安全的 WebView。选择标签页会重新创建编辑器并重置撤销历史记录。</value></data>
+  <data name="AboutSection.Text" xml:space="preserve"><value>关于</value></data>
+  <data name="AboutSettingsCard.Header" xml:space="preserve"><value>Excalidraw Desktop</value></data>
+  <data name="AboutSettingsCard.Description" xml:space="preserve"><value>以本地使用为核心的 Excalidraw WinUI 桌面应用。</value></data>
+  <data name="EditorWebView.AutomationProperties.Name" xml:space="preserve"><value>Excalidraw 编辑器</value></data>
+  <data name="StartupStatus.Text" xml:space="preserve"><value>正在启动 Excalidraw Desktop…</value></data>
+  <data name="RetryEditorButton.AutomationProperties.Name" xml:space="preserve"><value>重试启动此编辑器</value></data>
+  <data name="RetryEditorButton.Content" xml:space="preserve"><value>重试</value></data>
+  <data name="WebView2HelpButton.AutomationProperties.Name" xml:space="preserve"><value>打开 Microsoft WebView2 安装和修复帮助</value></data>
+  <data name="WebView2HelpButton.Content" xml:space="preserve"><value>WebView2 帮助</value></data>
+  <data name="CloseFailedTabButton.AutomationProperties.Name" xml:space="preserve"><value>关闭此启动失败的绘图标签页</value></data>
+  <data name="CloseFailedTabButton.Content" xml:space="preserve"><value>关闭标签页</value></data>
+  <data name="SystemLanguageOption" xml:space="preserve"><value>使用系统语言</value></data>
+  <data name="VersionFormat" xml:space="preserve"><value>版本 {0}.{1}.{2}.{3}</value></data>
+  <data name="LanguageRestartMessageFormat" xml:space="preserve"><value>应用当前使用 {0}。重启 Excalidraw Desktop 以应用所选语言。未保存的绘图不会自动关闭。</value></data>
+  <data name="EditorAutomationName" xml:space="preserve"><value>Excalidraw 编辑器</value></data>
+  <data name="SleepingStatus" xml:space="preserve"><value>休眠中 — 选择此标签页以恢复</value></data>
+  <data name="EditorFailureGuidance" xml:space="preserve"><value>重试编辑器或关闭此标签页。已保存的绘图不会改变。</value></data>
+  <data name="DragOpenCaption" xml:space="preserve"><value>在标签页中打开绘图</value></data>
+  <data name="RecentFilesEmpty" xml:space="preserve"><value>没有最近使用的绘图</value></data>
+  <data name="ClearRecentDrawings" xml:space="preserve"><value>清除最近使用的绘图</value></data>
+  <data name="SettingsTabTitle" xml:space="preserve"><value>设置</value></data>
+  <data name="ContextNewTab" xml:space="preserve"><value>新建标签页</value></data>
+  <data name="ContextCopyPath" xml:space="preserve"><value>复制路径</value></data>
+  <data name="ContextRevealInExplorer" xml:space="preserve"><value>在资源管理器中显示</value></data>
+  <data name="ContextMoveToNewWindow" xml:space="preserve"><value>将标签页移到新窗口</value></data>
+  <data name="ContextCloseTab" xml:space="preserve"><value>关闭标签页</value></data>
+  <data name="ContextCloseOtherTabs" xml:space="preserve"><value>关闭其他标签页</value></data>
+  <data name="ContextCloseTabsRight" xml:space="preserve"><value>关闭右侧标签页</value></data>
+  <data name="ActivatedDrawingOpenFailed" xml:space="preserve"><value>无法打开激活的绘图。</value></data>
+  <data name="ApplicationWindowTitleFormat" xml:space="preserve"><value>Excalidraw Desktop{0}</value></data>
+  <data name="CancelButton" xml:space="preserve"><value>取消</value></data>
+  <data name="ChangedOnDiskTitleSuffix" xml:space="preserve"><value> — 已在磁盘上更改</value></data>
+  <data name="DiscardAllButton" xml:space="preserve"><value>全部放弃</value></data>
+  <data name="DiscardAndCreate" xml:space="preserve"><value>放弃并新建</value></data>
+  <data name="DiscardAndOpen" xml:space="preserve"><value>放弃并打开</value></data>
+  <data name="DiscardButton" xml:space="preserve"><value>放弃</value></data>
+  <data name="DiscardUnsavedChangesTitle" xml:space="preserve"><value>放弃未保存的更改？</value></data>
+  <data name="DrawingChangedOutsideContent" xml:space="preserve"><value>重新加载磁盘上的版本、将此标签页另存为其他文件，或继续编辑。现有文件不会被自动覆盖。</value></data>
+  <data name="DrawingChangedOutsideTitle" xml:space="preserve"><value>绘图已在应用外部更改</value></data>
+  <data name="DrawingFileMissingContent" xml:space="preserve"><value>原文件已被移动或删除。请找到该文件、将此标签页保存到新文件，或在不覆盖任何内容的情况下继续编辑。</value></data>
+  <data name="DrawingFileMissingTitle" xml:space="preserve"><value>绘图文件缺失</value></data>
+  <data name="DrawingLoadFailedFormat" xml:space="preserve"><value>无法加载此绘图（{0}）。</value></data>
+  <data name="DrawingLoadFailureGuidance" xml:space="preserve"><value>请检查本地应用安装并重试。如果其他 WebView2 应用也无法运行，请使用 WebView2 帮助修复运行时。</value></data>
+  <data name="DrawingLocationMissing" xml:space="preserve"><value>绘图已不在保存的位置。</value></data>
+  <data name="DrawingPathCopyFailed" xml:space="preserve"><value>无法复制绘图路径。</value></data>
+  <data name="DrawingResumeFailed" xml:space="preserve"><value>无法恢复此绘图。</value></data>
+  <data name="DrawingStartFailed" xml:space="preserve"><value>无法启动此绘图。</value></data>
+  <data name="DrawingWindowTitleFormat" xml:space="preserve"><value>{0}{1} — Excalidraw Desktop</value></data>
+  <data name="DroppedDrawingsOpenFailed" xml:space="preserve"><value>无法打开拖放的绘图。</value></data>
+  <data name="EditorBridgeNotReady" xml:space="preserve"><value>编辑器已加载，但其桌面连接未能就绪。</value></data>
+  <data name="EditorBridgeRetryGuidance" xml:space="preserve"><value>请重试编辑器。如果问题仍然存在，请重新生成本地 Web 资源和桌面应用。</value></data>
+  <data name="EditorProcessFailedTitle" xml:space="preserve"><value>Excalidraw Desktop — 编辑器进程失败</value></data>
+  <data name="EditorProcessFailureGuidanceFormat" xml:space="preserve"><value>WebView2 报告了 {0}。请重试编辑器。如果仍然失败，请修复 WebView2 Runtime。</value></data>
+  <data name="EditorProcessStopped" xml:space="preserve"><value>编辑器进程意外停止。</value></data>
+  <data name="EditorRetryGuidance" xml:space="preserve"><value>请重试编辑器。如果问题仍然存在，请修复 WebView2 或重新生成桌面应用。已保存的绘图未被更改。</value></data>
+  <data name="EditorStartupFailedTitle" xml:space="preserve"><value>Excalidraw Desktop — 编辑器启动失败</value></data>
+  <data name="EditorStoppedDuringExport" xml:space="preserve"><value>编辑器在创建 PNG 时停止。</value></data>
+  <data name="ExcalidrawDrawingType" xml:space="preserve"><value>Excalidraw 绘图</value></data>
+  <data name="ExplorerShowDrawingFailed" xml:space="preserve"><value>文件资源管理器无法显示此绘图。</value></data>
+  <data name="ExportedFileFormat" xml:space="preserve"><value>已导出 {0}</value></data>
+  <data name="FileConflictResolutionFailed" xml:space="preserve"><value>无法解决文件冲突。</value></data>
+  <data name="FileLocationUnavailableTitle" xml:space="preserve"><value>文件位置不可用</value></data>
+  <data name="InitializingEditorTitle" xml:space="preserve"><value>Excalidraw Desktop — 正在初始化编辑器…</value></data>
+  <data name="InvalidPngExportData" xml:space="preserve"><value>编辑器发送了无效的 PNG 导出数据。</value></data>
+  <data name="KeepEditingButton" xml:space="preserve"><value>继续编辑</value></data>
+  <data name="LocateFileButton" xml:space="preserve"><value>查找文件</value></data>
+  <data name="NewDiscardContent" xml:space="preserve"><value>新建绘图将替换当前未保存的绘图。</value></data>
+  <data name="OkButton" xml:space="preserve"><value>确定</value></data>
+  <data name="OpenDiscardContent" xml:space="preserve"><value>打开其他绘图将替换当前未保存的绘图。</value></data>
+  <data name="OpenDrawingErrorTitle" xml:space="preserve"><value>无法打开绘图</value></data>
+  <data name="PngExportAccessDenied" xml:space="preserve"><value>Excalidraw Desktop 没有写入所选位置的权限。</value></data>
+  <data name="PngExportDestinationFailed" xml:space="preserve"><value>无法将 PNG 写入所选位置。</value></data>
+  <data name="PngExportErrorTitle" xml:space="preserve"><value>无法导出 PNG</value></data>
+  <data name="PngExportStartFailed" xml:space="preserve"><value>无法启动 PNG 导出。</value></data>
+  <data name="PngExportTimeout" xml:space="preserve"><value>PNG 导出耗时过长，已取消。</value></data>
+  <data name="PngExportWriteFailed" xml:space="preserve"><value>无法写入 PNG。请检查目标位置和可用磁盘空间。</value></data>
+  <data name="RecentDrawingOpenFailed" xml:space="preserve"><value>无法打开最近使用的绘图。</value></data>
+  <data name="ReloadButton" xml:space="preserve"><value>重新加载</value></data>
+  <data name="ResumingDrawing" xml:space="preserve"><value>正在恢复绘图…</value></data>
+  <data name="RetryingEditor" xml:space="preserve"><value>正在重试编辑器…</value></data>
+  <data name="ReviewTabsAutomationName" xml:space="preserve"><value>逐个检查未保存的标签页</value></data>
+  <data name="ReviewTabsButton" xml:space="preserve"><value>逐个检查标签页</value></data>
+  <data name="SaveAllButton" xml:space="preserve"><value>全部保存</value></data>
+  <data name="SaveAsButton" xml:space="preserve"><value>另存为</value></data>
+  <data name="SaveButton" xml:space="preserve"><value>保存</value></data>
+  <data name="SaveChangesBeforeClosingContent" xml:space="preserve"><value>如果关闭此绘图而不保存，你的更改将丢失。</value></data>
+  <data name="SaveChangesBeforeClosingTitle" xml:space="preserve"><value>关闭前保存更改？</value></data>
+  <data name="SelectedDrawingOpenFailed" xml:space="preserve"><value>无法打开所选绘图。</value></data>
+  <data name="SettingsButtonToolTip" xml:space="preserve"><value>显示“设置”标签页</value></data>
+  <data name="SettingsWindowTitle" xml:space="preserve"><value>设置 — Excalidraw Desktop</value></data>
+  <data name="SleepingTabHeaderFormat" xml:space="preserve"><value>{0} — 休眠中</value></data>
+  <data name="StartingWindowTitle" xml:space="preserve"><value>Excalidraw Desktop — 正在启动…</value></data>
+  <data name="StatusChangedOnDisk" xml:space="preserve"><value>已在磁盘上更改 — 解决</value></data>
+  <data name="StatusDrawingAutomationFormat" xml:space="preserve"><value>绘图：{0}</value></data>
+  <data name="StatusExportingPng" xml:space="preserve"><value>正在导出 PNG…</value></data>
+  <data name="StatusFileMissing" xml:space="preserve"><value>文件缺失 — 解决</value></data>
+  <data name="StatusFileMoved" xml:space="preserve"><value>文件已移动 — 解决</value></data>
+  <data name="StatusNewDrawing" xml:space="preserve"><value>新绘图</value></data>
+  <data name="StatusResolveHelpText" xml:space="preserve"><value>打开用于解决文件冲突的选项。</value></data>
+  <data name="StatusResuming" xml:space="preserve"><value>正在恢复</value></data>
+  <data name="StatusSaved" xml:space="preserve"><value>已保存</value></data>
+  <data name="StatusSleeping" xml:space="preserve"><value>休眠中</value></data>
+  <data name="StatusUnsaved" xml:space="preserve"><value>未保存的更改</value></data>
+  <data name="StatusUnsavedRecoveredFormat" xml:space="preserve"><value>未保存 • 已于 {0} 恢复</value></data>
+  <data name="TabAutomationNameFormat" xml:space="preserve"><value>{0}，{1}</value></data>
+  <data name="TabStateChangedOnDisk" xml:space="preserve"><value>已在磁盘上更改</value></data>
+  <data name="TabStateNewDrawing" xml:space="preserve"><value>新绘图</value></data>
+  <data name="TabStateSaved" xml:space="preserve"><value>已保存</value></data>
+  <data name="TabStateSleeping" xml:space="preserve"><value>休眠中</value></data>
+  <data name="TabStateUnsaved" xml:space="preserve"><value>未保存的更改</value></data>
+  <data name="UnsavedDrawingHelpText" xml:space="preserve"><value>未保存的绘图</value></data>
+  <data name="UnsavedDrawingsCountFormat" xml:space="preserve"><value>{0} 个绘图有未保存的更改：&#xA;&#xA;{1}</value></data>
+  <data name="UnsavedDrawingsTitle" xml:space="preserve"><value>未保存的绘图</value></data>
+  <data name="UntitledName" xml:space="preserve"><value>无标题</value></data>
+  <data name="UntitledNumberedFormat" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="WaitForDrawingExport" xml:space="preserve"><value>请等待当前 PNG 导出完成后再关闭此绘图。</value></data>
+  <data name="WaitForWindowExports" xml:space="preserve"><value>请等待 PNG 导出完成后再关闭此窗口。</value></data>
+  <data name="WebView2RepairGuidance" xml:space="preserve"><value>请安装或修复 Evergreen WebView2 Runtime，然后选择“重试”。已保存的绘图未被更改。</value></data>
+  <data name="WebView2Required" xml:space="preserve"><value>需要 Microsoft Edge WebView2 Runtime。</value></data>
+  <data name="DocumentNotFoundMessage" xml:space="preserve"><value>该位置已不存在此绘图。</value></data>
+  <data name="DocumentAccessDeniedMessage" xml:space="preserve"><value>Excalidraw Desktop 无权访问此绘图。</value></data>
+  <data name="DocumentReadFailedMessage" xml:space="preserve"><value>无法读取绘图。</value></data>
+  <data name="DocumentTooLargeMessage" xml:space="preserve"><value>所选绘图超过 50 MB 限制。</value></data>
+  <data name="DocumentPathUnavailableMessage" xml:space="preserve"><value>所选绘图没有本地文件路径。</value></data>
+  <data name="DocumentChangedExternallyMessage" xml:space="preserve"><value>绘图已在 Excalidraw Desktop 外部更改。请在保存前解决冲突。</value></data>
+  <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>该绘图已在另一个标签页中打开。请选择其他文件名。</value></data>
+  <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>无法将绘图写入磁盘。</value></data>
+  <data name="DocumentInvalidMessage" xml:space="preserve"><value>所选文件不是有效的 Excalidraw 绘图。</value></data>
+</root>

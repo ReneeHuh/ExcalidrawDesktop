@@ -1,6 +1,6 @@
 # Whole-map PNG export validation
 
-Date: September 2, 2026
+Date: September 3, 2026
 
 Status: Automated web, core, build, and packaged integration validation passed.
 Manual visual and failure-environment checks remain.

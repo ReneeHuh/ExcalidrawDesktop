@@ -11,11 +11,13 @@ internal sealed record DesktopPreferences(
     DesktopThemePreference Theme,
     bool ReopenSavedTabs,
     bool SuspendInactiveTabs,
-    bool UnloadInactiveTabs)
+    bool UnloadInactiveTabs,
+    string Language)
 {
     public static DesktopPreferences Default { get; } = new(
         DesktopThemePreference.System,
         ReopenSavedTabs: true,
         SuspendInactiveTabs: true,
-        UnloadInactiveTabs: true);
+        UnloadInactiveTabs: true,
+        ExcalidrawDesktop.Core.DesktopLanguages.SystemPreference);
 }

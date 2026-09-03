@@ -9,6 +9,7 @@ internal sealed class DesktopSettingsStore
     private const string ReopenSavedTabsKey = "Settings.ReopenSavedTabs";
     private const string SuspendInactiveTabsKey = "Settings.SuspendInactiveTabs";
     private const string UnloadInactiveTabsKey = "Settings.UnloadInactiveTabs";
+    private const string LanguageKey = "Settings.Language";
 
     private readonly ApplicationDataContainer values =
         ApplicationData.Current.LocalSettings;
@@ -24,7 +25,9 @@ internal sealed class DesktopSettingsStore
             theme,
             ReadBoolean(ReopenSavedTabsKey, defaults.ReopenSavedTabs),
             ReadBoolean(SuspendInactiveTabsKey, defaults.SuspendInactiveTabs),
-            ReadBoolean(UnloadInactiveTabsKey, defaults.UnloadInactiveTabs));
+            ReadBoolean(UnloadInactiveTabsKey, defaults.UnloadInactiveTabs),
+            ExcalidrawDesktop.Core.DesktopLanguages.NormalizePreference(
+                values.Values[LanguageKey] as string));
     }
 
     public void Save(DesktopPreferences preferences)
@@ -33,6 +36,7 @@ internal sealed class DesktopSettingsStore
         values.Values[ReopenSavedTabsKey] = preferences.ReopenSavedTabs;
         values.Values[SuspendInactiveTabsKey] = preferences.SuspendInactiveTabs;
         values.Values[UnloadInactiveTabsKey] = preferences.UnloadInactiveTabs;
+        values.Values[LanguageKey] = preferences.Language;
     }
 
     private bool ReadBoolean(string key, bool fallback) =>

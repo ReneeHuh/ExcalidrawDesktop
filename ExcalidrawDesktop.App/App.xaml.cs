@@ -1,4 +1,5 @@
 using ExcalidrawDesktop.Core;
+using ExcalidrawDesktop.App.Models;
 using ExcalidrawDesktop.App.Services;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -10,14 +11,65 @@ namespace ExcalidrawDesktop.App;
 
 public partial class App : Application
 {
+    private readonly DesktopPreferences startupPreferences;
+#if DEBUG
+    private readonly string localizationSmokeRequestPath = Path.Combine(
+        AppContext.BaseDirectory,
+        "localization-smoke.request");
+    private readonly string? localizationSmokeLanguage;
+#endif
     private MainWindow? window;
     private ApplicationWorkspaceCoordinator? workspaceCoordinator;
     private DispatcherQueue? dispatcherQueue;
 
     public App()
     {
+#if DEBUG
+        UnhandledException += OnUnhandledException;
+#endif
+        var preferences = new DesktopSettingsStore().Load();
+#if DEBUG
+        if (File.Exists(localizationSmokeRequestPath))
+        {
+            var requestedLanguage = File.ReadAllText(
+                localizationSmokeRequestPath).Trim();
+            localizationSmokeLanguage = DesktopLanguages.Supported
+                .FirstOrDefault(language => string.Equals(
+                    language.PreferenceTag,
+                    requestedLanguage,
+                    StringComparison.OrdinalIgnoreCase))
+                ?.PreferenceTag;
+            if (localizationSmokeLanguage is not null)
+            {
+                preferences = preferences with { Language = localizationSmokeLanguage };
+            }
+        }
+#endif
+        startupPreferences = preferences;
+        DesktopLanguageStartup.ApplyBeforeXaml(startupPreferences.Language);
+        DesktopResources.ConfigureLanguage(
+            Windows.Globalization.ApplicationLanguages.Languages.FirstOrDefault() ??
+            DesktopLanguageStartup.ResolveEffective(startupPreferences.Language).WinUiTag);
         InitializeComponent();
     }
+
+#if DEBUG
+    private void OnUnhandledException(
+        object sender,
+        Microsoft.UI.Xaml.UnhandledExceptionEventArgs args)
+    {
+        if (localizationSmokeLanguage is null)
+        {
+            return;
+        }
+
+        File.WriteAllText(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "localization-smoke-crash.txt"),
+            args.Exception.ToString());
+    }
+#endif
 
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
@@ -82,6 +134,12 @@ public partial class App : Application
         var imageExportSmokeRequestPath = Path.Combine(
             AppContext.BaseDirectory,
             "image-export-smoke.request");
+        var documentSafetySmokeRequestPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "document-safety-smoke.request");
+        var closeDecisionsSmokeRequestPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "close-decisions-smoke.request");
         var runRecoverySmoke = File.Exists(recoverySmokeRequestPath);
         var verifyRecoverySmoke = File.Exists(recoveryRestoreRequestPath);
         var runTitleBarSmoke = File.Exists(titleBarSmokeRequestPath);
@@ -97,6 +155,9 @@ public partial class App : Application
             performanceSmokeRequestPath);
         var runSuspensionSmoke = File.Exists(suspensionSmokeRequestPath);
         var runImageExportSmoke = File.Exists(imageExportSmokeRequestPath);
+        var runDocumentSafetySmoke = File.Exists(documentSafetySmokeRequestPath);
+        var runCloseDecisionsSmoke = File.Exists(closeDecisionsSmokeRequestPath);
+        var runLocalizationSmoke = localizationSmokeLanguage is not null;
         string? workspaceStatePath = File.Exists(workspaceSmokeRequestPath)
             ? Path.Combine(AppContext.BaseDirectory, "workspace-smoke-state.json")
             : runTabSmoke
@@ -117,6 +178,12 @@ public partial class App : Application
                         ? Path.Combine(AppContext.BaseDirectory, "suspension-smoke-state.json")
                     : runImageExportSmoke
                         ? Path.Combine(AppContext.BaseDirectory, "image-export-smoke-state.json")
+                    : runDocumentSafetySmoke
+                        ? Path.Combine(AppContext.BaseDirectory, "document-safety-smoke-state.json")
+                    : runCloseDecisionsSmoke
+                        ? Path.Combine(AppContext.BaseDirectory, "close-decisions-smoke-state.json")
+                    : runLocalizationSmoke
+                        ? Path.Combine(AppContext.BaseDirectory, "localization-smoke-state.json")
                     : runRecoverySmoke || verifyRecoverySmoke
                         ? Path.Combine(AppContext.BaseDirectory, "recovery-smoke-state.json")
                         : null;
@@ -168,6 +235,25 @@ public partial class App : Application
         {
             File.Delete(imageExportSmokeRequestPath);
         }
+        if (File.Exists(documentSafetySmokeRequestPath))
+        {
+            File.Delete(documentSafetySmokeRequestPath);
+        }
+        if (File.Exists(closeDecisionsSmokeRequestPath))
+        {
+            File.Delete(closeDecisionsSmokeRequestPath);
+        }
+        var closeDecisionsSmokeResultPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "close-decisions-smoke.result");
+        if (runCloseDecisionsSmoke && File.Exists(closeDecisionsSmokeResultPath))
+        {
+            File.Delete(closeDecisionsSmokeResultPath);
+        }
+        if (File.Exists(localizationSmokeRequestPath))
+        {
+            File.Delete(localizationSmokeRequestPath);
+        }
 #else
         const bool runTabSmoke = false;
         const string? workspaceStatePath = null;
@@ -182,8 +268,14 @@ public partial class App : Application
         const bool performanceUnloadInactive = false;
         const bool runSuspensionSmoke = false;
         const bool runImageExportSmoke = false;
+        const bool runDocumentSafetySmoke = false;
+        const bool runCloseDecisionsSmoke = false;
+        const bool runLocalizationSmoke = false;
+        const string? localizationSmokeLanguage = null;
 #endif
-        workspaceCoordinator = new ApplicationWorkspaceCoordinator(workspaceStatePath);
+        workspaceCoordinator = new ApplicationWorkspaceCoordinator(
+            workspaceStatePath,
+            startupPreferences);
         await workspaceCoordinator.InitializeAsync();
         var restoredWindows = workspaceCoordinator.RestoredWindows;
         var firstRestoredWindow = restoredWindows.FirstOrDefault();
@@ -202,7 +294,11 @@ public partial class App : Application
             runMultiWindowSmoke: runMultiWindowSmoke,
             runMultiWindowExitSmoke: runMultiWindowExitSmoke,
             runMultiWindowDirtyExitSmoke: runMultiWindowDirtyExitSmoke,
-            runImageExportSmoke: runImageExportSmoke);
+            runImageExportSmoke: runImageExportSmoke,
+            runDocumentSafetySmoke: runDocumentSafetySmoke,
+            runCloseDecisionsSmoke: runCloseDecisionsSmoke,
+            runLocalizationSmoke: runLocalizationSmoke,
+            localizationSmokeLanguage: localizationSmokeLanguage);
         workspaceCoordinator.RegisterWindow(window, firstRestoredWindow);
         window.Activate();
         MainWindow? restoredActiveWindow =

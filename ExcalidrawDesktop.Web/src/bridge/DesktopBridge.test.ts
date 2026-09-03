@@ -182,6 +182,25 @@ describe("DesktopBridge", () => {
     },
   );
 
+  it("delivers validated automation edit events to registered listeners", () => {
+    const { bridge, transport } = createBridge();
+    const listener = vi.fn();
+    const unsubscribe = bridge.onAutomationEditRequested(listener);
+
+    transport.respond({
+      version: 1,
+      kind: "event",
+      requestId: crypto.randomUUID(),
+      method: "app.automationEditRequested",
+      payload: { elementId: "recovery-test-element" },
+    });
+    expect(listener).toHaveBeenCalledWith({
+      elementId: "recovery-test-element",
+    });
+
+    unsubscribe();
+  });
+
   it("delivers the native theme even when it arrives before subscription", () => {
     const { bridge, transport } = createBridge();
     const listener = vi.fn();
@@ -196,6 +215,34 @@ describe("DesktopBridge", () => {
 
     bridge.onThemeChanged(listener);
     expect(listener).toHaveBeenCalledWith({ theme: "dark" });
+  });
+
+  it("delivers and validates a pending native language", () => {
+    const { bridge, transport } = createBridge();
+    const listener = vi.fn();
+
+    transport.respond({
+      version: 1,
+      kind: "event",
+      requestId: crypto.randomUUID(),
+      method: "app.languageChanged",
+      payload: { langCode: "ar-SA", direction: "rtl" },
+    });
+
+    bridge.onLanguageChanged(listener);
+    expect(listener).toHaveBeenCalledWith({
+      langCode: "ar-SA",
+      direction: "rtl",
+    });
+
+    transport.respond({
+      version: 1,
+      kind: "event",
+      requestId: crypto.randomUUID(),
+      method: "app.languageChanged",
+      payload: { langCode: "../../bad", direction: "rtl" },
+    });
+    expect(listener).toHaveBeenCalledOnce();
   });
 
   it("delivers and validates a pending native image export request", () => {
@@ -264,6 +311,7 @@ describe("DesktopBridge", () => {
     bridge.requestSelectAdjacentTab("previous");
     bridge.requestCloseTab();
     bridge.notifyCloseCancelled();
+    bridge.notifyLanguageApplied("ar-SA", "rtl");
     bridge.notifyDocumentRecovered();
     bridge.notifyRecoverySnapshot("snapshot");
 
@@ -277,6 +325,11 @@ describe("DesktopBridge", () => {
       },
       { kind: "event", method: "workspace.closeTabRequested" },
       { kind: "event", method: "app.closeCancelled" },
+      {
+        kind: "event",
+        method: "app.languageApplied",
+        payload: { langCode: "ar-SA", direction: "rtl" },
+      },
       { kind: "event", method: "document.recovered" },
       {
         kind: "event",

@@ -58,6 +58,10 @@ export type BridgeRequestMethod = keyof BridgeRequestMap;
 
 export type BridgeEventMap = {
   "app.ready": undefined;
+  "app.languageApplied": {
+    langCode: string;
+    direction: "ltr" | "rtl";
+  };
   "app.closeReady": undefined;
   "app.closeCancelled": undefined;
   "document.created": undefined;
@@ -82,6 +86,13 @@ export type BridgeEventMethod = keyof BridgeEventMap;
 export type HostEventMap = {
   "app.themeChanged": {
     theme: "light" | "dark";
+  };
+  "app.languageChanged": {
+    langCode: string;
+    direction: "ltr" | "rtl";
+  };
+  "app.automationEditRequested": {
+    elementId: string;
   };
   "document.saveRequested": {
     reason: "save" | "saveAs" | "close" | "externalConflict";
