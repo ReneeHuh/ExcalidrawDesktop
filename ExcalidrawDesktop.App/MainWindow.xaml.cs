@@ -26,6 +26,8 @@ public sealed partial class MainWindow : Window
 {
     private const string WebView2HelpUri =
         "https://developer.microsoft.com/en-us/microsoft-edge/webview2/";
+    private static readonly TimeSpan ExitActivationTimeout =
+        TimeSpan.FromSeconds(3);
 
     private readonly string webAssetPath = Path.Combine(
         AppContext.BaseDirectory,
@@ -5096,7 +5098,15 @@ public sealed partial class MainWindow : Window
         try
         {
             Activate();
-            await completion.Task;
+            try
+            {
+                await completion.Task.WaitAsync(ExitActivationTimeout);
+            }
+            catch (TimeoutException)
+            {
+                Debug.WriteLine("Window activation timed out during application exit.");
+                return false;
+            }
             return !resourcesDisposed;
         }
         finally
