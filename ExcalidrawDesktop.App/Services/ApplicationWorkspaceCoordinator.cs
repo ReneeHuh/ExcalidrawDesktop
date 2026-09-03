@@ -225,13 +225,9 @@ internal sealed class ApplicationWorkspaceCoordinator
         MainWindow? treatDirtyAsCleanInWindow = null)
     {
         var liveSnapshots = windows.Select(window =>
-            window.IsReadyForActivation
-                ? window.CaptureWorkspaceState(
-                    ReferenceEquals(window, treatDirtyAsCleanInWindow))
-                : restoreStates.GetValueOrDefault(window) ??
-                    window.CaptureWorkspaceState(
-                        ReferenceEquals(window, treatDirtyAsCleanInWindow),
-                        capturePlacement: false))
+            CaptureWindowForPersistence(
+                window,
+                ReferenceEquals(window, treatDirtyAsCleanInWindow)))
             .OfType<WorkspaceWindowState>()
             .ToArray();
         if (isExiting && exitWorkspace is not null)
@@ -267,6 +263,27 @@ internal sealed class ApplicationWorkspaceCoordinator
         {
             persistenceGate.Release();
         }
+    }
+
+    private WorkspaceWindowState? CaptureWindowForPersistence(
+        MainWindow window,
+        bool treatDirtyAsClean = false)
+    {
+        if (window.IsReadyForActivation)
+        {
+            return window.CaptureWorkspaceState(treatDirtyAsClean);
+        }
+
+        // A restored window can be persisted from its saved state until it
+        // finishes loading. A tear-out destination that already owns a tab
+        // must also be captured, but its empty placeholder must not become a
+        // blank window on the next launch.
+        return restoreStates.GetValueOrDefault(window) ??
+            (window.OpenSessions.Count > 0
+                ? window.CaptureWorkspaceState(
+                    treatDirtyAsClean,
+                    capturePlacement: false)
+                : null);
     }
 
     public Task PruneRecoverySnapshotsAsync(MainWindow? excludedWindow = null) =>
@@ -446,10 +463,10 @@ internal sealed class ApplicationWorkspaceCoordinator
         queuedPersistence?.Cancel();
         queuedPersistence?.Dispose();
         queuedPersistence = null;
-        exitWorkspace = windows.ToDictionary(
-            GetLogicalWindowId,
-            window => window.CaptureWorkspaceState(
-                capturePlacement: window.IsReadyForActivation));
+        exitWorkspace = windows
+            .Select(window => CaptureWindowForPersistence(window))
+            .OfType<WorkspaceWindowState>()
+            .ToDictionary(window => window.Id, StringComparer.OrdinalIgnoreCase);
         try
         {
             await PersistWorkspaceAsync();
