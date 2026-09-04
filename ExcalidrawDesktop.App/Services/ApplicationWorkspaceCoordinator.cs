@@ -53,6 +53,15 @@ internal sealed class ApplicationWorkspaceCoordinator
         };
         Preferences = preferences;
         desktopSettingsStore.Save(preferences);
+        DiagnosticLogService.Info("settings.changed", new
+        {
+            theme = preferences.Theme.ToString(),
+            preferences.ReopenSavedTabs,
+            preferences.SaveDirtyDrawingsOnClose,
+            preferences.SuspendInactiveTabs,
+            preferences.UnloadInactiveTabs,
+            language = preferences.Language,
+        });
         foreach (var window in windows.ToArray())
         {
             window.ApplySharedPreferences(preferences);
@@ -121,6 +130,12 @@ internal sealed class ApplicationWorkspaceCoordinator
         // tear-out. Only an activated window should become the activation
         // target for subsequent app-instance redirects.
         mostRecentlyActiveWindow ??= window;
+        DiagnosticLogService.Info("window.registered", new
+        {
+            windowId = logicalId,
+            windowCount = windows.Count,
+            restored = restoreState is not null,
+        });
     }
 
     public WorkspaceWindowState? GetRestoreState(MainWindow window) =>
@@ -144,6 +159,12 @@ internal sealed class ApplicationWorkspaceCoordinator
                 return;
             }
             mostRecentlyActiveWindow = window;
+            DiagnosticLogService.Info("window.activated", new
+            {
+                windowId = GetLogicalWindowId(window),
+                windowCount = windows.Count,
+                tabCount = window.OpenSessions.Count,
+            });
             if (window.IsReadyForActivation)
             {
                 QueuePersistWorkspace();
@@ -161,9 +182,16 @@ internal sealed class ApplicationWorkspaceCoordinator
 
     public void UnregisterWindow(MainWindow window)
     {
+        logicalWindowIds.TryGetValue(window, out var removedWindowId);
         windows.Remove(window);
         logicalWindowIds.Remove(window);
         restoreStates.Remove(window);
+        DiagnosticLogService.Info("window.unregistered", new
+        {
+            windowId = removedWindowId,
+            windowCount = windows.Count,
+            exiting = isExiting,
+        });
         if (ReferenceEquals(mostRecentlyActiveWindow, window))
         {
             mostRecentlyActiveWindow = windows.LastOrDefault();
@@ -174,6 +202,10 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
         else if (windows.Count == 0 && !isExiting)
         {
+            DiagnosticLogService.Info("application.exiting", new
+            {
+                reason = "last_window_closed",
+            });
             Microsoft.UI.Xaml.Application.Current.Exit();
         }
     }
@@ -216,6 +248,7 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
         catch (Exception exception)
         {
+            DiagnosticLogService.Error("workspace.persistence_failed", exception);
             System.Diagnostics.Debug.WriteLine(
                 $"Workspace persistence failed: {exception}");
         }
@@ -258,6 +291,12 @@ internal sealed class ApplicationWorkspaceCoordinator
         try
         {
             await workspaceStateStore.SaveAsync(state);
+            DiagnosticLogService.Info("workspace.persisted", new
+            {
+                windowCount = snapshotWindows.Length,
+                recentFileCount = RecentFiles.Count,
+                exiting = isExiting,
+            });
         }
         finally
         {
@@ -308,12 +347,19 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
 
         startupRecoveryPruned = true;
+        DiagnosticLogService.Info("window.ready", new
+        {
+            windowId = GetLogicalWindowId(window),
+            windowCount = windows.Count,
+            tabCount = window.OpenSessions.Count,
+        });
         try
         {
             await PruneRecoverySnapshotsAsync();
         }
         catch (Exception exception)
         {
+            DiagnosticLogService.Error("recovery.prune_failed", exception);
             System.Diagnostics.Debug.WriteLine(
                 $"Startup recovery snapshot cleanup failed: {exception}");
         }
@@ -460,6 +506,12 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
 
         isExiting = true;
+        DiagnosticLogService.Info("application.exit_requested", new
+        {
+            windowCount = windows.Count,
+            dirtyTabCount = windows.Sum(window =>
+                window.OpenSessions.Count(session => session.IsDirty)),
+        });
         queuedPersistence?.Cancel();
         queuedPersistence?.Dispose();
         queuedPersistence = null;
@@ -479,14 +531,25 @@ internal sealed class ApplicationWorkspaceCoordinator
 
                 if (!await window.ActivateForExitAsync())
                 {
+                    DiagnosticLogService.Info("application.exit_cancelled", new
+                    {
+                        reason = "activation_failed",
+                        windowId = GetLogicalWindowId(window),
+                    });
                     return;
                 }
                 if (!await window.RequestCloseAsync())
                 {
+                    DiagnosticLogService.Info("application.exit_cancelled", new
+                    {
+                        reason = "window_close_cancelled",
+                        windowId = GetLogicalWindowId(window),
+                    });
                     return;
                 }
             }
             await PersistWorkspaceAsync();
+            DiagnosticLogService.Info("application.exit_completed");
         }
         finally
         {

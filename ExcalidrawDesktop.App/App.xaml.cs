@@ -24,9 +24,10 @@ public partial class App : Application
 
     public App()
     {
-#if DEBUG
+        DiagnosticLogService.Initialize();
         UnhandledException += OnUnhandledException;
-#endif
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
         var preferences = new DesktopSettingsStore().Load();
 #if DEBUG
         if (File.Exists(localizationSmokeRequestPath))
@@ -53,11 +54,12 @@ public partial class App : Application
         InitializeComponent();
     }
 
-#if DEBUG
     private void OnUnhandledException(
         object sender,
         Microsoft.UI.Xaml.UnhandledExceptionEventArgs args)
     {
+        DiagnosticLogService.Error("exception.xaml_unhandled", args.Exception);
+#if DEBUG
         if (localizationSmokeLanguage is null)
         {
             return;
@@ -68,15 +70,37 @@ public partial class App : Application
                 AppContext.BaseDirectory,
                 "localization-smoke-crash.txt"),
             args.Exception.ToString());
-    }
 #endif
+    }
+
+    private static void OnDomainUnhandledException(
+        object sender,
+        System.UnhandledExceptionEventArgs args)
+    {
+        var exception = args.ExceptionObject as Exception ??
+            new InvalidOperationException(args.ExceptionObject?.ToString());
+        DiagnosticLogService.Error(
+            "exception.runtime_unhandled",
+            exception,
+            new { args.IsTerminating });
+    }
+
+    private static void OnUnobservedTaskException(
+        object? sender,
+        UnobservedTaskExceptionEventArgs args)
+    {
+        DiagnosticLogService.Error("exception.task_unobserved", args.Exception);
+        args.SetObserved();
+    }
 
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        DiagnosticLogService.Info("application.launch_requested");
         var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
         var mainInstance = AppInstance.FindOrRegisterForKey("main");
         if (!mainInstance.IsCurrent)
         {
+            DiagnosticLogService.Info("application.activation_redirected");
             await mainInstance.RedirectActivationToAsync(activation);
             Exit();
             return;
@@ -316,10 +340,19 @@ public partial class App : Application
         }
         restoredActiveWindow?.Activate();
         QueueActivatedFiles(activation, includeProcessArguments: true);
+        DiagnosticLogService.Info("application.launch_completed", new
+        {
+            restoredWindowCount = restoredWindows.Count,
+            windowCount = workspaceCoordinator.Windows.Count,
+        });
     }
 
     private void OnInstanceActivated(object? sender, AppActivationArguments args)
     {
+        DiagnosticLogService.Info("application.instance_activated", new
+        {
+            activationKind = args.Kind.ToString(),
+        });
         dispatcherQueue?.TryEnqueue(() =>
         {
             workspaceCoordinator?.ActivateMostRecentWindow();

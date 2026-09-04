@@ -4780,23 +4780,64 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void LogAction(
+        string action,
+        string inputSource,
+        DocumentSession? targetSession = null)
+    {
+        string? windowId = null;
+        try
+        {
+            windowId = workspaceCoordinator.GetLogicalWindowId(this);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        var active = ActiveSession;
+        var target = targetSession ?? active;
+        DiagnosticLogService.Info("action.invoked", new
+        {
+            action,
+            inputSource,
+            windowId,
+            windowCount = workspaceCoordinator.Windows.Count,
+            tabCount = sessions.Count,
+            settingsSelected = settingsTabItem is not null &&
+                ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem),
+            activeSessionId = active?.RecoveryId,
+            targetSessionId = target?.RecoveryId,
+            targetDirty = target?.IsDirty,
+            targetReady = target?.IsReady,
+            targetSuspended = target?.IsSuspended,
+            targetUnloaded = target?.IsUnloaded,
+            targetMoving = target?.IsMoving,
+            targetExporting = target?.IsExporting,
+            targetClosePromptOpen = target?.ClosePromptOpen,
+        });
+    }
+
     private void OnAddTabButtonClick(TabView sender, object args)
     {
+        LogAction("tab.new", "tab_button");
         CreateTab();
     }
 
     private void OnFileNewTabClick(object sender, RoutedEventArgs args)
     {
+        LogAction("tab.new", "menu");
         CreateTab();
     }
 
     private void OnFileNewWindowClick(object sender, RoutedEventArgs args)
     {
+        LogAction("window.new", "menu");
         workspaceCoordinator.CreateWindow();
     }
 
     private void OnFileOpenClick(object sender, RoutedEventArgs args)
     {
+        LogAction("document.open", "menu");
         if (ActiveSession is { } session)
         {
             _ = RequestOpenDocumentAsync(session);
@@ -4805,16 +4846,19 @@ public sealed partial class MainWindow : Window
 
     private void OnFileSaveClick(object sender, RoutedEventArgs args)
     {
+        LogAction("document.save", "menu");
         RequestSaveFromFileMenu(saveAs: false);
     }
 
     private void OnFileSaveAsClick(object sender, RoutedEventArgs args)
     {
+        LogAction("document.save_as", "menu");
         RequestSaveFromFileMenu(saveAs: true);
     }
 
     private async void OnFileExportPngClick(object sender, RoutedEventArgs args)
     {
+        LogAction("document.export_png", "menu");
         await ExportActiveSessionAsPngAsync();
     }
 
@@ -4851,6 +4895,10 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception exception)
         {
+            DiagnosticLogService.Error(
+                "image_export.start_failed",
+                exception,
+                new { sessionId = session.RecoveryId });
             Debug.WriteLine($"Could not start PNG export: {exception}");
             if (session.PendingImageExport is { } pending)
             {
@@ -5060,6 +5108,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnFileSaveAllClick(object sender, RoutedEventArgs args)
     {
+        LogAction("document.save_all", "menu");
         await SaveAllFromFileMenuAsync();
     }
 
@@ -5081,6 +5130,7 @@ public sealed partial class MainWindow : Window
 
     private void OnFileCloseTabClick(object sender, RoutedEventArgs args)
     {
+        LogAction("tab.close", "menu");
         if (settingsTabItem is not null &&
             ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem))
         {
@@ -5096,11 +5146,13 @@ public sealed partial class MainWindow : Window
 
     private void OnFileCloseWindowClick(object sender, RoutedEventArgs args)
     {
+        LogAction("window.close", "menu");
         Close();
     }
 
     private void OnFileExitClick(object sender, RoutedEventArgs args)
     {
+        LogAction("application.exit", "menu");
         _ = workspaceCoordinator.RequestExitAsync();
     }
 
@@ -5184,6 +5236,12 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception exception)
         {
+            DiagnosticLogService.Error("window.close_failed", exception, new
+            {
+                windowCount = workspaceCoordinator.Windows.Count,
+                tabCount = sessions.Count,
+                dirtyTabCount = sessions.Count(session => session.IsDirty),
+            });
             Debug.WriteLine(exception);
             return false;
         }
@@ -5195,11 +5253,13 @@ public sealed partial class MainWindow : Window
 
     private void OnSettingsClick(object sender, RoutedEventArgs args)
     {
+        LogAction("settings.open", "menu");
         ShowSettingsPage();
     }
 
     private void OnSettingsButtonClick(object sender, RoutedEventArgs args)
     {
+        LogAction("settings.open", "button");
         ShowSettingsPage();
     }
 
@@ -5274,6 +5334,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("tab.new", "keyboard");
         CreateTab();
     }
 
@@ -5282,6 +5343,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("window.new", "keyboard");
         workspaceCoordinator.CreateWindow();
     }
 
@@ -5290,6 +5352,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("tab.close", "keyboard");
         if (settingsTabItem is not null &&
             ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem))
         {
@@ -5308,6 +5371,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("document.open", "keyboard");
         if (ActiveSession is { } session)
         {
             _ = RequestOpenDocumentAsync(session);
@@ -5319,6 +5383,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("document.save", "keyboard");
         RequestSaveFromFileMenu(saveAs: false);
     }
 
@@ -5327,6 +5392,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("document.save_as", "keyboard");
         RequestSaveFromFileMenu(saveAs: true);
     }
 
@@ -5335,6 +5401,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("window.close", "keyboard");
         Close();
     }
 
@@ -5343,6 +5410,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("document.save_all", "keyboard");
         _ = SaveAllFromFileMenuAsync();
     }
 
@@ -5351,6 +5419,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("tab.next", "keyboard");
         if (DocumentTabs.SelectedItem is TabViewItem tab)
         {
             SelectAdjacentTabItem(tab, next: true);
@@ -5362,6 +5431,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        LogAction("tab.previous", "keyboard");
         if (DocumentTabs.SelectedItem is TabViewItem tab)
         {
             SelectAdjacentTabItem(tab, next: false);
@@ -5372,6 +5442,7 @@ public sealed partial class MainWindow : Window
         TabView sender,
         TabViewTabCloseRequestedEventArgs args)
     {
+        LogAction("tab.close", "tab", FindSession(args.Tab));
         if (settingsTabItem is not null && ReferenceEquals(args.Tab, settingsTabItem))
         {
             QueueHideSettingsPage();
@@ -5398,6 +5469,14 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception exception)
         {
+            DiagnosticLogService.Error("tab.close_failed", exception, new
+            {
+                sessionId = session.RecoveryId,
+                session.IsDirty,
+                session.IsReady,
+                session.IsSuspended,
+                session.IsUnloaded,
+            });
             Debug.WriteLine($"Tab close failed: {exception}");
             return false;
         }
@@ -5409,6 +5488,7 @@ public sealed partial class MainWindow : Window
     {
         var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
         var session = tab is null ? null : FindSession(tab);
+        LogAction("tab.tear_out_started", "drag", session);
         if (session is null || !CanMoveSession(session))
         {
             return;
@@ -5454,6 +5534,7 @@ public sealed partial class MainWindow : Window
         pendingTearOutWindow = null;
         var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
         var session = tab is null ? null : FindSession(tab);
+        LogAction("tab.tear_out_completed", "drag", session);
         if (destination is null || session is null ||
             !workspaceCoordinator.MoveSession(this, session, destination))
         {
@@ -5492,6 +5573,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        LogAction("tab.external_drop", "drag", session);
         workspaceCoordinator.MoveSession(source, session, this, args.DropIndex);
     }
 
@@ -5499,6 +5581,7 @@ public sealed partial class MainWindow : Window
         object sender,
         SelectionChangedEventArgs args)
     {
+        LogAction("tab.selected", "tab");
         var settingsSelected = settingsTabItem is not null &&
             ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem);
         settingsPageVisible = settingsSelected;
