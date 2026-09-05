@@ -12,48 +12,17 @@ $ErrorActionPreference = "Stop"
 $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
+. (Join-Path $testRoot "SmokeTestCommon.ps1")
 $startedProcess = $null
 $generatedPaths = [System.Collections.Generic.List[string]]::new()
 
 Add-Type -AssemblyName UIAutomationClient
 
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-
-[ComImport]
-[Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
-internal class WorkspaceApplicationActivationManager {}
-
-[ComImport]
-[Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IWorkspaceApplicationActivationManager
-{
-    int ActivateApplication([MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-        [MarshalAs(UnmanagedType.LPWStr)] string arguments, uint options, out uint processId);
-    int ActivateForFile(string appUserModelId, IntPtr itemArray, string verb, out uint processId);
-    int ActivateForProtocol(string appUserModelId, IntPtr itemArray, out uint processId);
-}
-
-public static class WorkspacePackagedAppActivator
-{
-    public static uint Activate(string appUserModelId)
-    {
-        var manager = (IWorkspaceApplicationActivationManager)new WorkspaceApplicationActivationManager();
-        var result = manager.ActivateApplication(appUserModelId, "", 0, out var processId);
-        Marshal.ThrowExceptionForHR(result);
-        return processId;
-    }
-}
-
-"@
-
 try {
     if (-not $SkipBuild) {
-        & $buildScript -Configuration Debug -SkipRestore -Deploy
+        & $buildScript -Configuration Debug -SkipRestore -Publish
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
@@ -61,12 +30,7 @@ try {
         throw "Close existing Excalidraw Desktop processes before running the workspace restore smoke test."
     }
 
-    $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $package) {
-        throw "The Excalidraw Desktop development package is not registered."
-    }
+    $package = Get-DesktopTestApplication
 
     $installRoot = [System.IO.Path]::GetFullPath($package.InstallLocation).TrimEnd('\') + '\'
     $firstPath = Join-Path $package.InstallLocation "workspace-one.excalidraw"
@@ -77,7 +41,7 @@ try {
     foreach ($path in @($firstPath, $secondPath, $statePath, $requestPath)) {
         $resolved = [System.IO.Path]::GetFullPath($path)
         if (-not $resolved.StartsWith($installRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "A workspace smoke path escaped the package install directory: $resolved"
+            throw "A workspace smoke path escaped the application directory: $resolved"
         }
         $generatedPaths.Add($resolved)
     }
@@ -98,9 +62,7 @@ try {
     [System.IO.File]::WriteAllText($statePath, $state)
     [System.IO.File]::WriteAllText($requestPath, "run")
 
-    $applicationId = "$($package.PackageFamilyName)!App"
-    $processId = [WorkspacePackagedAppActivator]::Activate($applicationId)
-    $startedProcess = Get-Process -Id $processId
+    $startedProcess = Start-DesktopTestApplication -Application $package
     $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     $expectedTitle = "workspace-two.excalidraw — Excalidraw Desktop"
     $workspaceRestored = $false

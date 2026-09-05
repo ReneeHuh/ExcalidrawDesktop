@@ -8,6 +8,10 @@ param(
 
     [switch] $SkipRestore,
 
+    [switch] $Publish,
+
+    # Compatibility alias for existing automation. Unpackaged builds are
+    # published to a folder; there is no package-registration deployment step.
     [switch] $Deploy,
 
     [switch] $Launch
@@ -21,6 +25,7 @@ $nativeRoot = Join-Path $repositoryRoot "ExcalidrawDesktop.App"
 $projectPath = Join-Path $nativeRoot "ExcalidrawDesktop.App.csproj"
 $webAssetsBuildScript = Join-Path $scriptRoot "Build-WebAssets.ps1"
 $localizationTestScript = Join-Path $scriptRoot "Test-Localization.ps1"
+$publishRoot = Join-Path $nativeRoot "bin\$Platform\$Configuration\unpacked"
 
 Push-Location $repositoryRoot
 try {
@@ -46,90 +51,48 @@ try {
 
     & dotnet build $projectPath `
         --configuration $Configuration `
-        -p:Platform=$Platform `
-        -p:AppxPackageSigningEnabled=false
+        -p:Platform=$Platform
     if ($LASTEXITCODE -ne 0) {
         throw "WinUI build failed with exit code $LASTEXITCODE."
     }
 
-    if ($Deploy -or $Launch) {
-        $buildRoot = Join-Path $nativeRoot "bin\$Platform\$Configuration"
-        $loosePackageRoot = $null
-        $transformedManifest = Get-ChildItem -LiteralPath $buildRoot -Recurse -Filter "AppxManifest.xml" |
-            Where-Object {
-                $_.DirectoryName -notlike "*\AppX" -and
-                (Test-Path -LiteralPath (Join-Path $_.DirectoryName "ExcalidrawDesktop.exe"))
-            } |
-            Sort-Object LastWriteTimeUtc -Descending |
-            Select-Object -First 1
-        if ($transformedManifest) {
-            $candidateLoosePackageRoot = Join-Path $transformedManifest.DirectoryName "AppX"
-            if (Test-Path -LiteralPath $candidateLoosePackageRoot -PathType Container) {
-                $loosePackageRoot = $candidateLoosePackageRoot
-                Get-ChildItem -LiteralPath $transformedManifest.DirectoryName -Force |
-                    Where-Object { $_.Name -notin @("AppX", "publish") } |
-                    Copy-Item -Destination $loosePackageRoot -Recurse -Force
-            }
+    if ($Publish -or $Deploy -or $Launch) {
+        $resolvedNativeRoot = [IO.Path]::GetFullPath($nativeRoot).TrimEnd(
+            [IO.Path]::DirectorySeparatorChar,
+            [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+        $resolvedPublishRoot = [IO.Path]::GetFullPath($publishRoot)
+        if (-not $resolvedPublishRoot.StartsWith(
+            $resolvedNativeRoot,
+            [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to clean publish output outside $resolvedNativeRoot."
         }
 
-        $appManifest = if ($loosePackageRoot) {
-            Get-Item -LiteralPath (Join-Path $loosePackageRoot "AppxManifest.xml")
-        }
-        else {
-            Get-ChildItem -LiteralPath $buildRoot -Recurse -Filter "AppxManifest.xml" |
-                Where-Object { $_.DirectoryName -notlike "*\publish*" } |
-                Sort-Object LastWriteTimeUtc -Descending |
-                Select-Object -First 1
+        if (Test-Path -LiteralPath $resolvedPublishRoot) {
+            Remove-Item -LiteralPath $resolvedPublishRoot -Recurse -Force
         }
 
-        if (-not $appManifest) {
-            throw "The generated AppxManifest.xml could not be found below $buildRoot."
+        & dotnet publish $projectPath `
+            --configuration $Configuration `
+            --runtime "win-$Platform" `
+            --self-contained true `
+            --output $publishRoot `
+            -p:Platform=$Platform `
+            -p:WindowsPackageType=None `
+            -p:WindowsAppSDKSelfContained=true
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unpackaged WinUI publish failed with exit code $LASTEXITCODE."
         }
 
-        [xml] $manifestXml = Get-Content -LiteralPath $appManifest.FullName -Raw
-        $packageName = $manifestXml.Package.Identity.Name
-        $packageVersion = [version] $manifestXml.Package.Identity.Version
-        $packageRoot = [System.IO.Path]::GetFullPath(
-            $appManifest.DirectoryName).TrimEnd(
-                [System.IO.Path]::DirectorySeparatorChar)
-        $registeredPackage = Get-AppxPackage -Name $packageName |
-            Where-Object { $_.Version -eq $packageVersion } |
-            Sort-Object Version -Descending |
-            Select-Object -First 1
-        $registeredRoot = if ($registeredPackage) {
-            [System.IO.Path]::GetFullPath(
-                $registeredPackage.InstallLocation).TrimEnd(
-                    [System.IO.Path]::DirectorySeparatorChar)
+        $executablePath = Join-Path $publishRoot "ExcalidrawDesktop.exe"
+        if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+            throw "The published executable was not found at $executablePath."
         }
 
-        if ($registeredPackage -and
-            [string]::Equals(
-                $registeredRoot,
-                $packageRoot,
-                [System.StringComparison]::OrdinalIgnoreCase)) {
-            Write-Host (
-                "Development package {0} {1} is already registered from {2}." -f
-                    $packageName,
-                    $packageVersion,
-                    $packageRoot)
-        }
-        else {
-            Add-AppxPackage -Register $appManifest.FullName
-        }
+        Write-Host "Unpackaged application published to $publishRoot."
     }
 
     if ($Launch) {
-        $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-            Sort-Object Version -Descending |
-            Select-Object -First 1
-        if (-not $package) {
-            throw "The Excalidraw Desktop development package is not registered."
-        }
-
-        Start-Process `
-            -FilePath "explorer.exe" `
-            -ArgumentList "shell:AppsFolder\$($package.PackageFamilyName)!App" `
-            -WindowStyle Hidden
+        Start-Process -FilePath $executablePath -WorkingDirectory $publishRoot
     }
 }
 finally {

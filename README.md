@@ -77,8 +77,11 @@ the app so the native shell and every editor stay in the same language.
 ### Current availability
 
 Excalidraw Desktop currently targets Windows 11 on x64 PCs and requires the
-Microsoft Edge WebView2 Runtime. A packaged release and end-user installation
-instructions will be added before the first public release.
+Microsoft Edge WebView2 Runtime. The application is distributed as a
+self-contained folder: extract the complete archive and run
+`ExcalidrawDesktop.exe`. Keep the executable and its accompanying files
+together. Windows may ask you to choose Excalidraw Desktop the first time you
+open an `.excalidraw` file from Explorer.
 
 If an editor tab cannot start, use its **Retry** action first. The failure view
 also links to Microsoft's
@@ -97,7 +100,9 @@ information.
 
 ### Architecture
 
-Excalidraw Desktop is a packaged WinUI 3 application. The native shell owns
+Excalidraw Desktop is an unpackaged, self-contained WinUI 3 application. The
+published folder carries the .NET and Windows App SDK runtimes and can be
+launched directly without registering an MSIX package. The native shell owns
 windows, tabs, file dialogs, persistence, recovery, and OS integration. A local
 React entry point hosts the public `@excalidraw/excalidraw` package inside
 WebView2 and communicates with the shell through a typed JSON bridge.
@@ -111,7 +116,7 @@ ExcalidrawDesktop.App/         WinUI shell, native file lifecycle, and WebView2 
 ExcalidrawDesktop.Core/        Shared protocol, validation, recovery, and workspace logic
 ExcalidrawDesktop.Core.Tests/  C# protocol and domain tests
 ExcalidrawDesktop.Web/         React entry point and TypeScript bridge
-SmokeTests/                    Packaged application tests
+SmokeTests/                    Unpackaged desktop integration tests
 tools/                         Build and dependency-update scripts
 docs/                          Plans, backlog, and validation records
 ExcalidrawDesktop.sln          Visual Studio solution
@@ -140,15 +145,17 @@ The script restores the exact npm dependencies, builds
 `ExcalidrawDesktop.App/Assets/Web`, and builds the native x64 application.
 Generated web assets, `node_modules`, and .NET build output remain untracked.
 
-After the first restore, register and launch the development package with:
+After the first restore, publish and launch the unpackaged application with:
 
 ```powershell
-.\tools\Build-Desktop.ps1 -SkipRestore -Deploy -Launch
+.\tools\Build-Desktop.ps1 -SkipRestore -Publish -Launch
 ```
 
-Do not launch `ExcalidrawDesktop.exe` directly from `bin`; the packaged WinUI
-application requires its registered MSIX identity. Open
-`ExcalidrawDesktop.sln` in Visual Studio when working on the native projects.
+The runnable folder is written to
+`ExcalidrawDesktop.App\bin\x64\<Configuration>\unpacked`. The application keeps
+settings, workspace state, recovery snapshots, and diagnostics below
+`%LOCALAPPDATA%\ExcalidrawDesktop`. Open `ExcalidrawDesktop.sln` in Visual
+Studio when working on the native projects.
 
 To build only the local web bundle:
 
@@ -186,20 +193,20 @@ Run the native protocol, persistence, and document tests:
 dotnet test .\ExcalidrawDesktop.sln -p:Platform=x64
 ```
 
-Validate native localization catalogs, XAML resource references, manifest
-resources, and format placeholders:
+Validate native localization catalogs, XAML resource references, and format
+placeholders:
 
 ```powershell
 .\tools\Test-Localization.ps1
 ```
 
-Run the packaged startup and bridge-readiness smoke test:
+Run the unpackaged startup and bridge-readiness smoke test:
 
 ```powershell
 .\SmokeTests\Invoke-SmokeTest.ps1
 ```
 
-Additional packaged suites cover tabs, workspace restoration, recovery,
+Additional unpackaged suites cover tabs, workspace restoration, recovery,
 title-bar interactions, inactive-tab suspension, performance, and Explorer
 file activation:
 
@@ -214,8 +221,8 @@ file activation:
 .\SmokeTests\Invoke-LocalizationSmokeTest.ps1 -SkipBuild
 ```
 
-Use `-SkipBuild` to test the registered output or `-KeepRunning` to leave a
-successful test instance open.
+Use `-SkipBuild` to test the existing published output or `-KeepRunning` to
+leave a successful test instance open.
 
 ### Project status and plans
 

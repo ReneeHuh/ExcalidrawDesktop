@@ -12,49 +12,15 @@ $ErrorActionPreference = "Stop"
 $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
+. (Join-Path $testRoot "SmokeTestCommon.ps1")
 $startedProcess = $null
 $generatedPaths = [System.Collections.Generic.List[string]]::new()
 
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-
-[ComImport]
-[Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
-internal class ImageExportApplicationActivationManager {}
-
-[ComImport]
-[Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IImageExportApplicationActivationManager
-{
-    int ActivateApplication(
-        [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-        [MarshalAs(UnmanagedType.LPWStr)] string arguments,
-        uint options,
-        out uint processId);
-    int ActivateForFile(string appUserModelId, IntPtr itemArray, string verb, out uint processId);
-    int ActivateForProtocol(string appUserModelId, IntPtr itemArray, out uint processId);
-}
-
-public static class ImageExportPackagedAppActivator
-{
-    public static uint Activate(string appUserModelId)
-    {
-        var manager = (IImageExportApplicationActivationManager)
-            new ImageExportApplicationActivationManager();
-        var result = manager.ActivateApplication(appUserModelId, "", 0, out var processId);
-        Marshal.ThrowExceptionForHR(result);
-        return processId;
-    }
-}
-"@
-
 try {
     if (-not $SkipBuild) {
-        & $buildScript -Configuration Debug -SkipRestore -Deploy
+        & $buildScript -Configuration Debug -SkipRestore -Publish
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
@@ -62,12 +28,7 @@ try {
         throw "Close existing Excalidraw Desktop processes before running the image export smoke test."
     }
 
-    $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $package -or [string]::IsNullOrWhiteSpace($package.InstallLocation)) {
-        throw "The Excalidraw Desktop development package is not registered correctly."
-    }
+    $package = Get-DesktopTestApplication
 
     $installRoot = [System.IO.Path]::GetFullPath($package.InstallLocation).TrimEnd('\') + '\'
     $requestPath = Join-Path $package.InstallLocation "image-export-smoke.request"
@@ -79,7 +40,7 @@ try {
         if (-not $resolved.StartsWith(
             $installRoot,
             [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "An image-export smoke path escaped the package install directory: $resolved"
+            throw "An image-export smoke path escaped the application directory: $resolved"
         }
         $generatedPaths.Add($resolved)
         if ([System.IO.File]::Exists($resolved)) {
@@ -88,9 +49,7 @@ try {
     }
 
     [System.IO.File]::WriteAllText($requestPath, "run")
-    $applicationId = "$($package.PackageFamilyName)!App"
-    $processId = [ImageExportPackagedAppActivator]::Activate($applicationId)
-    $startedProcess = Get-Process -Id $processId
+    $startedProcess = Start-DesktopTestApplication -Application $package
     $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 
     while ([DateTime]::UtcNow -lt $deadlineUtc) {
@@ -105,13 +64,13 @@ try {
         if ($startedProcess.MainWindowTitle -eq
             "Excalidraw Desktop — Image export smoke passed") {
             if (-not [System.IO.File]::Exists($outputPath)) {
-                throw "The packaged image export did not create a PNG."
+                throw "The unpackaged image export did not create a PNG."
             }
             $bytes = [System.IO.File]::ReadAllBytes($outputPath)
             $signature = [byte[]] @(137, 80, 78, 71, 13, 10, 26, 10)
             if ($bytes.Length -lt 24 -or
                 ($bytes[0..7] -join ',') -ne ($signature -join ',')) {
-                throw "The packaged image export is not a valid PNG stream."
+                throw "The unpackaged image export is not a valid PNG stream."
             }
             $width = [uint32] (
                 $bytes[16] * 16777216 +
@@ -143,7 +102,7 @@ try {
         Start-Sleep -Milliseconds 250
     }
 
-    throw "Timed out waiting for packaged image export. Last title: $($startedProcess.MainWindowTitle)"
+    throw "Timed out waiting for unpackaged image export. Last title: $($startedProcess.MainWindowTitle)"
 }
 finally {
     if ($startedProcess -and -not $KeepRunning) {

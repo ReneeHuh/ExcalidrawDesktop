@@ -80,9 +80,9 @@ function Invoke-DialogButton {
 
 try {
     if (-not $SkipBuild) {
-        & $buildScript -Configuration Debug -SkipRestore -Deploy
+        & $buildScript -Configuration Debug -SkipRestore -Publish
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
@@ -90,7 +90,7 @@ try {
         throw "Close existing Excalidraw Desktop processes before running the close-decisions smoke test."
     }
 
-    $package = Get-DesktopDevelopmentPackage
+    $package = Get-DesktopTestApplication
     $installRoot = [System.IO.Path]::GetFullPath(
         $package.InstallLocation).TrimEnd('\') + '\'
     $requestPath = Join-Path $package.InstallLocation "close-decisions-smoke.request"
@@ -101,7 +101,7 @@ try {
         if (-not $resolved.StartsWith(
                 $installRoot,
                 [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "A close-decisions smoke path escaped the package install directory: $resolved"
+            throw "A close-decisions smoke path escaped the application directory: $resolved"
         }
         if ([System.IO.File]::Exists($resolved)) {
             [System.IO.File]::Delete($resolved)
@@ -109,7 +109,7 @@ try {
     }
 
     [System.IO.File]::WriteAllText($requestPath, "run")
-    $startedProcess = Start-DesktopPackagedApp -Package $package
+    $startedProcess = Start-DesktopTestApplication -Application $package
     $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "SecondaryButton" -DeadlineUtc $deadlineUtc

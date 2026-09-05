@@ -10,40 +10,10 @@ $ErrorActionPreference = "Stop"
 $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
+. (Join-Path $testRoot "SmokeTestCommon.ps1")
 $startedProcess = $null
 $generatedFiles = [System.Collections.Generic.List[string]]::new()
 $recoveryDirectory = $null
-
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-
-[ComImport]
-[Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
-internal class RecoveryApplicationActivationManager {}
-
-[ComImport]
-[Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IRecoveryApplicationActivationManager
-{
-    int ActivateApplication([MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-        [MarshalAs(UnmanagedType.LPWStr)] string arguments, uint options, out uint processId);
-    int ActivateForFile(string appUserModelId, IntPtr itemArray, string verb, out uint processId);
-    int ActivateForProtocol(string appUserModelId, IntPtr itemArray, out uint processId);
-}
-
-public static class RecoveryPackagedAppActivator
-{
-    public static uint Activate(string appUserModelId)
-    {
-        var manager = (IRecoveryApplicationActivationManager)new RecoveryApplicationActivationManager();
-        var result = manager.ActivateApplication(appUserModelId, "", 0, out var processId);
-        Marshal.ThrowExceptionForHR(result);
-        return processId;
-    }
-}
-"@
 
 function Wait-ForTitle {
     param(
@@ -67,9 +37,9 @@ function Wait-ForTitle {
 
 try {
     if (-not $SkipBuild) {
-        & $buildScript -Configuration Debug -SkipRestore -Deploy
+        & $buildScript -Configuration Debug -SkipRestore -Publish
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
@@ -77,12 +47,7 @@ try {
         throw "Close existing Excalidraw Desktop processes before running the recovery smoke test."
     }
 
-    $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $package) {
-        throw "The Excalidraw Desktop development package is not registered."
-    }
+    $package = Get-DesktopTestApplication
 
     $installRoot = [System.IO.Path]::GetFullPath($package.InstallLocation).TrimEnd('\') + '\'
     $statePath = Join-Path $package.InstallLocation "recovery-smoke-state.json"
@@ -92,7 +57,7 @@ try {
     foreach ($path in @($statePath, $snapshotRequestPath, $restoreRequestPath, $recoveryDirectory)) {
         $resolved = [System.IO.Path]::GetFullPath($path)
         if (-not $resolved.StartsWith($installRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "A recovery smoke path escaped the package install directory: $resolved"
+            throw "A recovery smoke path escaped the application directory: $resolved"
         }
     }
     $generatedFiles.Add($statePath)
@@ -108,10 +73,8 @@ try {
         }
     }
 
-    $applicationId = "$($package.PackageFamilyName)!App"
     [System.IO.File]::WriteAllText($snapshotRequestPath, "run")
-    $processId = [RecoveryPackagedAppActivator]::Activate($applicationId)
-    $startedProcess = Get-Process -Id $processId
+    $startedProcess = Start-DesktopTestApplication -Application $package
     Wait-ForTitle -Process $startedProcess `
         -ExpectedTitle "Excalidraw Desktop — Recovery snapshot saved" `
         -DeadlineUtc ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds))
@@ -136,8 +99,7 @@ try {
     $startedProcess = $null
 
     [System.IO.File]::WriteAllText($restoreRequestPath, "run")
-    $processId = [RecoveryPackagedAppActivator]::Activate($applicationId)
-    $startedProcess = Get-Process -Id $processId
+    $startedProcess = Start-DesktopTestApplication -Application $package
     Wait-ForTitle -Process $startedProcess `
         -ExpectedTitle "Excalidraw Desktop — Recovery smoke restored" `
         -DeadlineUtc ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds))

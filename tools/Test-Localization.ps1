@@ -106,16 +106,6 @@ foreach ($xamlFile in $xamlFiles) {
     }
 }
 
-$manifestPath = Join-Path $appRoot "Package.appxmanifest"
-$manifest = Get-Content -LiteralPath $manifestPath -Raw
-$manifestKeys = [regex]::Matches($manifest, 'ms-resource:([A-Za-z0-9_.-]+)')
-foreach ($manifestKey in $manifestKeys) {
-    $key = $manifestKey.Groups[1].Value
-    if (-not $canonical.ContainsKey($key)) {
-        throw "Package manifest references missing en-US key '$key'."
-    }
-}
-
 function Get-PlaceholderSignature([string] $value) {
     return @(
         [regex]::Matches($value, '\{(\d+)(?:[^{}]*)\}') |

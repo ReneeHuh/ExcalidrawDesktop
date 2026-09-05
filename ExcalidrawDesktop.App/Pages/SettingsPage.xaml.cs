@@ -1,9 +1,9 @@
 using ExcalidrawDesktop.App.Models;
 using ExcalidrawDesktop.App.Services;
 using ExcalidrawDesktop.Core;
+using System.Reflection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Windows.ApplicationModel;
 
 namespace ExcalidrawDesktop.App.Pages;
 
@@ -36,7 +36,8 @@ public sealed partial class SettingsPage : Page
                 Tag = language.PreferenceTag,
             });
         }
-        var version = Package.Current.Id.Version;
+        var version = Assembly.GetEntryAssembly()?.GetName().Version ??
+            new Version(0, 0, 0, 0);
         VersionText.Text = DesktopResources.Format(
             "VersionFormat",
             "Version {0}.{1}.{2}.{3}",

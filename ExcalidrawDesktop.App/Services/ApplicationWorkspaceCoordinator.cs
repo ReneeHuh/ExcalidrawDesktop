@@ -1,6 +1,5 @@
 using ExcalidrawDesktop.App.Models;
 using ExcalidrawDesktop.Core;
-using Windows.Storage;
 
 namespace ExcalidrawDesktop.App.Services;
 
@@ -24,9 +23,7 @@ internal sealed class ApplicationWorkspaceCoordinator
         string? workspaceStatePath = null,
         DesktopPreferences? startupPreferences = null)
     {
-        WorkspaceStatePath = workspaceStatePath ?? Path.Combine(
-            ApplicationData.Current.LocalFolder.Path,
-            "workspace-state.json");
+        WorkspaceStatePath = workspaceStatePath ?? DesktopPaths.WorkspaceStatePath;
         workspaceStateStore = new MultiWindowWorkspaceStateStore(WorkspaceStatePath);
         recoverySnapshotStore = new RecoverySnapshotStore(Path.Combine(
             Path.GetDirectoryName(WorkspaceStatePath)!,

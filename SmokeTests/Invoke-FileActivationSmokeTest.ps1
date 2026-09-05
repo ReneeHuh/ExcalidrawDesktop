@@ -12,6 +12,7 @@ $ErrorActionPreference = "Stop"
 $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
+. (Join-Path $testRoot "SmokeTestCommon.ps1")
 $startedProcess = $null
 $generatedPaths = [System.Collections.Generic.List[string]]::new()
 
@@ -40,11 +41,49 @@ function Wait-ForTitle {
     throw "Timed out waiting for '$Prefix'. Last title: $($Process.MainWindowTitle)"
 }
 
+function Get-RegisteredFileActivationArguments {
+    param([Parameter(Mandatory)] $Application)
+
+    $openWithPath =
+        "Registry::HKEY_CURRENT_USER\Software\Classes\.excalidraw\OpenWithProgids"
+    $openWith = Get-ItemProperty -LiteralPath $openWithPath -ErrorAction Stop
+    foreach ($property in $openWith.PSObject.Properties) {
+        if ($property.Name.StartsWith("PS", [System.StringComparison]::Ordinal) -or
+            -not $property.Name.StartsWith("App.", [System.StringComparison]::Ordinal)) {
+            continue
+        }
+        $commandPath =
+            "Registry::HKEY_CURRENT_USER\Software\Classes\$($property.Name)\shell\open\command"
+        $command = (Get-ItemProperty -LiteralPath $commandPath -ErrorAction SilentlyContinue).'(default)'
+        if ($command -and $command.StartsWith(
+                $Application.ExecutablePath,
+                [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $command.Substring($Application.ExecutablePath.Length).Trim()
+        }
+    }
+    throw "The unpackaged app did not register an .excalidraw file activation command."
+}
+
+function Start-RegisteredFileActivation {
+    param(
+        [Parameter(Mandatory)] $Application,
+        [Parameter(Mandatory)] [string] $RegisteredArguments,
+        [Parameter(Mandatory)] [string] $Path
+    )
+
+    $arguments = $RegisteredArguments.Replace("%1", $Path)
+    return Start-Process `
+        -FilePath $Application.ExecutablePath `
+        -WorkingDirectory $Application.InstallLocation `
+        -ArgumentList $arguments `
+        -PassThru
+}
+
 try {
     if (-not $SkipBuild) {
-        & $buildScript -Configuration Debug -SkipRestore -Deploy
+        & $buildScript -Configuration Debug -SkipRestore -Publish
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
@@ -52,21 +91,14 @@ try {
         throw "Close existing Excalidraw Desktop processes before running the file activation smoke test."
     }
 
-    $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $package) {
-        throw "The Excalidraw Desktop development package is not registered."
-    }
+    $package = Get-DesktopTestApplication
 
-    $manifest = Get-AppxPackageManifest $package
-    $association = $manifest.Package.Applications.Application.Extensions.Extension |
-        Where-Object { $_.Category -eq "windows.fileTypeAssociation" } |
-        Select-Object -First 1
-    if (-not $association -or
-        $association.FileTypeAssociation.SupportedFileTypes.FileType -notcontains ".excalidraw") {
-        throw "The registered package does not declare the .excalidraw association."
-    }
+    # A portable app registers its per-user file association on first launch.
+    $registrationProcess = Start-DesktopTestApplication -Application $package
+    Wait-ForTitle -Process $registrationProcess -Prefix "Excalidraw Desktop"
+    Stop-DesktopTestProcess -Process $registrationProcess
+    $registeredArguments = Get-RegisteredFileActivationArguments `
+        -Application $package
 
     $installRoot = [System.IO.Path]::GetFullPath($package.InstallLocation).TrimEnd('\') + '\'
     $firstPath = Join-Path $package.InstallLocation "activation-one.excalidraw"
@@ -76,7 +108,7 @@ try {
     foreach ($path in @($firstPath, $secondPath, $requestPath, $statePath)) {
         $resolved = [System.IO.Path]::GetFullPath($path)
         if (-not $resolved.StartsWith($installRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "A file activation smoke path escaped the package directory: $resolved"
+            throw "A file activation smoke path escaped the application directory: $resolved"
         }
         $generatedPaths.Add($resolved)
     }
@@ -86,25 +118,22 @@ try {
     [System.IO.File]::WriteAllText($secondPath, $drawing)
     [System.IO.File]::WriteAllText($requestPath, "run")
 
-    Start-Process -FilePath $firstPath
-    $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    while ([DateTime]::UtcNow -lt $deadlineUtc -and -not $startedProcess) {
-        $startedProcess = Get-Process -Name "ExcalidrawDesktop" -ErrorAction SilentlyContinue |
-            Sort-Object StartTime |
-            Select-Object -First 1
-        if (-not $startedProcess) {
-            Start-Sleep -Milliseconds 250
-        }
-    }
-    if (-not $startedProcess) {
-        throw "Windows did not launch Excalidraw Desktop for the associated file."
-    }
+    $startedProcess = Start-RegisteredFileActivation `
+        -Application $package `
+        -RegisteredArguments $registeredArguments `
+        -Path $firstPath
     Wait-ForTitle -Process $startedProcess -Prefix "activation-one.excalidraw"
 
-    Start-Process -FilePath $secondPath
+    $null = Start-RegisteredFileActivation `
+        -Application $package `
+        -RegisteredArguments $registeredArguments `
+        -Path $secondPath
     Wait-ForTitle -Process $startedProcess -Prefix "activation-two.excalidraw"
 
-    Start-Process -FilePath $firstPath
+    $null = Start-RegisteredFileActivation `
+        -Application $package `
+        -RegisteredArguments $registeredArguments `
+        -Path $firstPath
     Wait-ForTitle -Process $startedProcess -Prefix "activation-one.excalidraw"
 
     $root = [System.Windows.Automation.AutomationElement]::FromHandle(

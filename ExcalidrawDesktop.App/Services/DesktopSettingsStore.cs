@@ -1,51 +1,80 @@
 using ExcalidrawDesktop.App.Models;
-using Windows.Storage;
+using System.Text.Json;
 
 namespace ExcalidrawDesktop.App.Services;
 
 internal sealed class DesktopSettingsStore
 {
-    private const string ThemeKey = "Settings.Theme";
-    private const string ReopenSavedTabsKey = "Settings.ReopenSavedTabs";
-    private const string SaveDirtyDrawingsOnCloseKey =
-        "Settings.SaveDirtyDrawingsOnClose";
-    private const string SuspendInactiveTabsKey = "Settings.SuspendInactiveTabs";
-    private const string UnloadInactiveTabsKey = "Settings.UnloadInactiveTabs";
-    private const string LanguageKey = "Settings.Language";
+    private const int CurrentVersion = 1;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true,
+    };
 
-    private readonly ApplicationDataContainer values =
-        ApplicationData.Current.LocalSettings;
+    private readonly string settingsPath;
+
+    public DesktopSettingsStore(string? settingsPath = null)
+    {
+        this.settingsPath = settingsPath ?? DesktopPaths.SettingsPath;
+    }
 
     public DesktopPreferences Load()
     {
-        var defaults = DesktopPreferences.Default;
-        var theme = values.Values[ThemeKey] is string themeValue &&
-            Enum.TryParse<DesktopThemePreference>(themeValue, ignoreCase: true, out var parsed)
-                ? parsed
-                : defaults.Theme;
-        return new DesktopPreferences(
-            theme,
-            ReadBoolean(ReopenSavedTabsKey, defaults.ReopenSavedTabs),
-            ReadBoolean(
-                SaveDirtyDrawingsOnCloseKey,
-                defaults.SaveDirtyDrawingsOnClose),
-            ReadBoolean(SuspendInactiveTabsKey, defaults.SuspendInactiveTabs),
-            ReadBoolean(UnloadInactiveTabsKey, defaults.UnloadInactiveTabs),
-            ExcalidrawDesktop.Core.DesktopLanguages.NormalizePreference(
-                values.Values[LanguageKey] as string));
+        try
+        {
+            if (!File.Exists(settingsPath))
+            {
+                return DesktopPreferences.Default;
+            }
+
+            var document = JsonSerializer.Deserialize<SettingsDocument>(
+                File.ReadAllText(settingsPath),
+                JsonOptions);
+            if (document is not { Version: CurrentVersion } ||
+                document.Preferences is not { } preferences)
+            {
+                return DesktopPreferences.Default;
+            }
+
+            return preferences with
+            {
+                Language = ExcalidrawDesktop.Core.DesktopLanguages
+                    .NormalizePreference(preferences.Language),
+            };
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            DiagnosticLogService.Error("settings.load_failed", exception);
+            return DesktopPreferences.Default;
+        }
     }
 
     public void Save(DesktopPreferences preferences)
     {
-        values.Values[ThemeKey] = preferences.Theme.ToString();
-        values.Values[ReopenSavedTabsKey] = preferences.ReopenSavedTabs;
-        values.Values[SaveDirtyDrawingsOnCloseKey] =
-            preferences.SaveDirtyDrawingsOnClose;
-        values.Values[SuspendInactiveTabsKey] = preferences.SuspendInactiveTabs;
-        values.Values[UnloadInactiveTabsKey] = preferences.UnloadInactiveTabs;
-        values.Values[LanguageKey] = preferences.Language;
+        var directory = Path.GetDirectoryName(settingsPath)!;
+        Directory.CreateDirectory(directory);
+        var temporaryPath = settingsPath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(
+                temporaryPath,
+                JsonSerializer.Serialize(
+                    new SettingsDocument(CurrentVersion, preferences),
+                    JsonOptions));
+            File.Move(temporaryPath, settingsPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
     }
 
-    private bool ReadBoolean(string key, bool fallback) =>
-        values.Values[key] is bool value ? value : fallback;
+    private sealed record SettingsDocument(
+        int Version,
+        DesktopPreferences Preferences);
 }

@@ -12,6 +12,7 @@ $ErrorActionPreference = "Stop"
 $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
+. (Join-Path $testRoot "SmokeTestCommon.ps1")
 $startedProcess = $null
 $requestPath = $null
 $statePath = $null
@@ -19,36 +20,6 @@ $statePath = $null
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
-
-[ComImport]
-[Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
-internal class MultiWindowApplicationActivationManager {}
-
-[ComImport]
-[Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IMultiWindowApplicationActivationManager
-{
-    int ActivateApplication(
-        [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-        [MarshalAs(UnmanagedType.LPWStr)] string arguments,
-        uint options,
-        out uint processId);
-    int ActivateForFile(string appUserModelId, IntPtr itemArray, string verb, out uint processId);
-    int ActivateForProtocol(string appUserModelId, IntPtr itemArray, out uint processId);
-}
-
-public static class MultiWindowPackagedAppActivator
-{
-    public static uint Activate(string appUserModelId)
-    {
-        var manager = (IMultiWindowApplicationActivationManager)
-            new MultiWindowApplicationActivationManager();
-        var result = manager.ActivateApplication(appUserModelId, "", 0, out var processId);
-        Marshal.ThrowExceptionForHR(result);
-        return processId;
-    }
-}
 
 public static class MultiWindowProcessWindows
 {
@@ -86,9 +57,9 @@ public static class MultiWindowProcessWindows
 
 try {
     if (-not $SkipBuild) {
-        & $buildScript -Configuration Debug -SkipRestore -Deploy
+        & $buildScript -Configuration Debug -SkipRestore -Publish
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
@@ -96,12 +67,7 @@ try {
         throw "Close existing Excalidraw Desktop processes before running the multi-window smoke test."
     }
 
-    $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $package -or [string]::IsNullOrWhiteSpace($package.InstallLocation)) {
-        throw "The Excalidraw Desktop development package is not registered correctly."
-    }
+    $package = Get-DesktopTestApplication
 
     $requestPath = Join-Path $package.InstallLocation "multi-window-smoke.request"
     $statePath = Join-Path $package.InstallLocation "multi-window-smoke-state.json"
@@ -109,9 +75,7 @@ try {
         [System.IO.File]::Delete($statePath)
     }
     [System.IO.File]::WriteAllText($requestPath, "run")
-    $applicationId = "$($package.PackageFamilyName)!App"
-    $processId = [MultiWindowPackagedAppActivator]::Activate($applicationId)
-    $startedProcess = Get-Process -Id $processId
+    $startedProcess = Start-DesktopTestApplication -Application $package
     $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 
     while ([DateTime]::UtcNow -lt $deadlineUtc) {

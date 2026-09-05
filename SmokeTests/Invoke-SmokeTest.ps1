@@ -18,6 +18,7 @@ $testStartedUtc = [DateTime]::UtcNow
 $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
+. (Join-Path $testRoot "SmokeTestCommon.ps1")
 $nativeRoot = Join-Path $repositoryRoot "ExcalidrawDesktop.App"
 $expectedBuildRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $nativeRoot "bin\x64\$Configuration"))
@@ -59,7 +60,7 @@ try {
     if (-not $SkipBuild) {
         $buildArguments = @{
             Configuration = $Configuration
-            Deploy = $true
+            Publish = $true
         }
         if (-not $Restore) {
             $buildArguments.SkipRestore = $true
@@ -67,22 +68,17 @@ try {
 
         & $buildScript @buildArguments
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
-    $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $package) {
-        throw "The Excalidraw Desktop development package is not registered. Run without -SkipBuild."
-    }
+    $package = Get-DesktopTestApplication -Configuration $Configuration
 
     $installLocation = [System.IO.Path]::GetFullPath($package.InstallLocation)
     if (-not $installLocation.StartsWith(
         $expectedBuildRoot,
         [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "The registered package points outside this build tree: $installLocation"
+        throw "The unpackaged application points outside this build tree: $installLocation"
     }
 
     $existingProcesses = @(Get-Process -Name "ExcalidrawDesktop" -ErrorAction SilentlyContinue)
@@ -98,10 +94,7 @@ try {
     }
     [System.IO.File]::WriteAllText($requestPath, "run")
 
-    Start-Process `
-        -FilePath "explorer.exe" `
-        -ArgumentList "shell:AppsFolder\$($package.PackageFamilyName)!App" `
-        -WindowStyle Hidden
+    $startedProcess = Start-DesktopTestApplication -Application $package
 
     $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     while ([DateTime]::UtcNow -lt $deadlineUtc) {
@@ -127,7 +120,7 @@ try {
                     [pscustomobject]@{
                         Result = "Passed"
                         ProcessId = $startedProcess.Id
-                        Package = $package.PackageFullName
+                        Deployment = "Unpackaged"
                         InstallLocation = $installLocation
                         ReadyTitle = $startedProcess.MainWindowTitle
                         ElapsedMilliseconds = [Math]::Round($elapsed.TotalMilliseconds)

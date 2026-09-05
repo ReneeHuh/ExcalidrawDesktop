@@ -12,48 +12,15 @@ $ErrorActionPreference = "Stop"
 $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
+. (Join-Path $testRoot "SmokeTestCommon.ps1")
 $startedProcess = $null
 $requestPath = $null
 $statePath = $null
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-
-[ComImport]
-[Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
-internal class ApplicationActivationManager {}
-
-[ComImport]
-[Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IApplicationActivationManager
-{
-    int ActivateApplication(
-        [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-        [MarshalAs(UnmanagedType.LPWStr)] string arguments,
-        uint options,
-        out uint processId);
-    int ActivateForFile(string appUserModelId, IntPtr itemArray, string verb, out uint processId);
-    int ActivateForProtocol(string appUserModelId, IntPtr itemArray, out uint processId);
-}
-
-public static class PackagedAppActivator
-{
-    public static uint Activate(string appUserModelId, string arguments)
-    {
-        var manager = (IApplicationActivationManager)new ApplicationActivationManager();
-        var result = manager.ActivateApplication(appUserModelId, arguments, 0, out var processId);
-        Marshal.ThrowExceptionForHR(result);
-        return processId;
-    }
-}
-"@
-
 try {
     if (-not $SkipBuild) {
-        & $buildScript -Configuration Debug -SkipRestore -Deploy
+        & $buildScript -Configuration Debug -SkipRestore -Publish
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
@@ -62,22 +29,16 @@ try {
         throw "Close existing Excalidraw Desktop processes before running the tab smoke test."
     }
 
-    $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $package) {
-        throw "The Excalidraw Desktop development package is not registered."
-    }
-
-    $applicationId = "$($package.PackageFamilyName)!App"
+    $package = Get-DesktopTestApplication
     $requestPath = Join-Path $package.InstallLocation "tab-smoke.request"
     $statePath = Join-Path $package.InstallLocation "tab-smoke-state.json"
     if ([System.IO.File]::Exists($statePath)) {
         [System.IO.File]::Delete($statePath)
     }
     [System.IO.File]::WriteAllText($requestPath, "run")
-    $processId = [PackagedAppActivator]::Activate($applicationId, "--tab-smoke")
-    $startedProcess = Get-Process -Id $processId
+    $startedProcess = Start-DesktopTestApplication `
+        -Application $package `
+        -Arguments "--tab-smoke"
     $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 
     while ([DateTime]::UtcNow -lt $deadlineUtc) {
@@ -89,7 +50,7 @@ try {
         if ($startedProcess.MainWindowTitle.StartsWith(
                 "Excalidraw Desktop — Tab smoke failed",
                 [System.StringComparison]::Ordinal)) {
-            throw "The packaged tab isolation check failed. $($startedProcess.MainWindowTitle)"
+            throw "The unpackaged tab isolation check failed. $($startedProcess.MainWindowTitle)"
         }
 
         if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Tab smoke passed") {
@@ -111,7 +72,7 @@ try {
         Start-Sleep -Milliseconds 250
     }
 
-    throw "Timed out waiting for the packaged tab isolation check. Last title: $($startedProcess.MainWindowTitle)"
+    throw "Timed out waiting for the unpackaged tab isolation check. Last title: $($startedProcess.MainWindowTitle)"
 }
 finally {
     if ($requestPath -and [System.IO.File]::Exists($requestPath)) {

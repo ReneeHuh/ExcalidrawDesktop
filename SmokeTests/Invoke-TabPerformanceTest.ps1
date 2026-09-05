@@ -19,6 +19,7 @@ $ErrorActionPreference = "Stop"
 $testRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $testRoot
 $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
+. (Join-Path $testRoot "SmokeTestCommon.ps1")
 if ($SuspendInactiveTabs -and $UnloadInactiveTabs) {
     throw "Choose either -SuspendInactiveTabs or -UnloadInactiveTabs, not both."
 }
@@ -66,45 +67,11 @@ function Get-ProcessTreeMetrics {
     }
 }
 
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-
-[ComImport]
-[Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
-internal class ApplicationActivationManager {}
-
-[ComImport]
-[Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IApplicationActivationManager
-{
-    int ActivateApplication(
-        [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-        [MarshalAs(UnmanagedType.LPWStr)] string arguments,
-        uint options,
-        out uint processId);
-    int ActivateForFile(string appUserModelId, IntPtr itemArray, string verb, out uint processId);
-    int ActivateForProtocol(string appUserModelId, IntPtr itemArray, out uint processId);
-}
-
-public static class PerformancePackagedAppActivator
-{
-    public static uint Activate(string appUserModelId)
-    {
-        var manager = (IApplicationActivationManager)new ApplicationActivationManager();
-        var result = manager.ActivateApplication(appUserModelId, "", 0, out var processId);
-        Marshal.ThrowExceptionForHR(result);
-        return processId;
-    }
-}
-"@
-
 try {
     if (-not $SkipBuild) {
-        & $buildScript -Configuration Debug -SkipRestore -Deploy
+        & $buildScript -Configuration Debug -SkipRestore -Publish
         if ($LASTEXITCODE -ne 0) {
-            throw "The desktop build/deploy command failed with exit code $LASTEXITCODE."
+            throw "The desktop build/publish command failed with exit code $LASTEXITCODE."
         }
     }
 
@@ -112,14 +79,8 @@ try {
         throw "Close existing Excalidraw Desktop processes before running the performance test."
     }
 
-    $package = Get-AppxPackage -Name "ExcalidrawDesktop.Development" |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $package) {
-        throw "The Excalidraw Desktop development package is not registered."
-    }
+    $package = Get-DesktopTestApplication
 
-    $applicationId = "$($package.PackageFamilyName)!App"
     $requestPath = Join-Path $package.InstallLocation "performance-smoke.request"
     $resultPath = Join-Path $package.InstallLocation "performance-smoke-result.json"
     $statePath = Join-Path $package.InstallLocation "performance-smoke-state.json"
@@ -142,8 +103,7 @@ try {
         }
         [System.IO.File]::WriteAllText($requestPath, $request)
         $launchStarted = [System.Diagnostics.Stopwatch]::StartNew()
-        $processId = [PerformancePackagedAppActivator]::Activate($applicationId)
-        $startedProcess = Get-Process -Id $processId
+        $startedProcess = Start-DesktopTestApplication -Application $package
         $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 
         while ([DateTime]::UtcNow -lt $deadlineUtc) {
@@ -152,7 +112,7 @@ try {
                 throw "Excalidraw Desktop exited during the $tabCount-tab run."
             }
             if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Performance smoke failed") {
-                throw "The packaged $tabCount-tab performance run failed."
+                throw "The unpackaged $tabCount-tab performance run failed."
             }
             if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Performance smoke passed" -and
                 [System.IO.File]::Exists($resultPath)) {
@@ -187,15 +147,15 @@ try {
         recordedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
         machine = $env:COMPUTERNAME
         osVersion = [System.Environment]::OSVersion.VersionString
-        packageVersion = $package.Version.ToString()
+        applicationVersion = $package.Version
         configuration = if ($UnloadInactiveTabs) {
-            "Debug x64 packaged; inactive clean editors unloaded"
+            "Debug x64 unpackaged; inactive clean editors unloaded"
         }
         elseif ($SuspendInactiveTabs) {
-            "Debug x64 packaged; inactive clean tabs suspended"
+            "Debug x64 unpackaged; inactive clean tabs suspended"
         }
         else {
-            "Debug x64 packaged; all tabs live"
+            "Debug x64 unpackaged; all tabs live"
         }
         measurements = $measurements
     }

@@ -49,8 +49,10 @@ public partial class App : Application
         startupPreferences = preferences;
         DesktopLanguageStartup.ApplyBeforeXaml(startupPreferences.Language);
         DesktopResources.ConfigureLanguage(
-            Windows.Globalization.ApplicationLanguages.Languages.FirstOrDefault() ??
-            DesktopLanguageStartup.ResolveEffective(startupPreferences.Language).WinUiTag);
+            Microsoft.Windows.Globalization.ApplicationLanguages.Languages
+                .FirstOrDefault() ??
+            DesktopLanguageStartup.ResolveEffective(
+                startupPreferences.Language).WinUiTag);
         InitializeComponent();
     }
 
@@ -96,6 +98,7 @@ public partial class App : Application
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         DiagnosticLogService.Info("application.launch_requested");
+        EnsureFileTypeRegistration();
         var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
         var mainInstance = AppInstance.FindOrRegisterForKey("main");
         if (!mainInstance.IsCurrent)
@@ -402,6 +405,36 @@ public partial class App : Application
         return path is not null && File.Exists(path)
                 ? [path]
                 : [];
+    }
+
+    private static void EnsureFileTypeRegistration()
+    {
+        try
+        {
+            var executablePath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executablePath))
+            {
+                return;
+            }
+
+            ActivationRegistrationManager.RegisterForFileTypeActivation(
+                [".excalidraw"],
+                $"{executablePath},0",
+                DesktopResources.Get(
+                    "ExcalidrawFileTypeDisplayName",
+                    "Excalidraw drawing"),
+                ["open"],
+                executablePath);
+            DiagnosticLogService.Info("application.file_type_registered");
+        }
+        catch (Exception exception)
+        {
+            // File association repair is best effort and must never block the
+            // editor from opening directly or accepting command-line paths.
+            DiagnosticLogService.Error(
+                "application.file_type_registration_failed",
+                exception);
+        }
     }
 
 #if DEBUG

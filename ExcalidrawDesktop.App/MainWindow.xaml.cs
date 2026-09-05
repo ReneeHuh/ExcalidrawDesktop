@@ -30,6 +30,8 @@ public sealed partial class MainWindow : Window
         "https://developer.microsoft.com/en-us/microsoft-edge/webview2/";
     private static readonly TimeSpan ExitActivationTimeout =
         TimeSpan.FromSeconds(3);
+    private static readonly object WebViewEnvironmentLock = new();
+    private static Task<CoreWebView2Environment>? webViewEnvironmentTask;
 
     private readonly string webAssetPath = Path.Combine(
         AppContext.BaseDirectory,
@@ -144,9 +146,8 @@ public sealed partial class MainWindow : Window
             SettingsButton,
             DesktopResources.Get("SettingsButtonToolTip", "Show Settings tab"));
         InitializeTitleBar();
-        var effectiveWorkspaceStatePath = workspaceStatePath ?? Path.Combine(
-                Windows.Storage.ApplicationData.Current.LocalFolder.Path,
-                "workspace-state.json");
+        var effectiveWorkspaceStatePath =
+            workspaceStatePath ?? DesktopPaths.WorkspaceStatePath;
         recoverySnapshotStore = new RecoverySnapshotStore(Path.Combine(
             Path.GetDirectoryName(effectiveWorkspaceStatePath)!,
             $"{Path.GetFileNameWithoutExtension(effectiveWorkspaceStatePath)}.recovery"));
@@ -1176,7 +1177,8 @@ public sealed partial class MainWindow : Window
                     entryPointPath);
             }
 
-            await webView.EnsureCoreWebView2Async();
+            var webViewEnvironment = GetWebViewEnvironment();
+            await webView.EnsureCoreWebView2Async(await webViewEnvironment);
             ConfigureWebView(session, webView.CoreWebView2);
             var entryPoint = runTabSmoke || runMultiWindowSmoke || runSuspensionSmoke ||
                 runRecoverySmoke || verifyRecoverySmoke ||
@@ -1214,6 +1216,24 @@ public sealed partial class MainWindow : Window
         {
             session.IsInitializing = false;
         }
+    }
+
+    private static Task<CoreWebView2Environment> GetWebViewEnvironment()
+    {
+        lock (WebViewEnvironmentLock)
+        {
+            return webViewEnvironmentTask ??=
+                CreateWebViewEnvironmentAsync();
+        }
+    }
+
+    private static async Task<CoreWebView2Environment>
+        CreateWebViewEnvironmentAsync()
+    {
+        return await CoreWebView2Environment.CreateWithOptionsAsync(
+            null,
+            DesktopPaths.WebView2DataDirectory,
+            new CoreWebView2EnvironmentOptions());
     }
 
     private void ConfigureWebView(DocumentSession session, CoreWebView2 coreWebView)

@@ -17,10 +17,8 @@ internal static class DiagnosticLogService
     private static long sequence;
     private static bool initialized;
 
-    public static string DirectoryPath { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "ExcalidrawDesktop",
-        "Diagnostics");
+    public static string DirectoryPath { get; } =
+        DesktopPaths.DiagnosticsDirectory;
 
     private static string CurrentLogPath => Path.Combine(
         DirectoryPath,
