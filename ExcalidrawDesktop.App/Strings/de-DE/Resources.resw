@@ -175,4 +175,7 @@
   <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>Diese Zeichnung ist bereits in einem anderen Tab geöffnet. Wähle einen anderen Dateinamen.</value></data>
   <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>Die Zeichnung konnte nicht auf den Datenträger geschrieben werden.</value></data>
   <data name="DocumentInvalidMessage" xml:space="preserve"><value>Die ausgewählte Datei ist keine gültige Excalidraw-Zeichnung.</value></data>
+  <data name="EditorRetryFailed" xml:space="preserve"><value>Zeichnung konnte nicht wiederhergestellt werden</value></data>
+  <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>Die Wiederherstellungsdaten dieser ungespeicherten Zeichnung fehlen oder sind nicht lesbar. Es wurde keine Zeichnungsdatei geändert.</value></data>
+  <data name="EditorRetryFileGuidance" xml:space="preserve"><value>Versuchen Sie es erneut oder öffnen Sie die Zeichnungsdatei erneut. Es wurde keine Zeichnungsdatei geändert.</value></data>
 </root>

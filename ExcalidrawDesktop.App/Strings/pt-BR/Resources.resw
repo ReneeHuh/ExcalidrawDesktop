@@ -175,4 +175,7 @@
   <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>Esse desenho já está aberto em outra guia. Escolha outro nome de arquivo.</value></data>
   <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>Não foi possível gravar o desenho no disco.</value></data>
   <data name="DocumentInvalidMessage" xml:space="preserve"><value>O arquivo selecionado não é um desenho válido do Excalidraw.</value></data>
+  <data name="EditorRetryFailed" xml:space="preserve"><value>Não foi possível restaurar o desenho</value></data>
+  <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>Os dados de recuperação deste desenho não salvo estão ausentes ou não podem ser lidos. Nenhum arquivo de desenho foi alterado.</value></data>
+  <data name="EditorRetryFileGuidance" xml:space="preserve"><value>Tente novamente ou reabra o arquivo do desenho. Nenhum arquivo de desenho foi alterado.</value></data>
 </root>

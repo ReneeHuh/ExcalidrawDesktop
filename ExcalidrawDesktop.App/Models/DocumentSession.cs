@@ -2,6 +2,7 @@ using ExcalidrawDesktop.Core;
 using ExcalidrawDesktop.App.Controls;
 using ExcalidrawDesktop.App.Services;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 using Windows.Storage;
@@ -58,6 +59,8 @@ internal sealed class DocumentSession : IDisposable
 
     public bool IsInitializing { get; set; }
 
+    public bool IsRetrying { get; set; }
+
     public bool IsSuspended { get; set; }
 
     public bool IsSuspensionChanging { get; set; }
@@ -103,6 +106,35 @@ internal sealed class DocumentSession : IDisposable
     public BridgeDispatcher Dispatcher { get; set; } = null!;
 
     public CoreWebView2? CoreWebView { get; set; }
+
+    /// <summary>
+    /// Posts a host-to-editor message. Returns false instead of throwing when
+    /// the editor has no CoreWebView2 yet, or the CoreWebView2 is closed,
+    /// crashed, or mid lifecycle transition (HRESULT 0x8007139F). Every
+    /// outbound editor message goes through here so the tolerance is uniform.
+    /// </summary>
+    public bool TryPostEditorMessage(string json)
+    {
+        if (CoreWebView is not { } coreWebView)
+        {
+            return false;
+        }
+
+        try
+        {
+            coreWebView.PostWebMessageAsJson(json);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is COMException or
+            ObjectDisposedException or
+            InvalidOperationException)
+        {
+            Debug.WriteLine(
+                $"Editor message dropped ({exception.GetType().Name} 0x{exception.HResult:X8}): {exception.Message}");
+            return false;
+        }
+    }
 
     public Action? DetachWebViewHandlers { get; set; }
 
@@ -214,11 +246,6 @@ internal sealed class DocumentSession : IDisposable
         }
     }
 }
-
-internal sealed record PendingEditorLoad(
-    string FileName,
-    string Content,
-    bool IsRecovery);
 
 internal sealed record PendingImageExport(
     Guid ExportId,

@@ -128,6 +128,10 @@ export class DesktopBridge {
     this.notify("document.recovered", undefined);
   }
 
+  public notifyDocumentLoadFailed() {
+    this.notify("document.loadFailed", undefined);
+  }
+
   public notifyRecoverySnapshot(content: string) {
     this.notify("document.recoverySnapshot", { content });
   }
@@ -266,7 +270,7 @@ export class DesktopBridge {
       );
     }
 
-    const requestId = crypto.randomUUID();
+    const requestId = this.ownerWindow.crypto.randomUUID();
     const response = new Promise<BridgeRequestMap[Method]["response"]>(
       (resolve, reject) => {
         const pendingRequest: PendingRequest = {
@@ -310,7 +314,7 @@ export class DesktopBridge {
     this.transport?.postMessage({
       version: 1,
       kind: "event",
-      requestId: crypto.randomUUID(),
+      requestId: this.ownerWindow.crypto.randomUUID(),
       method,
       ...(payload === undefined ? {} : { payload }),
     });

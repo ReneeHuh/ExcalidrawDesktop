@@ -28,6 +28,7 @@ const createBridge = () => {
   const ownerWindow = {
     chrome: { webview: transport },
     document: window.document,
+    crypto: window.crypto,
     setTimeout: window.setTimeout.bind(window),
     clearTimeout: window.clearTimeout.bind(window),
   } as unknown as Window;
@@ -313,6 +314,7 @@ describe("DesktopBridge", () => {
     bridge.notifyCloseCancelled();
     bridge.notifyLanguageApplied("ar-SA", "rtl");
     bridge.notifyDocumentRecovered();
+    bridge.notifyDocumentLoadFailed();
     bridge.notifyRecoverySnapshot("snapshot");
 
     expect(transport.posted).toMatchObject([
@@ -331,6 +333,7 @@ describe("DesktopBridge", () => {
         payload: { langCode: "ar-SA", direction: "rtl" },
       },
       { kind: "event", method: "document.recovered" },
+      { kind: "event", method: "document.loadFailed" },
       {
         kind: "event",
         method: "document.recoverySnapshot",

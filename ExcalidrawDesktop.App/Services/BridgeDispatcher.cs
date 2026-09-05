@@ -14,6 +14,7 @@ public sealed class BridgeDispatcher
     private readonly Action documentCreated;
     private readonly Action<string> documentOpened;
     private readonly Action documentRecovered;
+    private readonly Action? documentLoadFailed;
     private readonly Func<string, Task> recoverySnapshotReceived;
     private readonly Action externalConflictDetected;
     private readonly Action closeCancelled;
@@ -40,7 +41,8 @@ public sealed class BridgeDispatcher
         Action closeTabRequested,
         Action<bool> selectAdjacentTabRequested,
         Action<Guid, string> imageExportFailed,
-        Action<string, string>? languageApplied = null)
+        Action<string, string>? languageApplied = null,
+        Action? documentLoadFailed = null)
     {
         this.documentService = documentService;
         this.appReady = appReady;
@@ -58,6 +60,7 @@ public sealed class BridgeDispatcher
         this.selectAdjacentTabRequested = selectAdjacentTabRequested;
         this.imageExportFailed = imageExportFailed;
         this.languageApplied = languageApplied;
+        this.documentLoadFailed = documentLoadFailed;
     }
 
     public async Task DispatchAsync(CoreWebView2 webView, BridgeMessage message)
@@ -86,17 +89,19 @@ public sealed class BridgeDispatcher
                     "BridgeMethodNotFound",
                     "The requested desktop bridge method is not available."),
             };
-            webView.PostWebMessageAsJson(BridgeResponseJson.Success(message, response));
+            TryPostResponse(webView, BridgeResponseJson.Success(message, response));
         }
         catch (BridgeProtocolException exception)
         {
-            webView.PostWebMessageAsJson(
+            TryPostResponse(
+                webView,
                 BridgeResponseJson.Error(message, exception.Code, exception.Message));
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            webView.PostWebMessageAsJson(
+            TryPostResponse(
+                webView,
                 BridgeResponseJson.Error(
                     message,
                     "InternalError",
@@ -104,8 +109,42 @@ public sealed class BridgeDispatcher
         }
     }
 
+    /// <summary>
+    /// Posts a bridge response, tolerating a CoreWebView2 that was closed or
+    /// crashed while the request was in flight. The editor session surfaces
+    /// that failure through its own lifecycle handling; the dispatcher must
+    /// not let it escape into the async void message handler.
+    /// </summary>
+    private static bool TryPostResponse(CoreWebView2 webView, string json)
+    {
+        try
+        {
+            webView.PostWebMessageAsJson(json);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is System.Runtime.InteropServices.COMException or
+            ObjectDisposedException or
+            InvalidOperationException)
+        {
+            Debug.WriteLine($"Bridge response dropped; the editor is no longer reachable: {exception.Message}");
+            DiagnosticLogService.Info("bridge.response_dropped", new
+            {
+                reason = exception.GetType().Name,
+                hresult = exception.HResult,
+            });
+            return false;
+        }
+    }
+
     private async Task DispatchEventAsync(BridgeMessage message)
     {
+        if (message.Method == "document.loadFailed")
+        {
+            documentLoadFailed?.Invoke();
+            return;
+        }
+
         if (message.Method == "app.ready")
         {
             appReady();

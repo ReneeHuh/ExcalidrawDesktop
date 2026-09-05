@@ -51,28 +51,17 @@ internal sealed class DesktopSettingsStore
         }
     }
 
-    public void Save(DesktopPreferences preferences)
-    {
-        var directory = Path.GetDirectoryName(settingsPath)!;
-        Directory.CreateDirectory(directory);
-        var temporaryPath = settingsPath + $".{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllText(
-                temporaryPath,
-                JsonSerializer.Serialize(
-                    new SettingsDocument(CurrentVersion, preferences),
-                    JsonOptions));
-            File.Move(temporaryPath, settingsPath, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
-    }
+    /// <summary>
+    /// Persists the preferences. Throws <see cref="IOException"/> or
+    /// <see cref="UnauthorizedAccessException"/> when the settings file cannot
+    /// be written; callers decide how to surface that.
+    /// </summary>
+    public void Save(DesktopPreferences preferences) =>
+        ExcalidrawDesktop.Core.AtomicFile.WriteAllText(
+            settingsPath,
+            JsonSerializer.Serialize(
+                new SettingsDocument(CurrentVersion, preferences),
+                JsonOptions));
 
     private sealed record SettingsDocument(
         int Version,

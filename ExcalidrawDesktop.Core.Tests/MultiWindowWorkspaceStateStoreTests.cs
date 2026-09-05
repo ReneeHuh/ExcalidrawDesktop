@@ -102,21 +102,24 @@ public sealed class MultiWindowWorkspaceStateStoreTests : IDisposable
     public async Task MigratesVersionTwoIntoOneLogicalWindow()
     {
         var path = Path.Combine(testDirectory, "workspace.json");
-        var legacyStore = new WorkspaceStateStore(path);
         var recoveryId = Guid.NewGuid().ToString("N");
-        await legacyStore.SaveAsync(new WorkspaceState(
-            WorkspaceState.CurrentVersion,
-            new[]
-            {
-                new WorkspaceTabState(
-                    @"C:\Drawings\one.excalidraw",
-                    false,
-                    recoveryId,
-                    "one.excalidraw"),
-            },
-            @"C:\Drawings\one.excalidraw",
-            new[] { @"C:\Drawings\one.excalidraw" },
-            recoveryId));
+        // A legacy single-window file as written by the pre-multi-window store.
+        Directory.CreateDirectory(testDirectory);
+        await File.WriteAllTextAsync(
+            path,
+            System.Text.Json.JsonSerializer.Serialize(new WorkspaceState(
+                WorkspaceState.CurrentVersion,
+                new[]
+                {
+                    new WorkspaceTabState(
+                        @"C:\Drawings\one.excalidraw",
+                        false,
+                        recoveryId,
+                        "one.excalidraw"),
+                },
+                @"C:\Drawings\one.excalidraw",
+                new[] { @"C:\Drawings\one.excalidraw" },
+                recoveryId)));
 
         var migrated = await new MultiWindowWorkspaceStateStore(path).LoadAsync();
 

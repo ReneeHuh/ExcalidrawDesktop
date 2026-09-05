@@ -98,7 +98,6 @@ public partial class App : Application
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         DiagnosticLogService.Info("application.launch_requested");
-        EnsureFileTypeRegistration();
         var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
         var mainInstance = AppInstance.FindOrRegisterForKey("main");
         if (!mainInstance.IsCurrent)
@@ -109,223 +108,22 @@ public partial class App : Application
             return;
         }
 
+        // Only the surviving main instance repairs file associations; a
+        // redirected launch must not touch the registry on its way out.
+        EnsureFileTypeRegistration();
         dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         mainInstance.Activated += OnInstanceActivated;
-#if DEBUG
-        var tabSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "tab-smoke.request");
-        var runTabSmoke = args.Arguments.Contains(
-                "--tab-smoke",
-                StringComparison.Ordinal) ||
-            Environment.GetCommandLineArgs().Any(argument =>
-                string.Equals(argument, "--tab-smoke", StringComparison.Ordinal)) ||
-            File.Exists(tabSmokeRequestPath);
-        if (File.Exists(tabSmokeRequestPath))
-        {
-            File.Delete(tabSmokeRequestPath);
-        }
-        var workspaceSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "workspace-smoke.request");
-        var startupSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "startup-smoke.request");
-        var recoverySmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "recovery-smoke.request");
-        var recoveryRestoreRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "recovery-restore.request");
-        var fileActivationSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "file-activation-smoke.request");
-        var titleBarSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "titlebar-smoke.request");
-        var multiWindowSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "multi-window-smoke.request");
-        var multiWindowExitSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "multi-window-exit-smoke.request");
-        var multiWindowDirtyExitSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "multi-window-dirty-exit-smoke.request");
-        var performanceSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "performance-smoke.request");
-        var suspensionSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "suspension-smoke.request");
-        var imageExportSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "image-export-smoke.request");
-        var documentSafetySmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "document-safety-smoke.request");
-        var closeDecisionsSmokeRequestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "close-decisions-smoke.request");
-        var runRecoverySmoke = File.Exists(recoverySmokeRequestPath);
-        var verifyRecoverySmoke = File.Exists(recoveryRestoreRequestPath);
-        var runTitleBarSmoke = File.Exists(titleBarSmokeRequestPath);
-        var runMultiWindowSmoke = File.Exists(multiWindowSmokeRequestPath);
-        var runMultiWindowExitSmoke = File.Exists(multiWindowExitSmokeRequestPath);
-        var runMultiWindowDirtyExitSmoke = File.Exists(
-            multiWindowDirtyExitSmokeRequestPath);
-        var performanceTabCount = ReadPerformanceTabCount(
-            performanceSmokeRequestPath);
-        var performanceSuspendInactive = ReadPerformanceSuspendMode(
-            performanceSmokeRequestPath);
-        var performanceUnloadInactive = ReadPerformanceUnloadMode(
-            performanceSmokeRequestPath);
-        var runSuspensionSmoke = File.Exists(suspensionSmokeRequestPath);
-        var runImageExportSmoke = File.Exists(imageExportSmokeRequestPath);
-        var runDocumentSafetySmoke = File.Exists(documentSafetySmokeRequestPath);
-        var runCloseDecisionsSmoke = File.Exists(closeDecisionsSmokeRequestPath);
-        var runLocalizationSmoke = localizationSmokeLanguage is not null;
-        string? workspaceStatePath = File.Exists(workspaceSmokeRequestPath)
-            ? Path.Combine(AppContext.BaseDirectory, "workspace-smoke-state.json")
-            : runTabSmoke
-                ? Path.Combine(AppContext.BaseDirectory, "tab-smoke-state.json")
-                : File.Exists(startupSmokeRequestPath)
-                    ? Path.Combine(AppContext.BaseDirectory, "startup-smoke-state.json")
-                    : File.Exists(fileActivationSmokeRequestPath)
-                        ? Path.Combine(AppContext.BaseDirectory, "file-activation-smoke-state.json")
-                    : runTitleBarSmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "titlebar-smoke-state.json")
-                    : runMultiWindowSmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "multi-window-smoke-state.json")
-                    : runMultiWindowExitSmoke || runMultiWindowDirtyExitSmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "multi-window-exit-smoke-state.json")
-                    : performanceTabCount > 0
-                        ? Path.Combine(AppContext.BaseDirectory, "performance-smoke-state.json")
-                    : runSuspensionSmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "suspension-smoke-state.json")
-                    : runImageExportSmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "image-export-smoke-state.json")
-                    : runDocumentSafetySmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "document-safety-smoke-state.json")
-                    : runCloseDecisionsSmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "close-decisions-smoke-state.json")
-                    : runLocalizationSmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "localization-smoke-state.json")
-                    : runRecoverySmoke || verifyRecoverySmoke
-                        ? Path.Combine(AppContext.BaseDirectory, "recovery-smoke-state.json")
-                        : null;
-        if (File.Exists(workspaceSmokeRequestPath))
-        {
-            File.Delete(workspaceSmokeRequestPath);
-        }
-        if (File.Exists(startupSmokeRequestPath))
-        {
-            File.Delete(startupSmokeRequestPath);
-        }
-        if (File.Exists(recoverySmokeRequestPath))
-        {
-            File.Delete(recoverySmokeRequestPath);
-        }
-        if (File.Exists(recoveryRestoreRequestPath))
-        {
-            File.Delete(recoveryRestoreRequestPath);
-        }
-        if (File.Exists(fileActivationSmokeRequestPath))
-        {
-            File.Delete(fileActivationSmokeRequestPath);
-        }
-        if (File.Exists(titleBarSmokeRequestPath))
-        {
-            File.Delete(titleBarSmokeRequestPath);
-        }
-        if (File.Exists(multiWindowSmokeRequestPath))
-        {
-            File.Delete(multiWindowSmokeRequestPath);
-        }
-        if (File.Exists(multiWindowExitSmokeRequestPath))
-        {
-            File.Delete(multiWindowExitSmokeRequestPath);
-        }
-        if (File.Exists(multiWindowDirtyExitSmokeRequestPath))
-        {
-            File.Delete(multiWindowDirtyExitSmokeRequestPath);
-        }
-        if (File.Exists(performanceSmokeRequestPath))
-        {
-            File.Delete(performanceSmokeRequestPath);
-        }
-        if (File.Exists(suspensionSmokeRequestPath))
-        {
-            File.Delete(suspensionSmokeRequestPath);
-        }
-        if (File.Exists(imageExportSmokeRequestPath))
-        {
-            File.Delete(imageExportSmokeRequestPath);
-        }
-        if (File.Exists(documentSafetySmokeRequestPath))
-        {
-            File.Delete(documentSafetySmokeRequestPath);
-        }
-        if (File.Exists(closeDecisionsSmokeRequestPath))
-        {
-            File.Delete(closeDecisionsSmokeRequestPath);
-        }
-        var closeDecisionsSmokeResultPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "close-decisions-smoke.result");
-        if (runCloseDecisionsSmoke && File.Exists(closeDecisionsSmokeResultPath))
-        {
-            File.Delete(closeDecisionsSmokeResultPath);
-        }
-        if (File.Exists(localizationSmokeRequestPath))
-        {
-            File.Delete(localizationSmokeRequestPath);
-        }
-#else
-        const bool runTabSmoke = false;
-        const string? workspaceStatePath = null;
-        const bool runRecoverySmoke = false;
-        const bool verifyRecoverySmoke = false;
-        const bool runTitleBarSmoke = false;
-        const bool runMultiWindowSmoke = false;
-        const bool runMultiWindowExitSmoke = false;
-        const bool runMultiWindowDirtyExitSmoke = false;
-        const int performanceTabCount = 0;
-        const bool performanceSuspendInactive = false;
-        const bool performanceUnloadInactive = false;
-        const bool runSuspensionSmoke = false;
-        const bool runImageExportSmoke = false;
-        const bool runDocumentSafetySmoke = false;
-        const bool runCloseDecisionsSmoke = false;
-        const bool runLocalizationSmoke = false;
-        const string? localizationSmokeLanguage = null;
-#endif
+        var smokeOptions = ResolveSmokeOptions(args.Arguments);
         workspaceCoordinator = new ApplicationWorkspaceCoordinator(
-            workspaceStatePath,
+            smokeOptions.WorkspaceStatePath,
             startupPreferences);
         await workspaceCoordinator.InitializeAsync();
         var restoredWindows = workspaceCoordinator.RestoredWindows;
         var firstRestoredWindow = restoredWindows.FirstOrDefault();
         window = new MainWindow(
             workspaceCoordinator,
-            runTabSmoke,
-            workspaceStatePath,
-            runRecoverySmoke,
-            verifyRecoverySmoke,
-            runTitleBarSmoke,
-            performanceTabCount,
-            runSuspensionSmoke,
-            performanceSuspendInactive,
-            performanceUnloadInactive,
             restoreWorkspace: true,
-            runMultiWindowSmoke: runMultiWindowSmoke,
-            runMultiWindowExitSmoke: runMultiWindowExitSmoke,
-            runMultiWindowDirtyExitSmoke: runMultiWindowDirtyExitSmoke,
-            runImageExportSmoke: runImageExportSmoke,
-            runDocumentSafetySmoke: runDocumentSafetySmoke,
-            runCloseDecisionsSmoke: runCloseDecisionsSmoke,
-            runLocalizationSmoke: runLocalizationSmoke,
-            localizationSmokeLanguage: localizationSmokeLanguage);
+            smokeOptions: smokeOptions);
         workspaceCoordinator.RegisterWindow(window, firstRestoredWindow);
         window.Activate();
         MainWindow? restoredActiveWindow =
@@ -385,17 +183,16 @@ public partial class App : Application
             _ => [],
         };
 
-        var activatedPaths = paths
+        var candidates = paths
             .Concat(includeProcessArguments
                 ? Environment.GetCommandLineArgs().Skip(1)
                 : [])
-            .Where(path => string.Equals(
-                Path.GetExtension(path.Trim('"')),
-                ".excalidraw",
-                StringComparison.OrdinalIgnoreCase))
-            .Select(path => path.Trim().Trim('"'))
-            .Where(File.Exists)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
+            .Select(path => path.Trim().Trim('"'));
+        // SelectSupported canonicalises, filters to .excalidraw, skips
+        // malformed paths and de-duplicates, so the same file passed twice
+        // (relative and absolute, or differently cased) opens once.
+        var activatedPaths = DesktopDropPaths.SelectSupported(candidates)
+            .Where(File.Exists);
         workspaceCoordinator.QueueActivatedFiles(activatedPaths);
     }
 
@@ -407,12 +204,25 @@ public partial class App : Application
                 : [];
     }
 
+    /// <summary>
+    /// Registers the .excalidraw association for this executable once per
+    /// install location and version. The registration writes HKCU keys, so it
+    /// is skipped when a stamp shows the same executable already did it.
+    /// </summary>
     private static void EnsureFileTypeRegistration()
     {
         try
         {
             var executablePath = Environment.ProcessPath;
             if (string.IsNullOrWhiteSpace(executablePath))
+            {
+                return;
+            }
+
+            var version = typeof(App).Assembly.GetName().Version?.ToString() ?? "0";
+            var stamp = $"{executablePath}|{version}";
+            var stampPath = DesktopPaths.FileAssociationStampPath;
+            if (ReadStamp(stampPath) == stamp)
             {
                 return;
             }
@@ -425,6 +235,7 @@ public partial class App : Application
                     "Excalidraw drawing"),
                 ["open"],
                 executablePath);
+            AtomicFile.WriteAllText(stampPath, stamp);
             DiagnosticLogService.Info("application.file_type_registered");
         }
         catch (Exception exception)
@@ -437,31 +248,141 @@ public partial class App : Application
         }
     }
 
-#if DEBUG
-    private static int ReadPerformanceTabCount(string requestPath)
+    private static string? ReadStamp(string stampPath)
     {
-        if (!File.Exists(requestPath))
+        try
         {
-            return 0;
+            return File.Exists(stampPath) ? File.ReadAllText(stampPath) : null;
         }
-
-        var value = File.ReadAllText(requestPath);
-        return int.TryParse(value.Split(':')[0], out var count) &&
-            count is >= 1 and <= 20
-                ? count
-                : 0;
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
-    private static bool ReadPerformanceSuspendMode(string requestPath) =>
-        File.Exists(requestPath) &&
-        File.ReadAllText(requestPath).EndsWith(
-            ":suspend",
-            StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// Consumes the debug smoke-test request files dropped next to the
+    /// executable by the SmokeTests scripts and selects the isolated
+    /// workspace-state file for the active scenario.
+    /// </summary>
+    private DesktopSmokeOptions ResolveSmokeOptions(string launchArguments)
+    {
+#if DEBUG
+        var baseDirectory = AppContext.BaseDirectory;
+        string StatePath(string name) =>
+            Path.Combine(baseDirectory, $"{name}-state.json");
 
-    private static bool ReadPerformanceUnloadMode(string requestPath) =>
-        File.Exists(requestPath) &&
-        File.ReadAllText(requestPath).EndsWith(
-            ":unload",
-            StringComparison.OrdinalIgnoreCase);
+        // Returns whether the request file existed, deleting it so the
+        // scenario runs once. The file content, when present, is returned via
+        // the out parameter for scenarios that carry parameters.
+        bool Consume(string name, out string? content)
+        {
+            var path = Path.Combine(baseDirectory, $"{name}.request");
+            content = null;
+            if (!File.Exists(path))
+            {
+                return false;
+            }
+
+            content = File.ReadAllText(path);
+            File.Delete(path);
+            return true;
+        }
+
+        bool Requested(string name) => Consume(name, out _);
+
+        var runTabSmoke = launchArguments.Contains(
+                "--tab-smoke",
+                StringComparison.Ordinal) ||
+            Environment.GetCommandLineArgs().Any(argument =>
+                string.Equals(argument, "--tab-smoke", StringComparison.Ordinal));
+        runTabSmoke |= Requested("tab-smoke");
+        var runWorkspaceSmoke = Requested("workspace-smoke");
+        var runStartupSmoke = Requested("startup-smoke");
+        var runRecoverySmoke = Requested("recovery-smoke");
+        var verifyRecoverySmoke = Requested("recovery-restore");
+        var runFileActivationSmoke = Requested("file-activation-smoke");
+        var runTitleBarSmoke = Requested("titlebar-smoke");
+        var runMultiWindowSmoke = Requested("multi-window-smoke");
+        var runMultiWindowExitSmoke = Requested("multi-window-exit-smoke");
+        var runMultiWindowDirtyExitSmoke = Requested("multi-window-dirty-exit-smoke");
+        var runSuspensionSmoke = Requested("suspension-smoke");
+        var runImageExportSmoke = Requested("image-export-smoke");
+        var runDocumentSafetySmoke = Requested("document-safety-smoke");
+        var runCloseDecisionsSmoke = Requested("close-decisions-smoke");
+        Consume("performance-smoke", out var performanceRequest);
+        var performanceTabCount = ParsePerformanceTabCount(performanceRequest);
+        var performanceSuspendInactive = PerformanceModeIs(performanceRequest, ":suspend");
+        var performanceUnloadInactive = PerformanceModeIs(performanceRequest, ":unload");
+        // The localization request was already read by the constructor.
+        Requested("localization-smoke");
+        var runLocalizationSmoke = localizationSmokeLanguage is not null;
+        if (runCloseDecisionsSmoke)
+        {
+            var closeDecisionsResultPath = Path.Combine(
+                baseDirectory,
+                "close-decisions-smoke.result");
+            if (File.Exists(closeDecisionsResultPath))
+            {
+                File.Delete(closeDecisionsResultPath);
+            }
+        }
+
+        // The first active scenario selects the workspace-state file, keeping
+        // the scenarios isolated from each other and from the real workspace.
+        (bool Active, string Name)[] stateSelection =
+        [
+            (runWorkspaceSmoke, "workspace-smoke"),
+            (runTabSmoke, "tab-smoke"),
+            (runStartupSmoke, "startup-smoke"),
+            (runFileActivationSmoke, "file-activation-smoke"),
+            (runTitleBarSmoke, "titlebar-smoke"),
+            (runMultiWindowSmoke, "multi-window-smoke"),
+            (runMultiWindowExitSmoke || runMultiWindowDirtyExitSmoke, "multi-window-exit-smoke"),
+            (performanceTabCount > 0, "performance-smoke"),
+            (runSuspensionSmoke, "suspension-smoke"),
+            (runImageExportSmoke, "image-export-smoke"),
+            (runDocumentSafetySmoke, "document-safety-smoke"),
+            (runCloseDecisionsSmoke, "close-decisions-smoke"),
+            (runLocalizationSmoke, "localization-smoke"),
+            (runRecoverySmoke || verifyRecoverySmoke, "recovery-smoke"),
+        ];
+        var selectedState = stateSelection.FirstOrDefault(scenario => scenario.Active);
+        return new DesktopSmokeOptions(
+            RunTabSmoke: runTabSmoke,
+            WorkspaceStatePath: selectedState.Active ? StatePath(selectedState.Name) : null,
+            RunRecoverySmoke: runRecoverySmoke,
+            VerifyRecoverySmoke: verifyRecoverySmoke,
+            RunTitleBarSmoke: runTitleBarSmoke,
+            PerformanceTabCount: performanceTabCount,
+            RunSuspensionSmoke: runSuspensionSmoke,
+            PerformanceSuspendInactive: performanceSuspendInactive,
+            PerformanceUnloadInactive: performanceUnloadInactive,
+            RunMultiWindowSmoke: runMultiWindowSmoke,
+            RunMultiWindowExitSmoke: runMultiWindowExitSmoke,
+            RunMultiWindowDirtyExitSmoke: runMultiWindowDirtyExitSmoke,
+            RunImageExportSmoke: runImageExportSmoke,
+            RunDocumentSafetySmoke: runDocumentSafetySmoke,
+            RunCloseDecisionsSmoke: runCloseDecisionsSmoke,
+            RunLocalizationSmoke: runLocalizationSmoke,
+            LocalizationSmokeLanguage: localizationSmokeLanguage);
+#else
+        _ = launchArguments;
+        return DesktopSmokeOptions.None;
+#endif
+    }
+
+#if DEBUG
+    private static int ParsePerformanceTabCount(string? request) =>
+        request is not null &&
+        int.TryParse(request.Split(':')[0], out var count) &&
+        count is >= 1 and <= 20
+            ? count
+            : 0;
+
+    private static bool PerformanceModeIs(string? request, string suffix) =>
+        request is not null &&
+        request.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
 #endif
 }

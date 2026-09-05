@@ -175,4 +175,7 @@
   <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>该绘图已在另一个标签页中打开。请选择其他文件名。</value></data>
   <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>无法将绘图写入磁盘。</value></data>
   <data name="DocumentInvalidMessage" xml:space="preserve"><value>所选文件不是有效的 Excalidraw 绘图。</value></data>
+  <data name="EditorRetryFailed" xml:space="preserve"><value>无法恢复绘图</value></data>
+  <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>此未保存绘图的恢复数据缺失或无法读取。未更改任何绘图文件。</value></data>
+  <data name="EditorRetryFileGuidance" xml:space="preserve"><value>请重试或重新打开绘图文件。未更改任何绘图文件。</value></data>
 </root>

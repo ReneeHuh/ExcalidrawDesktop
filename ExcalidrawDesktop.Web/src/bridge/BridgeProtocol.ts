@@ -68,6 +68,7 @@ export type BridgeEventMap = {
   "document.dirtyChanged": { isDirty: boolean };
   "document.opened": { fileName: string };
   "document.recovered": undefined;
+  "document.loadFailed": undefined;
   "document.recoverySnapshot": { content: string };
   "image.exportFailed": {
     exportId: string;

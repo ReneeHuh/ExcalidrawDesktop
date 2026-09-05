@@ -1,12 +1,12 @@
 import {
   CaptureUpdateAction,
-  getSceneVersion,
   loadFromBlob,
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import type { DesktopBridge } from "../bridge/DesktopBridge";
+import { getDocumentRevision } from "./DocumentRevision";
 
 export type DocumentEditorApi = Pick<
   ExcalidrawImperativeAPI,
@@ -38,7 +38,7 @@ type LoadDocumentOptions = {
 
 export type OpenDocumentResult =
   | { status: "cancelled" }
-  | { status: "opened"; fileName: string; sceneVersion: number };
+  | { status: "opened"; fileName: string; revision: string };
 
 export const requestNewDocument = (
   bridge: Pick<DesktopBridge, "newDocument">,
@@ -93,7 +93,7 @@ export const loadDocumentContentIntoEditor = async ({
   return {
     status: "opened",
     fileName,
-    sceneVersion: getSceneVersion(scene.elements),
+    revision: getDocumentRevision(scene.elements, scene.appState),
   };
 };
 
@@ -106,7 +106,7 @@ type SaveDocumentOptions = {
 
 export type SaveDocumentResult =
   | { status: "cancelled" }
-  | { status: "saved"; fileName: string; sceneVersion: number };
+  | { status: "saved"; fileName: string; revision: string };
 
 export const saveDocumentFromEditor = async ({
   api,
@@ -115,10 +115,13 @@ export const saveDocumentFromEditor = async ({
   serialize = serializeAsJSON,
 }: SaveDocumentOptions): Promise<SaveDocumentResult> => {
   const elements = api.getSceneElements();
-  const sceneVersion = getSceneVersion(elements);
+  const appState = api.getAppState();
+  // Capture the baseline before awaiting the native save. The user can keep
+  // editing while a picker or disk write is in progress.
+  const revision = getDocumentRevision(elements, appState);
   const content = serialize(
     elements,
-    api.getAppState(),
+    appState,
     api.getFiles(),
     "local",
   );
@@ -126,5 +129,5 @@ export const saveDocumentFromEditor = async ({
     ? await bridge.saveDocumentAs(content)
     : await bridge.saveDocument(content);
 
-  return response.status === "saved" ? { ...response, sceneVersion } : response;
+  return response.status === "saved" ? { ...response, revision } : response;
 };

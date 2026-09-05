@@ -175,4 +175,7 @@
   <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>Ce dessin est déjà ouvert dans un autre onglet. Choisissez un autre nom de fichier.</value></data>
   <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>Impossible d’écrire le dessin sur le disque.</value></data>
   <data name="DocumentInvalidMessage" xml:space="preserve"><value>Le fichier sélectionné n’est pas un dessin Excalidraw valide.</value></data>
+  <data name="EditorRetryFailed" xml:space="preserve"><value>Impossible de restaurer le dessin</value></data>
+  <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>Les données de récupération de ce dessin non enregistré sont manquantes ou illisibles. Aucun fichier de dessin n&apos;a été modifié.</value></data>
+  <data name="EditorRetryFileGuidance" xml:space="preserve"><value>Réessayez ou rouvrez le fichier du dessin. Aucun fichier de dessin n&apos;a été modifié.</value></data>
 </root>

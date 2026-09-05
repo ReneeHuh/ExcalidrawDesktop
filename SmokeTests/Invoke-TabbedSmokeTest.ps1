@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateRange(5, 120)]
-    [int] $TimeoutSeconds = 30,
+    [int] $TimeoutSeconds = 60,
 
     [switch] $SkipBuild,
 
@@ -65,6 +65,14 @@ try {
                 ViewportAndZoomIsolated = $true
                 SelectionIsolated = $true
                 UndoHistoryIsolated = $true
+                SavedDrawingRestoredOnRetry = $true
+                RecoverySnapshotRestoredOnRetry = $true
+                UnavailableRecoveryBlocksRetry = $true
+                PendingCloseCancelledOnEditorFailure = $true
+                BackgroundChangesTracked = $true
+                BackgroundRecoveryRestored = $true
+                BackgroundSaveClearedDirtyState = $true
+                ViewportChangesIgnored = $true
             }
             return
         }

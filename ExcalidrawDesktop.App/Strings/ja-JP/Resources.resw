@@ -175,4 +175,7 @@
   <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>その図面は別のタブで既に開かれています。別のファイル名を選択してください。</value></data>
   <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>図面をディスクに書き込めませんでした。</value></data>
   <data name="DocumentInvalidMessage" xml:space="preserve"><value>選択したファイルは有効な Excalidraw 図面ではありません。</value></data>
+  <data name="EditorRetryFailed" xml:space="preserve"><value>図面を復元できませんでした</value></data>
+  <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>この未保存の図面の復元データが見つからないか、読み取れません。図面ファイルは変更されていません。</value></data>
+  <data name="EditorRetryFileGuidance" xml:space="preserve"><value>再試行するか、図面ファイルを開き直してください。図面ファイルは変更されていません。</value></data>
 </root>

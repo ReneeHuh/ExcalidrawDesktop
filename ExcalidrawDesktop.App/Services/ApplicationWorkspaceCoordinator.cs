@@ -9,7 +9,6 @@ internal sealed class ApplicationWorkspaceCoordinator
     private readonly Dictionary<MainWindow, string> logicalWindowIds = [];
     private readonly Dictionary<MainWindow, WorkspaceWindowState> restoreStates = [];
     private readonly MultiWindowWorkspaceStateStore workspaceStateStore;
-    private readonly RecoverySnapshotStore recoverySnapshotStore;
     private readonly DesktopSettingsStore desktopSettingsStore = new();
     private readonly SemaphoreSlim persistenceGate = new(1, 1);
     private CancellationTokenSource? queuedPersistence;
@@ -25,9 +24,8 @@ internal sealed class ApplicationWorkspaceCoordinator
     {
         WorkspaceStatePath = workspaceStatePath ?? DesktopPaths.WorkspaceStatePath;
         workspaceStateStore = new MultiWindowWorkspaceStateStore(WorkspaceStatePath);
-        recoverySnapshotStore = new RecoverySnapshotStore(Path.Combine(
-            Path.GetDirectoryName(WorkspaceStatePath)!,
-            $"{Path.GetFileNameWithoutExtension(WorkspaceStatePath)}.recovery"));
+        RecoverySnapshotStore = new RecoverySnapshotStore(
+            DesktopPaths.GetRecoveryDirectory(WorkspaceStatePath));
         Preferences = startupPreferences ?? desktopSettingsStore.Load();
         StartupLanguagePreference = Preferences.Language;
         EffectiveLanguage = DesktopLanguageStartup.ResolveEffective(
@@ -37,6 +35,7 @@ internal sealed class ApplicationWorkspaceCoordinator
     public IReadOnlyList<MainWindow> Windows => windows;
     public List<string> RecentFiles { get; } = [];
     public string WorkspaceStatePath { get; }
+    public RecoverySnapshotStore RecoverySnapshotStore { get; }
     public IReadOnlyList<WorkspaceWindowState> RestoredWindows { get; private set; } = [];
     public DesktopPreferences Preferences { get; private set; }
     public DesktopLanguage EffectiveLanguage { get; }
@@ -49,7 +48,18 @@ internal sealed class ApplicationWorkspaceCoordinator
             Language = DesktopLanguages.NormalizePreference(preferences.Language),
         };
         Preferences = preferences;
-        desktopSettingsStore.Save(preferences);
+        try
+        {
+            desktopSettingsStore.Save(preferences);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            // The in-memory preferences still apply for this session; the
+            // failure is recorded rather than allowed to unwind a XAML event
+            // handler and terminate the process.
+            DiagnosticLogService.Error("settings.save_failed", exception);
+        }
         DiagnosticLogService.Info("settings.changed", new
         {
             theme = preferences.Theme.ToString(),
@@ -91,7 +101,6 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
         var window = new MainWindow(
             this,
-            workspaceStatePath: WorkspaceStatePath,
             restoreWorkspace: restoreState is not null,
             createInitialTab: createInitialTab);
         RegisterWindow(window, restoreState);
@@ -100,6 +109,22 @@ internal sealed class ApplicationWorkspaceCoordinator
             window.Activate();
         }
         return window;
+    }
+
+    /// <summary>
+    /// Creates the hidden destination window for a tab tear-out drag without
+    /// registering it. It becomes a workspace member only once a session is
+    /// actually moved into it (see <see cref="MoveSession"/>), so persistence,
+    /// exit, and activation fallback never observe an empty placeholder.
+    /// </summary>
+    public MainWindow CreateTearOutPlaceholder()
+    {
+        if (isExiting)
+        {
+            throw new InvalidOperationException(
+                "A new window cannot be created while the application is exiting.");
+        }
+        return new MainWindow(this, restoreWorkspace: false, createInitialTab: false);
     }
 
     public void RegisterWindow(
@@ -123,9 +148,6 @@ internal sealed class ApplicationWorkspaceCoordinator
         {
             restoreStates[window] = restoreState;
         }
-        // Registration also happens for the hidden placeholder used by a tab
-        // tear-out. Only an activated window should become the activation
-        // target for subsequent app-instance redirects.
         mostRecentlyActiveWindow ??= window;
         DiagnosticLogService.Info("window.registered", new
         {
@@ -142,6 +164,12 @@ internal sealed class ApplicationWorkspaceCoordinator
         logicalWindowIds.TryGetValue(window, out var id)
             ? id
             : throw new InvalidOperationException("The window is not registered.");
+
+    public bool TryGetLogicalWindowId(MainWindow window, out string id) =>
+        logicalWindowIds.TryGetValue(window, out id!);
+
+    private string? LogicalWindowIdOrNull(MainWindow window) =>
+        logicalWindowIds.TryGetValue(window, out var id) ? id : null;
 
     public bool IsRestoredLastActiveWindow(MainWindow window) =>
         string.Equals(GetLogicalWindowId(window), restoredLastActiveWindowId,
@@ -179,6 +207,10 @@ internal sealed class ApplicationWorkspaceCoordinator
 
     public void UnregisterWindow(MainWindow window)
     {
+        if (!windows.Contains(window))
+        {
+            return;
+        }
         logicalWindowIds.TryGetValue(window, out var removedWindowId);
         windows.Remove(window);
         logicalWindowIds.Remove(window);
@@ -203,6 +235,7 @@ internal sealed class ApplicationWorkspaceCoordinator
             {
                 reason = "last_window_closed",
             });
+            DiagnosticLogService.Flush();
             Microsoft.UI.Xaml.Application.Current.Exit();
         }
     }
@@ -323,7 +356,7 @@ internal sealed class ApplicationWorkspaceCoordinator
     }
 
     public Task PruneRecoverySnapshotsAsync(MainWindow? excludedWindow = null) =>
-        recoverySnapshotStore.PruneExceptAsync(
+        RecoverySnapshotStore.PruneExceptAsync(
             windows.Where(window => !ReferenceEquals(window, excludedWindow))
                 .SelectMany(window => window.OpenSessions)
                 .Where(session => session.IsDirty)
@@ -466,7 +499,7 @@ internal sealed class ApplicationWorkspaceCoordinator
         int? index = null)
     {
         if (isExiting || ReferenceEquals(source, destination) ||
-            !windows.Contains(source) || !windows.Contains(destination))
+            !windows.Contains(source) || destination.IsClosed)
         {
             return false;
         }
@@ -477,6 +510,10 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
         try
         {
+            if (!windows.Contains(destination))
+            {
+                RegisterWindow(destination);
+            }
             destination.AttachMovedSession(transfer, index);
             destination.Activate();
             mostRecentlyActiveWindow = destination;
@@ -526,27 +563,34 @@ internal sealed class ApplicationWorkspaceCoordinator
                     continue;
                 }
 
+                if (window.IsClosed)
+                {
+                    continue;
+                }
+
                 if (!await window.ActivateForExitAsync())
                 {
-                    DiagnosticLogService.Info("application.exit_cancelled", new
+                    // Windows may refuse to bring a window to the foreground
+                    // (foreground lock). Any dialog the close flow shows still
+                    // renders inside the window, so continue rather than abort.
+                    DiagnosticLogService.Info("application.exit_activation_skipped", new
                     {
-                        reason = "activation_failed",
-                        windowId = GetLogicalWindowId(window),
+                        windowId = LogicalWindowIdOrNull(window),
                     });
-                    return;
                 }
                 if (!await window.RequestCloseAsync())
                 {
                     DiagnosticLogService.Info("application.exit_cancelled", new
                     {
                         reason = "window_close_cancelled",
-                        windowId = GetLogicalWindowId(window),
+                        windowId = LogicalWindowIdOrNull(window),
                     });
                     return;
                 }
             }
             await PersistWorkspaceAsync();
             DiagnosticLogService.Info("application.exit_completed");
+            DiagnosticLogService.Flush();
         }
         finally
         {

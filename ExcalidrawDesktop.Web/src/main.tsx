@@ -4,7 +4,6 @@ import ReactDOM from "react-dom/client";
 import {
   CaptureUpdateAction,
   Excalidraw,
-  getSceneVersion,
   MainMenu,
   serializeAsJSON,
   THEME,
@@ -17,6 +16,7 @@ import {
   loadDocumentContentIntoEditor,
   saveDocumentFromEditor,
 } from "./document/DocumentController";
+import { getDocumentRevision } from "./document/DocumentRevision";
 import { exportWholeDrawingAsPng } from "./export/ImageExportController";
 import {
   getDesktopErrorString,
@@ -56,6 +56,7 @@ type DesktopSmokeState = {
   zoom: number;
   selectedElementIds: string[];
   indexedDbValue: string | null;
+  viewBackgroundColor: string;
 };
 
 type DesktopSmokeApi = {
@@ -67,6 +68,7 @@ type DesktopSmokeApi = {
     indexedDbValue: string;
   }): void;
   readState(): DesktopSmokeState;
+  updateAppState(appState: Parameters<ExcalidrawImperativeAPI["updateScene"]>[0]["appState"]): void;
   focusCanvas(): boolean;
 };
 
@@ -82,7 +84,10 @@ const DesktopApp = () => {
   );
   const [excalidrawAPI, setExcalidrawAPI] =
     React.useState<ExcalidrawImperativeAPI | null>(null);
-  const savedSceneVersion = React.useRef(0);
+  // undefined: initial empty editor; null: recovered content must be saved.
+  const savedRevision = React.useRef<string | null | undefined>(undefined);
+  const lastSnapshotRevision = React.useRef<string | null>(null);
+  const pendingSnapshotRevision = React.useRef<string | null>(null);
   const isDirty = React.useRef(false);
   const isDocumentOperationInProgress = React.useRef(false);
   const isImageExportInProgress = React.useRef(false);
@@ -92,6 +97,7 @@ const DesktopApp = () => {
     if (!nextIsDirty && recoveryTimer.current !== undefined) {
       ownerWindow.clearTimeout(recoveryTimer.current);
       recoveryTimer.current = undefined;
+      pendingSnapshotRevision.current = null;
     }
     if (isDirty.current === nextIsDirty) {
       return;
@@ -101,30 +107,50 @@ const DesktopApp = () => {
     desktopBridge.notifyDocumentDirtyChanged(nextIsDirty);
   }, []);
 
-  const scheduleRecoverySnapshot = React.useCallback(() => {
-    if (!excalidrawAPI) {
-      return;
-    }
-
-    if (recoveryTimer.current !== undefined) {
-      ownerWindow.clearTimeout(recoveryTimer.current);
-    }
-    recoveryTimer.current = ownerWindow.setTimeout(() => {
-      recoveryTimer.current = undefined;
-      if (!isDirty.current) {
+  const scheduleRecoverySnapshot = React.useCallback(
+    (revision: string) => {
+      if (!excalidrawAPI) {
         return;
       }
 
-      desktopBridge.notifyRecoverySnapshot(
-        serializeAsJSON(
-          excalidrawAPI.getSceneElements(),
-          excalidrawAPI.getAppState(),
-          excalidrawAPI.getFiles(),
-          "local",
-        ),
-      );
-    }, 2_000);
-  }, [excalidrawAPI]);
+      // Viewport activity must neither serialize the drawing again nor keep
+      // postponing a pending snapshot of the same content.
+      if (lastSnapshotRevision.current === revision ||
+          pendingSnapshotRevision.current === revision) {
+        return;
+      }
+
+      if (recoveryTimer.current !== undefined) {
+        ownerWindow.clearTimeout(recoveryTimer.current);
+      }
+      pendingSnapshotRevision.current = revision;
+      recoveryTimer.current = ownerWindow.setTimeout(() => {
+        recoveryTimer.current = undefined;
+        pendingSnapshotRevision.current = null;
+        if (!isDirty.current) {
+          return;
+        }
+
+        const elements = excalidrawAPI.getSceneElements();
+        const appState = excalidrawAPI.getAppState();
+        const currentRevision = getDocumentRevision(elements, appState);
+        if (lastSnapshotRevision.current === currentRevision) {
+          return;
+        }
+
+        desktopBridge.notifyRecoverySnapshot(
+          serializeAsJSON(
+            elements,
+            appState,
+            excalidrawAPI.getFiles(),
+            "local",
+          ),
+        );
+        lastSnapshotRevision.current = currentRevision;
+      }, 2_000);
+    },
+    [excalidrawAPI],
+  );
 
   React.useEffect(
     () => () => {
@@ -197,17 +223,20 @@ const DesktopApp = () => {
           notifyOpened: !payload.isRecovery,
         });
         if (result.status === "opened") {
+          lastSnapshotRevision.current = null;
           if (payload.isRecovery) {
-            savedSceneVersion.current = -1;
+            savedRevision.current = null;
             updateDirty(true);
             desktopBridge.notifyDocumentRecovered();
+            scheduleRecoverySnapshot(result.revision);
           } else {
-            savedSceneVersion.current = result.sceneVersion;
+            savedRevision.current = result.revision;
             updateDirty(false);
           }
         }
       } catch (error: unknown) {
         console.error("The drawing could not be opened.", error);
+        desktopBridge.notifyDocumentLoadFailed();
         excalidrawAPI.setToast({
           message: getDesktopErrorString(
             language.langCode,
@@ -221,7 +250,7 @@ const DesktopApp = () => {
         isDocumentOperationInProgress.current = false;
       }
     });
-  }, [excalidrawAPI, language.langCode, updateDirty]);
+  }, [excalidrawAPI, language.langCode, scheduleRecoverySnapshot, updateDirty]);
 
   const saveDocument = React.useCallback(
     async (saveAs: boolean): Promise<boolean> => {
@@ -237,11 +266,16 @@ const DesktopApp = () => {
           saveAs,
         });
         if (result.status === "saved") {
-          savedSceneVersion.current = result.sceneVersion;
-          updateDirty(
-            getSceneVersion(excalidrawAPI.getSceneElements()) !==
-              result.sceneVersion,
+          savedRevision.current = result.revision;
+          lastSnapshotRevision.current = null;
+          const currentRevision = getDocumentRevision(
+            excalidrawAPI.getSceneElements(),
+            excalidrawAPI.getAppState(),
           );
+          updateDirty(currentRevision !== result.revision);
+          if (isDirty.current) {
+            scheduleRecoverySnapshot(currentRevision);
+          }
           return !isDirty.current;
         }
         return false;
@@ -261,7 +295,7 @@ const DesktopApp = () => {
         isDocumentOperationInProgress.current = false;
       }
     },
-    [excalidrawAPI, language.langCode, updateDirty],
+    [excalidrawAPI, language.langCode, scheduleRecoverySnapshot, updateDirty],
   );
 
   React.useEffect(
@@ -394,6 +428,9 @@ const DesktopApp = () => {
     };
 
     smokeWindow.__EXCALIDRAW_DESKTOP_SMOKE__ = {
+      updateAppState(appState) {
+        excalidrawAPI.updateScene({ appState, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+      },
       configureState(options) {
         void writeIndexedDb(options.indexedDbValue)
           .then(readIndexedDb)
@@ -457,6 +494,7 @@ const DesktopApp = () => {
           zoom: appState.zoom.value,
           selectedElementIds: Object.keys(appState.selectedElementIds),
           indexedDbValue: verifiedIndexedDbValue,
+          viewBackgroundColor: appState.viewBackgroundColor,
         };
       },
       focusCanvas() {
@@ -589,12 +627,15 @@ const DesktopApp = () => {
           langCode={language.langCode}
           theme={theme}
           UIOptions={desktopUIOptions}
-          onChange={(elements) => {
-            const nextIsDirty =
-              getSceneVersion(elements) !== savedSceneVersion.current;
+          onChange={(elements, appState) => {
+            if (savedRevision.current === undefined) {
+              savedRevision.current = getDocumentRevision([], appState);
+            }
+            const revision = getDocumentRevision(elements, appState);
+            const nextIsDirty = revision !== savedRevision.current;
             updateDirty(nextIsDirty);
             if (nextIsDirty) {
-              scheduleRecoverySnapshot();
+              scheduleRecoverySnapshot(revision);
             }
           }}
         >

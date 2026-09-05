@@ -89,6 +89,11 @@ also links to Microsoft's
 Install or repair the Evergreen WebView2 Runtime, restart Excalidraw Desktop,
 and retry the tab. A failed editor does not overwrite its saved drawing.
 
+Retry reloads a saved drawing or restores the latest recovery snapshot for an
+unsaved drawing. Saving stays disabled until restoration finishes. If unsaved
+recovery data is missing or unreadable, the tab stays in its failure view and
+the saved file remains unchanged.
+
 This project is an independent desktop host for the open-source
 [Excalidraw](https://github.com/excalidraw/excalidraw) editor. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and licensing

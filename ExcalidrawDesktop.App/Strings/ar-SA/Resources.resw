@@ -175,4 +175,7 @@
   <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>هذا الرسم مفتوح بالفعل في علامة تبويب أخرى. اختر اسم ملف مختلفًا.</value></data>
   <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>تعذرت كتابة الرسم على القرص.</value></data>
   <data name="DocumentInvalidMessage" xml:space="preserve"><value>الملف المحدد ليس رسم Excalidraw صالحًا.</value></data>
+  <data name="EditorRetryFailed" xml:space="preserve"><value>تعذرت استعادة الرسم</value></data>
+  <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>بيانات استعادة هذا الرسم غير المحفوظ مفقودة أو غير قابلة للقراءة. لم يتم تغيير أي ملف رسم.</value></data>
+  <data name="EditorRetryFileGuidance" xml:space="preserve"><value>حاول مرة أخرى أو أعد فتح ملف الرسم. لم يتم تغيير أي ملف رسم.</value></data>
 </root>

@@ -110,9 +110,14 @@ public static class BridgeMessageParser
         new("BridgeMessageInvalid", message);
 }
 
+internal static class BridgeEnvelopeJson
+{
+    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+}
+
 public static class BridgeResponseJson
 {
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions Options = BridgeEnvelopeJson.Options;
 
     public static string Success(BridgeMessage request, object? payload) =>
         JsonSerializer.Serialize(new
@@ -137,7 +142,7 @@ public static class BridgeResponseJson
 
 public static class BridgeEventJson
 {
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions Options = BridgeEnvelopeJson.Options;
 
     public static string Create(string method, object? payload = null) =>
         JsonSerializer.Serialize(new

@@ -114,38 +114,8 @@ public sealed class MultiWindowWorkspaceStateStore
             return;
         }
 
-        var directory = Path.GetDirectoryName(statePath) ??
-            throw new InvalidOperationException(
-                "The workspace state path has no directory.");
-        Directory.CreateDirectory(directory);
-        var temporaryPath = Path.Combine(
-            directory,
-            $".{Path.GetFileName(statePath)}.{Guid.NewGuid():N}.tmp");
-
-        try
-        {
-            await using (var stream = new FileStream(
-                temporaryPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                4096,
-                FileOptions.Asynchronous | FileOptions.WriteThrough))
-            {
-                await stream.WriteAsync(payload);
-                await stream.FlushAsync();
-            }
-
-            File.Move(temporaryPath, statePath, overwrite: true);
-            lastSavedPayload = payload;
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
+        await AtomicFile.WriteAllBytesAsync(statePath, payload);
+        lastSavedPayload = payload;
     }
 
     private static bool TryReadVersion(JsonElement root, out int version)

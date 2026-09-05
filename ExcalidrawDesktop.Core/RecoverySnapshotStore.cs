@@ -9,26 +9,8 @@ public sealed class RecoverySnapshotStore
         this.recoveryDirectory = Path.GetFullPath(recoveryDirectory);
     }
 
-    public async Task SaveAsync(string recoveryId, string content)
-    {
-        var snapshotPath = GetSnapshotPath(recoveryId);
-        Directory.CreateDirectory(recoveryDirectory);
-        var temporaryPath = Path.Combine(
-            recoveryDirectory,
-            $".{recoveryId}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            await File.WriteAllTextAsync(temporaryPath, content);
-            File.Move(temporaryPath, snapshotPath, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
-    }
+    public Task SaveAsync(string recoveryId, string content) =>
+        AtomicFile.WriteAllTextAsync(GetSnapshotPath(recoveryId), content);
 
     public async Task<string?> LoadAsync(string recoveryId)
     {
@@ -52,31 +34,35 @@ public sealed class RecoverySnapshotStore
     public Task DeleteAsync(string recoveryId)
     {
         var snapshotPath = GetSnapshotPath(recoveryId);
-        if (File.Exists(snapshotPath))
+        return Task.Run(() =>
         {
-            File.Delete(snapshotPath);
-        }
-        return Task.CompletedTask;
+            if (File.Exists(snapshotPath))
+            {
+                File.Delete(snapshotPath);
+            }
+        });
     }
 
     public Task PruneExceptAsync(IEnumerable<string> retainedRecoveryIds)
     {
-        if (!Directory.Exists(recoveryDirectory))
-        {
-            return Task.CompletedTask;
-        }
-
         var retained = retainedRecoveryIds
             .Select(NormalizeRecoveryId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var path in Directory.EnumerateFiles(recoveryDirectory, "*.excalidraw"))
+        return Task.Run(() =>
         {
-            if (!retained.Contains(Path.GetFileNameWithoutExtension(path)))
+            if (!Directory.Exists(recoveryDirectory))
             {
-                File.Delete(path);
+                return;
             }
-        }
-        return Task.CompletedTask;
+
+            foreach (var path in Directory.EnumerateFiles(recoveryDirectory, "*.excalidraw"))
+            {
+                if (!retained.Contains(Path.GetFileNameWithoutExtension(path)))
+                {
+                    File.Delete(path);
+                }
+            }
+        });
     }
 
     private string GetSnapshotPath(string recoveryId) => Path.Combine(

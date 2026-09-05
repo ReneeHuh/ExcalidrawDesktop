@@ -183,4 +183,7 @@
   <data name="DocumentAlreadyOpenMessage" xml:space="preserve"><value>That drawing is already open in another tab. Choose a different file name.</value></data>
   <data name="DocumentWriteFailedMessage" xml:space="preserve"><value>The drawing could not be written to disk.</value></data>
   <data name="DocumentInvalidMessage" xml:space="preserve"><value>The selected file is not a valid Excalidraw drawing.</value></data>
+  <data name="EditorRetryFailed" xml:space="preserve"><value>Could not restore drawing</value></data>
+  <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>The recovery data for this unsaved drawing is missing or unreadable. No drawing file has been changed.</value></data>
+  <data name="EditorRetryFileGuidance" xml:space="preserve"><value>Retry again or reopen the drawing file. No drawing file has been changed.</value></data>
 </root>
