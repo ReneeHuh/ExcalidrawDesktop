@@ -178,4 +178,12 @@
   <data name="EditorRetryFailed" xml:space="preserve"><value>Impossible de restaurer le dessin</value></data>
   <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>Les données de récupération de ce dessin non enregistré sont manquantes ou illisibles. Aucun fichier de dessin n&apos;a été modifié.</value></data>
   <data name="EditorRetryFileGuidance" xml:space="preserve"><value>Réessayez ou rouvrez le fichier du dessin. Aucun fichier de dessin n&apos;a été modifié.</value></data>
+  <data name="StatusRecoveryFailed" xml:space="preserve"><value>Récupération indisponible — Enregistrer sous…</value></data>
+  <data name="RecoveredDrawingName" xml:space="preserve"><value>Dessin récupéré</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>Échec de la récupération au démarrage</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>Certains dessins n’ont pas pu être récupérés. Les données de récupération ont été conservées.</value></data>
+  <data name="CloseWindowButton" xml:space="preserve"><value>Fermer la fenêtre</value></data>
+  <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>Impossible d’enregistrer les paramètres</value></data>
+  <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>La préférence sélectionnée est active pour cette session, mais n’a pas pu être enregistrée. Vérifiez l’emplacement des paramètres et réessayez.</value></data>
+  <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>Réessayer</value></data>
 </root>

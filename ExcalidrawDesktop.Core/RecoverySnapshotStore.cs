@@ -3,14 +3,22 @@ namespace ExcalidrawDesktop.Core;
 public sealed class RecoverySnapshotStore
 {
     private readonly string recoveryDirectory;
+    private readonly SemaphoreSlim fileGate = new(1, 1);
 
     public RecoverySnapshotStore(string recoveryDirectory)
     {
         this.recoveryDirectory = Path.GetFullPath(recoveryDirectory);
     }
 
-    public Task SaveAsync(string recoveryId, string content) =>
-        AtomicFile.WriteAllTextAsync(GetSnapshotPath(recoveryId), content);
+    public async Task SaveAsync(string recoveryId, string content)
+    {
+        await fileGate.WaitAsync();
+        try { await AtomicFile.WriteAllTextAsync(GetSnapshotPath(recoveryId), content); }
+        finally { fileGate.Release(); }
+    }
+
+    public Task SaveAsync(string recoveryId, string content, RecoveryFileBaseline? baseline) =>
+        SaveAsync(recoveryId, RecoveryFileBaseline.Attach(content, baseline));
 
     public async Task<string?> LoadAsync(string recoveryId)
     {
@@ -34,35 +42,58 @@ public sealed class RecoverySnapshotStore
     public Task DeleteAsync(string recoveryId)
     {
         var snapshotPath = GetSnapshotPath(recoveryId);
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
-            if (File.Exists(snapshotPath))
+            await fileGate.WaitAsync();
+            try
             {
-                File.Delete(snapshotPath);
+                if (File.Exists(snapshotPath)) File.Delete(snapshotPath);
             }
+            finally { fileGate.Release(); }
         });
     }
 
     public Task PruneExceptAsync(IEnumerable<string> retainedRecoveryIds)
-    {
-        var retained = retainedRecoveryIds
-            .Select(NormalizeRecoveryId)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return Task.Run(() =>
-        {
-            if (!Directory.Exists(recoveryDirectory))
-            {
-                return;
-            }
+        => PruneExceptAsync(() => retainedRecoveryIds);
 
-            foreach (var path in Directory.EnumerateFiles(recoveryDirectory, "*.excalidraw"))
+    public async Task PruneExceptAsync(Func<IEnumerable<string>> retainedRecoveryIds)
+    {
+        await fileGate.WaitAsync();
+        try
+        {
+            var retained = retainedRecoveryIds()
+                .Select(TryNormalizeRecoveryId)
+                .OfType<string>()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            await Task.Run(() =>
             {
-                if (!retained.Contains(Path.GetFileNameWithoutExtension(path)))
+                if (!Directory.Exists(recoveryDirectory)) return;
+                foreach (var path in Directory.EnumerateFiles(recoveryDirectory, "*.excalidraw"))
                 {
-                    File.Delete(path);
+                    if (!retained.Contains(Path.GetFileNameWithoutExtension(path)))
+                    {
+                        try { File.Delete(path); }
+                        catch (IOException) { }
+                        catch (UnauthorizedAccessException) { }
+                    }
                 }
-            }
-        });
+            });
+        }
+        finally { fileGate.Release(); }
+    }
+
+    /// <summary>Returns snapshot identities found on disk, including orphaned ones.</summary>
+    public IReadOnlyList<string> DiscoverSnapshotIds()
+    {
+        try
+        {
+            // Directory.Exists also returns false for access errors. Only a
+            // genuinely missing directory is safe to treat as no recoveries.
+            return Directory.EnumerateFiles(recoveryDirectory, "*.excalidraw")
+                .Select(path => TryNormalizeRecoveryId(Path.GetFileNameWithoutExtension(path)))
+                .OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+        catch (DirectoryNotFoundException) { return Array.Empty<string>(); }
     }
 
     private string GetSnapshotPath(string recoveryId) => Path.Combine(
@@ -73,4 +104,8 @@ public sealed class RecoverySnapshotStore
         Guid.TryParseExact(recoveryId, "N", out var parsed)
             ? parsed.ToString("N")
             : throw new ArgumentException("The recovery identifier is invalid.", nameof(recoveryId));
+
+    private static string? TryNormalizeRecoveryId(string? recoveryId) =>
+        recoveryId is null ? null : Guid.TryParseExact(recoveryId, "N", out var parsed)
+            ? parsed.ToString("N") : null;
 }

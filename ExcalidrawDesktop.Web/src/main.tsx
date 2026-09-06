@@ -17,6 +17,9 @@ import {
   saveDocumentFromEditor,
 } from "./document/DocumentController";
 import { getDocumentRevision } from "./document/DocumentRevision";
+import { RecoverySnapshotController } from "./document/RecoverySnapshotController";
+import { DocumentLoadQueue } from "./document/DocumentLoadQueue";
+import { LibraryController } from "./document/LibraryController";
 import { exportWholeDrawingAsPng } from "./export/ImageExportController";
 import {
   getDesktopErrorString,
@@ -25,21 +28,6 @@ import {
 import "./styles.css";
 
 const root = document.getElementById("root");
-
-if (!root) {
-  throw new Error("The Excalidraw Desktop root element is missing.");
-}
-
-const ownerDocument = root.ownerDocument;
-const ownerWindow = ownerDocument.defaultView;
-if (!ownerWindow) {
-  throw new Error("The Excalidraw Desktop window is unavailable.");
-}
-
-ownerWindow.EXCALIDRAW_ASSET_PATH = "/";
-ownerDocument.documentElement.lang = "en";
-ownerDocument.documentElement.dir = "ltr";
-const desktopBridge = new DesktopBridge(ownerWindow);
 
 const desktopUIOptions = {
   canvasActions: {
@@ -68,98 +56,68 @@ type DesktopSmokeApi = {
     indexedDbValue: string;
   }): void;
   readState(): DesktopSmokeState;
+  deleteAllElements(): void;
+  isSaving(): boolean;
   updateAppState(appState: Parameters<ExcalidrawImperativeAPI["updateScene"]>[0]["appState"]): void;
   focusCanvas(): boolean;
 };
 
-const DesktopApp = () => {
+export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; bridge?: DesktopBridge }) => {
+  const ownerDocument = mountNode.ownerDocument;
+  const ownerWindow = ownerDocument.defaultView;
+  if (!ownerWindow) throw new Error("The editor window is unavailable.");
+  const desktopBridge = React.useMemo(() => bridge ?? new DesktopBridge(ownerWindow), [bridge, ownerWindow]);
   const [language, setLanguage] = React.useState<{
     langCode: string;
     direction: "ltr" | "rtl";
   }>({ langCode: "en", direction: "ltr" });
   const [theme, setTheme] = React.useState<"light" | "dark">(() =>
-    ownerWindow.matchMedia("(prefers-color-scheme: dark)").matches
+    (ownerWindow.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false)
       ? THEME.DARK
       : THEME.LIGHT,
   );
   const [excalidrawAPI, setExcalidrawAPI] =
     React.useState<ExcalidrawImperativeAPI | null>(null);
+  const library = React.useRef<LibraryController | null>(null);
+  const [libraryFailed, setLibraryFailed] = React.useState(false);
   // undefined: initial empty editor; null: recovered content must be saved.
   const savedRevision = React.useRef<string | null | undefined>(undefined);
-  const lastSnapshotRevision = React.useRef<string | null>(null);
-  const pendingSnapshotRevision = React.useRef<string | null>(null);
   const isDirty = React.useRef(false);
+  const lastReportedRevision = React.useRef<string | undefined>(undefined);
   const isDocumentOperationInProgress = React.useRef(false);
+  const [closeBarrier, setCloseBarrier] = React.useState<{ barrierId: string; locked: boolean } | null>(null);
   const isImageExportInProgress = React.useRef(false);
-  const recoveryTimer = React.useRef<number | undefined>(undefined);
-
-  const updateDirty = React.useCallback((nextIsDirty: boolean) => {
-    if (!nextIsDirty && recoveryTimer.current !== undefined) {
-      ownerWindow.clearTimeout(recoveryTimer.current);
-      recoveryTimer.current = undefined;
-      pendingSnapshotRevision.current = null;
+  const activeExport = React.useRef<{ exportId: string; controller: AbortController } | null>(null);
+  const isDocumentLoading = React.useRef(false);
+  const recovery = React.useMemo(() => new RecoverySnapshotController(ownerWindow, () => {
+    if (!excalidrawAPI || !isDirty.current) {
+      return null;
     }
-    if (isDirty.current === nextIsDirty) {
+    const elements = excalidrawAPI.getSceneElements();
+    const appState = excalidrawAPI.getAppState();
+    return {
+      revision: getDocumentRevision(elements, appState),
+      content: serializeAsJSON(elements, appState, excalidrawAPI.getFiles(), "local"),
+    };
+  }, (content) => desktopBridge.saveRecoverySnapshot(content)), [excalidrawAPI]);
+
+  const updateDirty = React.useCallback((nextIsDirty: boolean, revision?: string) => {
+    if (!nextIsDirty) {
+      recovery.reset();
+    }
+    if (isDirty.current === nextIsDirty &&
+      (revision === undefined || revision === lastReportedRevision.current)) {
       return;
     }
 
+    if (revision !== undefined) lastReportedRevision.current = revision;
     isDirty.current = nextIsDirty;
     desktopBridge.notifyDocumentDirtyChanged(nextIsDirty);
-  }, []);
+  }, [recovery]);
 
   const scheduleRecoverySnapshot = React.useCallback(
-    (revision: string) => {
-      if (!excalidrawAPI) {
-        return;
-      }
-
-      // Viewport activity must neither serialize the drawing again nor keep
-      // postponing a pending snapshot of the same content.
-      if (lastSnapshotRevision.current === revision ||
-          pendingSnapshotRevision.current === revision) {
-        return;
-      }
-
-      if (recoveryTimer.current !== undefined) {
-        ownerWindow.clearTimeout(recoveryTimer.current);
-      }
-      pendingSnapshotRevision.current = revision;
-      recoveryTimer.current = ownerWindow.setTimeout(() => {
-        recoveryTimer.current = undefined;
-        pendingSnapshotRevision.current = null;
-        if (!isDirty.current) {
-          return;
-        }
-
-        const elements = excalidrawAPI.getSceneElements();
-        const appState = excalidrawAPI.getAppState();
-        const currentRevision = getDocumentRevision(elements, appState);
-        if (lastSnapshotRevision.current === currentRevision) {
-          return;
-        }
-
-        desktopBridge.notifyRecoverySnapshot(
-          serializeAsJSON(
-            elements,
-            appState,
-            excalidrawAPI.getFiles(),
-            "local",
-          ),
-        );
-        lastSnapshotRevision.current = currentRevision;
-      }, 2_000);
-    },
-    [excalidrawAPI],
-  );
-
-  React.useEffect(
-    () => () => {
-      if (recoveryTimer.current !== undefined) {
-        ownerWindow.clearTimeout(recoveryTimer.current);
-      }
-    },
-    [],
-  );
+    (revision: string) => recovery.schedule(revision), [recovery]);
+  React.useEffect(() => () => recovery.reset(), [recovery]);
 
   React.useEffect(
     () =>
@@ -204,57 +162,97 @@ const DesktopApp = () => {
   }, []);
 
   React.useEffect(() => {
-    if (!excalidrawAPI) {
-      return;
-    }
-
-    return desktopBridge.onDocumentLoadRequested(async (payload) => {
-      if (isDocumentOperationInProgress.current) {
-        return;
-      }
-
-      isDocumentOperationInProgress.current = true;
-      try {
-        const result = await loadDocumentContentIntoEditor({
-          api: excalidrawAPI,
-          bridge: desktopBridge,
-          fileName: payload.fileName,
-          content: payload.content,
-          notifyOpened: !payload.isRecovery,
-        });
-        if (result.status === "opened") {
-          lastSnapshotRevision.current = null;
-          if (payload.isRecovery) {
-            savedRevision.current = null;
-            updateDirty(true);
-            desktopBridge.notifyDocumentRecovered();
-            scheduleRecoverySnapshot(result.revision);
-          } else {
-            savedRevision.current = result.revision;
-            updateDirty(false);
-          }
-        }
-      } catch (error: unknown) {
-        console.error("The drawing could not be opened.", error);
-        desktopBridge.notifyDocumentLoadFailed();
+    if (!excalidrawAPI) return;
+    const loads = new DocumentLoadQueue(ownerWindow, {
+      busy: () => isDocumentOperationInProgress.current,
+      setLoading: (loading) => {
+        isDocumentLoading.current = loading;
+        isDocumentOperationInProgress.current = loading;
+      },
+      load: (payload, isCancelled) => loadDocumentContentIntoEditor({
+        api: excalidrawAPI,
+        bridge: desktopBridge,
+        fileName: payload.fileName,
+        content: payload.content,
+        notifyOpened: false,
+        isCancelled,
+      }),
+      applied: (payload, result) => {
+        if (result.status !== "opened") return;
+        recovery.reset();
+        savedRevision.current = payload.isRecovery ? null : result.revision;
+        updateDirty(payload.isRecovery, result.revision);
+        if (payload.isRecovery) scheduleRecoverySnapshot(result.revision);
+        desktopBridge.notifyDocumentLoadApplied(payload.loadId!, payload.fileName, payload.isRecovery);
+      },
+      failed: (payload, error) => {
+        desktopBridge.notifyDocumentLoadFailed(payload.loadId!);
         excalidrawAPI.setToast({
-          message: getDesktopErrorString(
-            language.langCode,
-            error instanceof DesktopBridgeError ? error.code : undefined,
-            "openFailed",
-          ),
+          message: getDesktopErrorString(language.langCode,
+            error instanceof DesktopBridgeError ? error.code : undefined, "openFailed"),
           closable: true,
           duration: 5000,
         });
-      } finally {
-        isDocumentOperationInProgress.current = false;
-      }
+      },
     });
-  }, [excalidrawAPI, language.langCode, scheduleRecoverySnapshot, updateDirty]);
+    const unsubscribe = desktopBridge.onDocumentLoadRequested(payload => loads.enqueue(payload));
+    const cancel = desktopBridge.onDocumentLoadCancelled(({ loadId }) => loads.cancel(loadId));
+    return () => { unsubscribe(); cancel(); loads.dispose(); };
+  }, [excalidrawAPI, language.langCode, recovery, scheduleRecoverySnapshot, updateDirty, desktopBridge]);
+
+  React.useEffect(() => {
+    if (!excalidrawAPI) return;
+    const controller = new LibraryController(desktopBridge,
+      items => excalidrawAPI.updateLibrary({ libraryItems: items as never[], merge: false }),
+      () => setLibraryFailed(true),
+      pending => desktopBridge.notifyLibraryStateChanged(pending));
+    library.current = controller;
+    void controller.start();
+    const unsubscribe = desktopBridge.onLibraryChanged(snapshot => controller.receive(snapshot));
+    return () => {
+      unsubscribe();
+      controller.dispose();
+      if (library.current === controller) library.current = null;
+    };
+  }, [excalidrawAPI, desktopBridge]);
+
+  React.useEffect(() => {
+    const unsubscribe = desktopBridge.onCloseBarrierRequested(({ barrierId, locked }) => {
+      setCloseBarrier(current => locked ? { barrierId, locked: true } :
+        current?.barrierId === barrierId ? null : current);
+    });
+    return () => { unsubscribe(); };
+  }, []);
+
+  React.useEffect(() => {
+    if (!closeBarrier?.locked || !excalidrawAPI) {
+      return;
+    }
+    let cancelled = false;
+    const waitForOperation = () => {
+      if (cancelled) return;
+      if (isDocumentOperationInProgress.current || library.current?.isSaving) {
+        ownerWindow.setTimeout(waitForOperation, 25);
+        return;
+      }
+      const revision = getDocumentRevision(
+        excalidrawAPI.getSceneElements(), excalidrawAPI.getAppState(),
+      );
+      desktopBridge.notifyCloseBarrierReady(closeBarrier.barrierId,
+        revision !== savedRevision.current, !library.current?.hasUnsavedChanges);
+    };
+    // Let Excalidraw commit the read-only render before acknowledging the barrier.
+    const timer = ownerWindow.setTimeout(waitForOperation, 0);
+    return () => {
+      cancelled = true;
+      ownerWindow.clearTimeout(timer);
+    };
+  }, [closeBarrier, excalidrawAPI]);
 
   const saveDocument = React.useCallback(
-    async (saveAs: boolean): Promise<boolean> => {
-      if (!excalidrawAPI || isDocumentOperationInProgress.current) {
+    async (saveAs: boolean, closeRequestId?: string): Promise<boolean> => {
+      if (!excalidrawAPI || isDocumentOperationInProgress.current ||
+        (closeBarrier?.locked && !closeRequestId)) {
         return false;
       }
 
@@ -264,15 +262,16 @@ const DesktopApp = () => {
           api: excalidrawAPI,
           bridge: desktopBridge,
           saveAs,
+          closeRequestId,
         });
         if (result.status === "saved") {
           savedRevision.current = result.revision;
-          lastSnapshotRevision.current = null;
+          recovery.reset();
           const currentRevision = getDocumentRevision(
             excalidrawAPI.getSceneElements(),
             excalidrawAPI.getAppState(),
           );
-          updateDirty(currentRevision !== result.revision);
+          updateDirty(currentRevision !== result.revision, currentRevision);
           if (isDirty.current) {
             scheduleRecoverySnapshot(currentRevision);
           }
@@ -295,7 +294,7 @@ const DesktopApp = () => {
         isDocumentOperationInProgress.current = false;
       }
     },
-    [excalidrawAPI, language.langCode, scheduleRecoverySnapshot, updateDirty],
+    [excalidrawAPI, language.langCode, recovery, scheduleRecoverySnapshot, updateDirty, closeBarrier],
   );
 
   React.useEffect(
@@ -304,15 +303,16 @@ const DesktopApp = () => {
         void saveDocument(
           request.reason === "saveAs" ||
             request.reason === "externalConflict",
+          request.closeRequestId,
         ).then(
           (isClean) => {
-            if (request.reason !== "close") {
+            if (request.reason !== "close" || !request.closeRequestId) {
               return;
             }
             if (isClean) {
-              desktopBridge.notifyCloseReady();
+              desktopBridge.notifyCloseReady(request.closeRequestId);
             } else {
-              desktopBridge.notifyCloseCancelled();
+              desktopBridge.notifyCloseCancelled(request.closeRequestId);
             }
           },
         );
@@ -332,6 +332,7 @@ const DesktopApp = () => {
     }
 
     return desktopBridge.onAutomationEditRequested(({ elementId }) => {
+      if (closeBarrier?.locked) return;
       const existingElements = excalidrawAPI.getSceneElements();
       excalidrawAPI.updateScene({
         elements: [
@@ -367,7 +368,7 @@ const DesktopApp = () => {
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       });
     });
-  }, [excalidrawAPI]);
+  }, [closeBarrier, excalidrawAPI]);
 
   React.useEffect(() => {
     if (
@@ -428,6 +429,15 @@ const DesktopApp = () => {
     };
 
     smokeWindow.__EXCALIDRAW_DESKTOP_SMOKE__ = {
+      isSaving: () => isDocumentOperationInProgress.current,
+      deleteAllElements() {
+        excalidrawAPI.updateScene({
+          elements: excalidrawAPI.getSceneElementsIncludingDeleted().map((element) => ({
+            ...element, isDeleted: true, version: element.version + 1,
+          })),
+          captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+        });
+      },
       updateAppState(appState) {
         excalidrawAPI.updateScene({ appState, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
       },
@@ -528,11 +538,15 @@ const DesktopApp = () => {
       }
 
       isImageExportInProgress.current = true;
-      void exportWholeDrawingAsPng(excalidrawAPI, request, ownerWindow)
+      const controller = new ownerWindow.AbortController();
+      activeExport.current = { exportId: request.exportId, controller };
+      void exportWholeDrawingAsPng(excalidrawAPI, request, ownerWindow, undefined, controller.signal)
         .catch((error: unknown) => {
+          if (controller.signal.aborted || activeExport.current?.exportId !== request.exportId) return;
           const message = getDesktopErrorString(
             language.langCode,
-            error instanceof DesktopBridgeError ? error.code : undefined,
+            error instanceof DesktopBridgeError ? error.code :
+              (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" ? error.code : undefined),
             "exportFailed",
           );
           desktopBridge.notifyImageExportFailed(request.exportId, message);
@@ -543,13 +557,30 @@ const DesktopApp = () => {
           });
         })
         .finally(() => {
-          isImageExportInProgress.current = false;
+          if (activeExport.current?.exportId === request.exportId) {
+            isImageExportInProgress.current = false;
+            activeExport.current = null;
+          }
         });
     });
   }, [excalidrawAPI, language.langCode]);
 
   React.useEffect(() => {
+    const unsubscribe = desktopBridge.onImageExportCancelRequested(({ exportId }) => {
+    if (activeExport.current?.exportId === exportId) {
+      activeExport.current?.controller.abort();
+    }
+    });
+    return () => { unsubscribe(); };
+  }, []);
+
+  React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (closeBarrier?.locked) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       if (
         (event.key.toLowerCase() === "n" ||
           event.key.toLowerCase() === "t") &&
@@ -614,26 +645,36 @@ const DesktopApp = () => {
     ownerWindow.addEventListener("keydown", handleKeyDown, true);
     return () =>
       ownerWindow.removeEventListener("keydown", handleKeyDown, true);
-  }, [openDocument, saveDocument]);
+  }, [closeBarrier, openDocument, saveDocument]);
 
   return (
     <main
       className="desktop-app"
       aria-label={getDesktopString(language.langCode, "editorLabel")}
     >
-      <div className="editor-surface">
+      {libraryFailed && <div role="alert" className="library-status">
+        {getDesktopString(language.langCode, "libraryUnavailable")}
+        <button type="button" onClick={() => { setLibraryFailed(false); library.current?.retry(); }}>
+          {getDesktopString(language.langCode, "settingsRetry")}
+        </button>
+      </div>}
+      <div className="editor-surface" style={closeBarrier?.locked ? { position: "relative" } : undefined}>
+        {closeBarrier?.locked && <div className="close-barrier-shield" aria-hidden="true" />}
         <Excalidraw
           excalidrawAPI={setExcalidrawAPI}
           langCode={language.langCode}
           theme={theme}
+          viewModeEnabled={closeBarrier?.locked ?? false}
+          onLibraryChange={items => library.current?.changed(items)}
           UIOptions={desktopUIOptions}
           onChange={(elements, appState) => {
+            if (isDocumentLoading.current) return;
             if (savedRevision.current === undefined) {
               savedRevision.current = getDocumentRevision([], appState);
             }
             const revision = getDocumentRevision(elements, appState);
             const nextIsDirty = revision !== savedRevision.current;
-            updateDirty(nextIsDirty);
+            updateDirty(nextIsDirty, revision);
             if (nextIsDirty) {
               scheduleRecoverySnapshot(revision);
             }
@@ -671,8 +712,14 @@ const DesktopApp = () => {
   );
 };
 
-ReactDOM.createRoot(root).render(
-  <React.StrictMode>
-    <DesktopApp />
-  </React.StrictMode>,
-);
+if (root) {
+  const appWindow = root.ownerDocument.defaultView;
+  if (!appWindow) throw new Error("The editor window is unavailable.");
+  appWindow.EXCALIDRAW_ASSET_PATH = "/";
+  const bridge = new DesktopBridge(appWindow);
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
+      <DesktopApp mountNode={root} bridge={bridge} />
+    </React.StrictMode>,
+  );
+}

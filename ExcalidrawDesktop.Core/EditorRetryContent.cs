@@ -3,7 +3,11 @@ namespace ExcalidrawDesktop.Core;
 public sealed record PendingEditorLoad(
     string FileName,
     string Content,
-    bool IsRecovery);
+    bool IsRecovery)
+{
+    // Assigned when a host stages this content for a particular editor page.
+    public Guid LoadId { get; init; }
+}
 
 public sealed record EditorRetryState(
     string DisplayName,

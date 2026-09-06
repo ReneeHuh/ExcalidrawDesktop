@@ -73,6 +73,16 @@ try {
                 BackgroundRecoveryRestored = $true
                 BackgroundSaveClearedDirtyState = $true
                 ViewportChangesIgnored = $true
+                DeletedShapeSaveClearedDirtyState = $true
+                SilentEditorCloseTimedOut = $true
+                LateCloseAcknowledgementIgnored = $true
+                CloseRetryAfterTimeoutSucceeded = $true
+                RecoveryRetriedAfterWriteFailure = $true
+                SaveCancellationReleasedEditor = $true
+                SaveRetryAfterCancellationSucceeded = $true
+                EditorFailureDuringPngExportHandled = $true
+                RecoveryExternalChangesProtected = $true
+                LegacyRecoveryRequiresConflictResolution = $true
             }
             return
         }

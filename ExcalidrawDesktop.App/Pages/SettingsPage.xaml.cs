@@ -15,8 +15,10 @@ internal sealed class PreferencesChangedEventArgs(DesktopPreferences preferences
 public sealed partial class SettingsPage : Page
 {
     private bool isLoading;
+    private bool persistenceFailed;
 
     internal event EventHandler<PreferencesChangedEventArgs>? PreferencesChanged;
+    internal event EventHandler? SettingsPersistenceRetryRequested;
 
     public SettingsPage()
     {
@@ -72,7 +74,7 @@ public sealed partial class SettingsPage : Page
                 language,
                 StringComparison.OrdinalIgnoreCase)) ??
             LanguagePicker.Items[0];
-        LanguageRestartInfoBar.IsOpen = !string.Equals(
+        LanguageRestartInfoBar.IsOpen = !persistenceFailed && !string.Equals(
             language,
             DesktopLanguages.NormalizePreference(startupLanguagePreference),
             StringComparison.OrdinalIgnoreCase);
@@ -80,6 +82,7 @@ public sealed partial class SettingsPage : Page
             "LanguageRestartMessageFormat",
             "The application is currently using {0}. Restart Excalidraw Desktop to apply the selected language. Unsaved drawings will not be closed automatically.",
             effectiveLanguage.NativeName);
+        SettingsPersistenceInfoBar.IsOpen = persistenceFailed;
         isLoading = false;
     }
 
@@ -107,4 +110,19 @@ public sealed partial class SettingsPage : Page
                 (LanguagePicker.SelectedItem as ComboBoxItem)?.Tag?.ToString() ??
                     DesktopLanguages.SystemPreference)));
     }
+
+    internal void ShowSettingsPersistenceFailure()
+    {
+        persistenceFailed = true;
+        SettingsPersistenceInfoBar.IsOpen = true;
+        LanguageRestartInfoBar.IsOpen = false;
+    }
+    internal void ClearSettingsPersistenceFailure()
+    {
+        persistenceFailed = false;
+        SettingsPersistenceInfoBar.IsOpen = false;
+    }
+
+    private void OnSettingsPersistenceRetry(object sender, RoutedEventArgs args) =>
+        SettingsPersistenceRetryRequested?.Invoke(this, EventArgs.Empty);
 }

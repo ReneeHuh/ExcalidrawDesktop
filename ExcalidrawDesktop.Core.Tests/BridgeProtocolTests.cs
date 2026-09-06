@@ -55,11 +55,13 @@ public sealed class BridgeProtocolTests
     [Fact]
     public void Event_CreateProducesAParseableCorrelatedHostEvent()
     {
+        var closeRequestId = Guid.NewGuid();
         var message = BridgeMessageParser.Parse(
-            BridgeEventJson.Create("document.saveRequested", new { reason = "close" }));
+            BridgeEventJson.Create("document.saveRequested", new { reason = "close", closeRequestId }));
 
         Assert.Equal("event", message.Kind);
         Assert.Equal("document.saveRequested", message.Method);
         Assert.Equal("close", message.Payload?.GetProperty("reason").GetString());
+        Assert.Equal(closeRequestId.ToString("D"), message.Payload?.GetProperty("closeRequestId").GetString());
     }
 }

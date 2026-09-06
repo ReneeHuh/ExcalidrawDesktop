@@ -1,0 +1,41 @@
+name: Dependency audit
+
+on:
+  pull_request:
+    paths:
+      - "ExcalidrawDesktop.Web/package.json"
+      - "ExcalidrawDesktop.Web/yarn.lock"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  yarn-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ExcalidrawDesktop.Web
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: ExcalidrawDesktop.Web/yarn.lock
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install locked dependencies
+        run: yarn install --frozen-lockfile --non-interactive
+      - name: Run Yarn audit
+        run: yarn audit --level moderate --json > dependency-audit.json
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dependency-audit
+          path: ExcalidrawDesktop.Web/dependency-audit.json

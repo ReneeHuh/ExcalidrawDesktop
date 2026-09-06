@@ -34,6 +34,7 @@ type LoadDocumentOptions = {
   content: string;
   notifyOpened?: boolean;
   loadScene?: SceneLoader;
+  isCancelled?: () => boolean;
 };
 
 export type OpenDocumentResult =
@@ -72,12 +73,17 @@ export const loadDocumentContentIntoEditor = async ({
   content,
   notifyOpened = true,
   loadScene = loadFromBlob,
+  isCancelled = () => false,
 }: LoadDocumentOptions): Promise<OpenDocumentResult> => {
   const scene = await loadScene(
     new Blob([content], { type: "application/json" }),
     api.getAppState(),
     api.getSceneElements(),
   );
+
+  if (isCancelled()) {
+    throw new Error("The document load was cancelled.");
+  }
 
   api.addFiles(Object.values(scene.files));
   api.updateScene({
@@ -101,6 +107,7 @@ type SaveDocumentOptions = {
   api: DocumentEditorApi;
   bridge: Pick<DesktopBridge, "saveDocument" | "saveDocumentAs">;
   saveAs: boolean;
+  closeRequestId?: string;
   serialize?: typeof serializeAsJSON;
 };
 
@@ -112,6 +119,7 @@ export const saveDocumentFromEditor = async ({
   api,
   bridge,
   saveAs,
+  closeRequestId,
   serialize = serializeAsJSON,
 }: SaveDocumentOptions): Promise<SaveDocumentResult> => {
   const elements = api.getSceneElements();
@@ -126,8 +134,8 @@ export const saveDocumentFromEditor = async ({
     "local",
   );
   const response = saveAs
-    ? await bridge.saveDocumentAs(content)
-    : await bridge.saveDocument(content);
+    ? await bridge.saveDocumentAs(content, closeRequestId)
+    : await bridge.saveDocument(content, closeRequestId);
 
   return response.status === "saved" ? { ...response, revision } : response;
 };

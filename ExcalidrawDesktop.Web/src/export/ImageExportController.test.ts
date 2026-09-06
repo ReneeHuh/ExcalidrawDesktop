@@ -101,4 +101,32 @@ describe("exportWholeDrawingAsPng", () => {
     ).rejects.toThrow("exceeds");
     expect(upload).not.toHaveBeenCalled();
   });
+
+  it("honors cancellation before a hung renderer can upload", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const upload = vi.fn();
+    await expect(exportWholeDrawingAsPng(createApi(), request, window, {
+      exportToBlob: vi.fn() as never,
+      getCommonBounds: vi.fn(() => [0, 0, 10, 10] as [number, number, number, number]),
+      upload,
+    }, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("stops waiting for a renderer already in progress and ignores its late blob", async () => {
+    const controller = new AbortController();
+    let finish!: (blob: Blob) => void;
+    const upload = vi.fn();
+    const operation = exportWholeDrawingAsPng(createApi(), request, window, {
+      exportToBlob: vi.fn(() => new Promise<Blob>(resolve => { finish = resolve; })) as never,
+      getCommonBounds: vi.fn(() => [0, 0, 10, 10] as [number, number, number, number]),
+      upload,
+    }, controller.signal);
+    controller.abort();
+    await expect(operation).rejects.toMatchObject({ name: "AbortError" });
+    finish(new Blob(["png"], { type: "image/png" }));
+    await Promise.resolve();
+    expect(upload).not.toHaveBeenCalled();
+  });
 });

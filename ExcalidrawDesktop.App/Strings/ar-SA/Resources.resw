@@ -178,4 +178,12 @@
   <data name="EditorRetryFailed" xml:space="preserve"><value>تعذرت استعادة الرسم</value></data>
   <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>بيانات استعادة هذا الرسم غير المحفوظ مفقودة أو غير قابلة للقراءة. لم يتم تغيير أي ملف رسم.</value></data>
   <data name="EditorRetryFileGuidance" xml:space="preserve"><value>حاول مرة أخرى أو أعد فتح ملف الرسم. لم يتم تغيير أي ملف رسم.</value></data>
+  <data name="StatusRecoveryFailed" xml:space="preserve"><value>الاسترداد غير متاح — حفظ باسم…</value></data>
+  <data name="RecoveredDrawingName" xml:space="preserve"><value>رسم مسترد</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>فشل الاسترداد عند بدء التشغيل</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>تعذر استعادة بعض الرسومات. تم الاحتفاظ ببيانات الاسترداد.</value></data>
+  <data name="CloseWindowButton" xml:space="preserve"><value>إغلاق النافذة</value></data>
+  <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>تعذر حفظ الإعدادات</value></data>
+  <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>التفضيل المحدد فعال لهذه الجلسة، ولكن تعذر حفظه. تحقق من موقع الإعدادات وحاول مرة أخرى.</value></data>
+  <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>إعادة المحاولة</value></data>
 </root>

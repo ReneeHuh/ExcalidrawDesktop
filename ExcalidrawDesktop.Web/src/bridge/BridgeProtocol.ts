@@ -32,6 +32,18 @@ export type DocumentNewResponse =
   | { status: "created" };
 
 export type BridgeRequestMap = {
+  "library.load": {
+    payload: undefined;
+    response: { status: "loaded"; content: string; revision: string } | { status: "unavailable" };
+  };
+  "library.save": {
+    payload: { content: string; expectedRevision: string };
+    response: { status: "saved"; content: string; revision: string };
+  };
+  "document.recoverySnapshot": {
+    payload: { content: string };
+    response: { status: "stored" | "ignored" };
+  };
   "app.ping": {
     payload: undefined;
     response: PingResponse;
@@ -45,11 +57,11 @@ export type BridgeRequestMap = {
     response: DocumentNewResponse;
   };
   "document.save": {
-    payload: { content: string };
+    payload: { content: string; closeRequestId?: string };
     response: DocumentSaveResponse;
   };
   "document.saveAs": {
-    payload: { content: string };
+    payload: { content: string; closeRequestId?: string };
     response: DocumentSaveResponse;
   };
 };
@@ -57,19 +69,24 @@ export type BridgeRequestMap = {
 export type BridgeRequestMethod = keyof BridgeRequestMap;
 
 export type BridgeEventMap = {
+  "document.cancelSave": { requestId: string };
   "app.ready": undefined;
   "app.languageApplied": {
     langCode: string;
     direction: "ltr" | "rtl";
   };
-  "app.closeReady": undefined;
-  "app.closeCancelled": undefined;
+  "app.closeReady": { closeRequestId: string };
+  "app.closeCancelled": { closeRequestId: string };
   "document.created": undefined;
   "document.dirtyChanged": { isDirty: boolean };
+  "library.stateChanged": { hasUnsavedChanges: boolean };
   "document.opened": { fileName: string };
   "document.recovered": undefined;
-  "document.loadFailed": undefined;
-  "document.recoverySnapshot": { content: string };
+  "document.loadFailed": { loadId: string };
+  "document.loadApplied": { loadId: string; fileName: string; isRecovery: boolean };
+  "document.loadCancelled": { loadId: string };
+  "document.closeBarrierReady": { barrierId: string; isDirty: boolean; canClose?: boolean };
+  "library.changed": { content: string; revision: string };
   "image.exportFailed": {
     exportId: string;
     message: string;
@@ -85,6 +102,10 @@ export type BridgeEventMap = {
 export type BridgeEventMethod = keyof BridgeEventMap;
 
 export type HostEventMap = {
+  "document.loadCancelled": { loadId: string };
+  "document.closeBarrierRequested": { barrierId: string; locked: boolean };
+  "document.saveCancelled": { closeRequestId: string };
+  "document.saveProgress": { requestId: string; isPickerOpen: boolean };
   "app.themeChanged": {
     theme: "light" | "dark";
   };
@@ -97,8 +118,10 @@ export type HostEventMap = {
   };
   "document.saveRequested": {
     reason: "save" | "saveAs" | "close" | "externalConflict";
+    closeRequestId?: string;
   };
   "document.loadRequested": {
+    loadId?: string;
     fileName: string;
     content: string;
     isRecovery: boolean;
@@ -111,6 +134,8 @@ export type HostEventMap = {
     scale: number;
     padding: number;
   };
+  "image.exportCancelRequested": { exportId: string };
+  "image.exportCancelled": { exportId: string };
 };
 
 export type HostEventMethod = keyof HostEventMap;
@@ -131,6 +156,28 @@ export const parseBridgeResponse = <Method extends BridgeRequestMethod>(
       throw new Error("The app.ping response payload is invalid.");
     }
     return payload as BridgeRequestMap[Method]["response"];
+  }
+
+  if (method === "library.load") {
+    if (!isRecord(payload) || (payload.status !== "loaded" && payload.status !== "unavailable")) {
+      throw new Error("The library.load response payload is invalid.");
+    }
+    if (payload.status === "unavailable") return { status: "unavailable" } as BridgeRequestMap[Method]["response"];
+    if (typeof payload.content !== "string" || typeof payload.revision !== "string") throw new Error("The library.load response payload is invalid.");
+    return { status: "loaded", content: payload.content, revision: payload.revision } as BridgeRequestMap[Method]["response"];
+  }
+
+  if (method === "library.save") {
+    if (!isRecord(payload) || payload.status !== "saved" ||
+        typeof payload.content !== "string" || typeof payload.revision !== "string") {
+      throw new Error("The library.save response payload is invalid.");
+    }
+    return { status: "saved", content: payload.content, revision: payload.revision } as BridgeRequestMap[Method]["response"];
+  }
+
+  if (method === "document.recoverySnapshot" && isRecord(payload) &&
+      (payload.status === "stored" || payload.status === "ignored")) {
+    return { status: payload.status } as BridgeRequestMap[Method]["response"];
   }
 
   if (method === "document.open") {

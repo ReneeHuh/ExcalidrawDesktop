@@ -5,9 +5,14 @@ namespace ExcalidrawDesktop.App.Services;
 
 internal sealed class ApplicationWorkspaceCoordinator
 {
+    internal enum SettingsPersistenceOutcome { AppliedAndPersisted, AppliedInMemoryOnly }
+    internal sealed record SettingsPersistenceResult(SettingsPersistenceOutcome Outcome, Exception? Error = null);
     private readonly List<MainWindow> windows = [];
     private readonly Dictionary<MainWindow, string> logicalWindowIds = [];
     private readonly Dictionary<MainWindow, WorkspaceWindowState> restoreStates = [];
+    private readonly PathReservationRegistry pathReservations = new();
+    private readonly RecoveryRetentionPolicy recoveryRetention = new();
+    private readonly LibraryStore libraryStore;
     private readonly MultiWindowWorkspaceStateStore workspaceStateStore;
     private readonly DesktopSettingsStore desktopSettingsStore = new();
     private readonly SemaphoreSlim persistenceGate = new(1, 1);
@@ -16,16 +21,20 @@ internal sealed class ApplicationWorkspaceCoordinator
     private string? restoredLastActiveWindowId;
     private bool isExiting;
     private bool startupRecoveryPruned;
+    public SettingsPersistenceResult? LastSettingsPersistenceResult { get; private set; }
     private Dictionary<string, WorkspaceWindowState>? exitWorkspace;
 
     public ApplicationWorkspaceCoordinator(
         string? workspaceStatePath = null,
-        DesktopPreferences? startupPreferences = null)
+        DesktopPreferences? startupPreferences = null,
+        DesktopSettingsStore? settingsStore = null)
     {
         WorkspaceStatePath = workspaceStatePath ?? DesktopPaths.WorkspaceStatePath;
         workspaceStateStore = new MultiWindowWorkspaceStateStore(WorkspaceStatePath);
         RecoverySnapshotStore = new RecoverySnapshotStore(
             DesktopPaths.GetRecoveryDirectory(WorkspaceStatePath));
+        desktopSettingsStore = settingsStore ?? new DesktopSettingsStore();
+        libraryStore = new LibraryStore(Path.Combine(DesktopPaths.DataRoot, "library.json"));
         Preferences = startupPreferences ?? desktopSettingsStore.Load();
         StartupLanguagePreference = Preferences.Language;
         EffectiveLanguage = DesktopLanguageStartup.ResolveEffective(
@@ -36,13 +45,45 @@ internal sealed class ApplicationWorkspaceCoordinator
     public List<string> RecentFiles { get; } = [];
     public string WorkspaceStatePath { get; }
     public RecoverySnapshotStore RecoverySnapshotStore { get; }
+    public MultiWindowWorkspaceStateStore.LoadStatus WorkspaceLoadStatus =>
+        workspaceStateStore.LastLoadStatus;
+    public IReadOnlyList<string> DiscoveredRecoverySnapshotIds =>
+        RecoverySnapshotStore.DiscoverSnapshotIds();
+    public bool IsExiting => isExiting;
+    public event Action<LibraryLoadResult>? LibraryChanged;
+
+    public Task<LibraryLoadResult> LoadLibraryAsync() => libraryStore.LoadAsync();
+
+    public async Task<LibrarySaveResult> SaveLibraryAsync(string content, string expectedRevision)
+    {
+        var result = await libraryStore.SaveAsync(content, expectedRevision);
+        LibraryChanged?.Invoke(new LibraryLoadResult("loaded", result.Content, result.Revision));
+        return result;
+    }
+
+    /// <summary>Reserves a path for an in-flight open or Save As operation.</summary>
+    public bool TryReservePath(string path, object owner, out IDisposable? reservation)
+    {
+        reservation = null;
+        var canonical = DesktopDocumentPath.Normalize(path);
+        if (canonical is null) return false;
+        return pathReservations.TryReserve(canonical, owner, out reservation);
+    }
+
+    public bool IsPathReservedByAnother(string path, object owner)
+    {
+        var canonical = DesktopDocumentPath.Normalize(path);
+        if (canonical is null) return false;
+        return pathReservations.IsReservedByAnother(canonical, owner);
+    }
     public IReadOnlyList<WorkspaceWindowState> RestoredWindows { get; private set; } = [];
     public DesktopPreferences Preferences { get; private set; }
     public DesktopLanguage EffectiveLanguage { get; }
     public string StartupLanguagePreference { get; }
 
-    public void UpdatePreferences(DesktopPreferences preferences)
+    public SettingsPersistenceResult UpdatePreferences(DesktopPreferences preferences)
     {
+        LastSettingsPersistenceResult = null;
         preferences = preferences with
         {
             Language = DesktopLanguages.NormalizePreference(preferences.Language),
@@ -59,7 +100,10 @@ internal sealed class ApplicationWorkspaceCoordinator
             // failure is recorded rather than allowed to unwind a XAML event
             // handler and terminate the process.
             DiagnosticLogService.Error("settings.save_failed", exception);
+            LastSettingsPersistenceResult = new(SettingsPersistenceOutcome.AppliedInMemoryOnly, exception);
         }
+        if (LastSettingsPersistenceResult is null || LastSettingsPersistenceResult.Error is null)
+            LastSettingsPersistenceResult = new(SettingsPersistenceOutcome.AppliedAndPersisted);
         DiagnosticLogService.Info("settings.changed", new
         {
             theme = preferences.Theme.ToString(),
@@ -73,11 +117,21 @@ internal sealed class ApplicationWorkspaceCoordinator
         {
             window.ApplySharedPreferences(preferences);
         }
+        return LastSettingsPersistenceResult;
     }
 
     public async Task InitializeAsync()
     {
         var state = await workspaceStateStore.LoadAsync();
+        recoveryRetention.Reset();
+        IReadOnlyList<string> discoveredRecoveryIds = [];
+        try
+        {
+            discoveredRecoveryIds = RecoverySnapshotStore.DiscoverSnapshotIds();
+            recoveryRetention.Seed(discoveredRecoveryIds);
+        }
+        catch (IOException) { recoveryRetention.MarkDiscoveryFailed(); }
+        catch (UnauthorizedAccessException) { recoveryRetention.MarkDiscoveryFailed(); }
         RecentFiles.Clear();
         RecentFiles.AddRange(state.RecentFiles
             .Select(DesktopDocumentPath.Normalize)
@@ -86,6 +140,23 @@ internal sealed class ApplicationWorkspaceCoordinator
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(10));
         RestoredWindows = state.Windows;
+        var referenced = state.Windows.SelectMany(w => w.Tabs)
+            .Select(t => t.RecoveryId).OfType<string>()
+            .Select(id => Guid.TryParseExact(id, "N", out var g) ? g.ToString("N") : null)
+            .OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var orphanIds = discoveredRecoveryIds
+            .Where(id => !referenced.Contains(id)).Take(50).ToArray();
+        if (orphanIds.Length > 0)
+        {
+            var windows = RestoredWindows.ToList();
+            if (windows.Count == 0)
+                windows.Add(new WorkspaceWindowState("recovery", null, false, orphanIds[0], Array.Empty<WorkspaceTabState>()));
+            var target = windows[0];
+            var tabs = target.Tabs.ToList();
+            tabs.AddRange(orphanIds.Select(id => new WorkspaceTabState(null, true, id)));
+            windows[0] = target with { Tabs = tabs, ActiveRecoveryId = target.ActiveRecoveryId ?? orphanIds[0] };
+            RestoredWindows = windows;
+        }
         restoredLastActiveWindowId = state.LastActiveWindowId;
     }
 
@@ -356,11 +427,18 @@ internal sealed class ApplicationWorkspaceCoordinator
     }
 
     public Task PruneRecoverySnapshotsAsync(MainWindow? excludedWindow = null) =>
-        RecoverySnapshotStore.PruneExceptAsync(
-            windows.Where(window => !ReferenceEquals(window, excludedWindow))
+        recoveryRetention.ShouldSkipPrune ? Task.CompletedTask :
+        RecoverySnapshotStore.PruneExceptAsync(() =>
+            recoveryRetention.GetRetained(windows.Where(window => !ReferenceEquals(window, excludedWindow))
                 .SelectMany(window => window.OpenSessions)
                 .Where(session => session.IsDirty)
-                .Select(session => session.RecoveryId));
+                .Select(session => session.RecoveryId)));
+
+    /// <summary>Releases an orphan only after a confirmed restore or explicit discard.</summary>
+    public void ReleasePreservedRecovery(string recoveryId)
+    {
+        recoveryRetention.Release(recoveryId);
+    }
 
     public async Task NotifyWindowReadyAsync(MainWindow window)
     {
@@ -370,7 +448,7 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
 
         QueuePersistWorkspace();
-        if (startupRecoveryPruned || windows.Any(candidate =>
+        if (startupRecoveryPruned || workspaceStateStore.LastLoadStatus != MultiWindowWorkspaceStateStore.LoadStatus.Loaded || windows.Any(candidate =>
                 !candidate.IsReadyForActivation))
         {
             return;

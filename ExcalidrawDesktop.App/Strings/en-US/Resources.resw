@@ -186,4 +186,12 @@
   <data name="EditorRetryFailed" xml:space="preserve"><value>Could not restore drawing</value></data>
   <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>The recovery data for this unsaved drawing is missing or unreadable. No drawing file has been changed.</value></data>
   <data name="EditorRetryFileGuidance" xml:space="preserve"><value>Retry again or reopen the drawing file. No drawing file has been changed.</value></data>
+  <data name="StatusRecoveryFailed" xml:space="preserve"><value>Recovery unavailable — Save As…</value></data>
+  <data name="RecoveredDrawingName" xml:space="preserve"><value>Recovered drawing</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>Startup recovery failed</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>Some drawings could not be restored. Recovery data was preserved.</value></data>
+  <data name="CloseWindowButton" xml:space="preserve"><value>Close window</value></data>
+  <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>Settings could not be saved</value></data>
+  <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>The selected preference is active for this session, but could not be saved. Check the settings location and retry.</value></data>
+  <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>Retry</value></data>
 </root>

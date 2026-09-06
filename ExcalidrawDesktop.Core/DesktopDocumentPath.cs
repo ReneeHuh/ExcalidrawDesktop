@@ -8,9 +8,15 @@ public static class DesktopDocumentPath
         {
             return null;
         }
-
-        return Path.GetFullPath(path)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (path.IndexOf('\0') >= 0) return null;
+        try
+        {
+            return Path.GetFullPath(path)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch (ArgumentException) { return null; }
+        catch (NotSupportedException) { return null; }
+        catch (IOException) { return null; }
     }
 
     public static bool Equals(string? left, string? right)

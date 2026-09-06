@@ -178,4 +178,12 @@
   <data name="EditorRetryFailed" xml:space="preserve"><value>Zeichnung konnte nicht wiederhergestellt werden</value></data>
   <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>Die Wiederherstellungsdaten dieser ungespeicherten Zeichnung fehlen oder sind nicht lesbar. Es wurde keine Zeichnungsdatei geändert.</value></data>
   <data name="EditorRetryFileGuidance" xml:space="preserve"><value>Versuchen Sie es erneut oder öffnen Sie die Zeichnungsdatei erneut. Es wurde keine Zeichnungsdatei geändert.</value></data>
+  <data name="StatusRecoveryFailed" xml:space="preserve"><value>Wiederherstellung nicht verfügbar — Speichern unter …</value></data>
+  <data name="RecoveredDrawingName" xml:space="preserve"><value>Wiederhergestellte Zeichnung</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>Startwiederherstellung fehlgeschlagen</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>Einige Zeichnungen konnten nicht wiederhergestellt werden. Die Wiederherstellungsdaten wurden beibehalten.</value></data>
+  <data name="CloseWindowButton" xml:space="preserve"><value>Fenster schließen</value></data>
+  <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>Einstellungen konnten nicht gespeichert werden</value></data>
+  <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>Die ausgewählte Einstellung ist für diese Sitzung aktiv, konnte aber nicht gespeichert werden. Überprüfen Sie den Speicherort und versuchen Sie es erneut.</value></data>
+  <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>Erneut versuchen</value></data>
 </root>

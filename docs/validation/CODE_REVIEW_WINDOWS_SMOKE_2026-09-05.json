@@ -1,0 +1,46 @@
+{
+  "date": "2026-09-05",
+  "appConfiguration": "Debug x64 unpackaged",
+  "suites": [
+    {
+      "suite": "document-safety",
+      "status": "passed",
+      "output": "Result               : Passed\r\nProcessId            : 12748\r\nSaveIsolation        : True\r\nBridgeIsolation      : True\r\nExternalModification : True\r\nExternalMoveOrRename : True\r\nExternalDeletion     : True\r\nConflictReload       : True\r\nConflictSaveAs       : True\r\nConflictKeepEditing  : True"
+    },
+    {
+      "suite": "close-decisions",
+      "status": "passed",
+      "output": "Result                                : Passed\r\nProcessId                             : 23840\r\nCancelPreservedDirtyDrawing           : True\r\nDiscardClosedDirtyDrawing             : True\r\nSaveWroteOwningFileAndClosed          : True\r\nWindowCancelPreservedAllDirtyDrawings : True\r\nReviewSelectedFirstDirtyDrawing       : True\r\nSaveAllWroteEveryOwningFile           : True"
+    },
+    {
+      "suite": "tabbed",
+      "status": "passed",
+      "output": "Result                                   : Passed\r\nProcessId                                : 23852\r\nTabCount                                 : 2\r\nUniqueOrigins                            : 2\r\nLocalStorageIsolated                     : True\r\nIndexedDbIsolated                        : True\r\nSceneStateIsolated                       : True\r\nViewportAndZoomIsolated                  : True\r\nSelectionIsolated                        : True\r\nUndoHistoryIsolated                      : True\r\nSavedDrawingRestoredOnRetry              : True\r\nRecoverySnapshotRestoredOnRetry          : True\r\nUnavailableRecoveryBlocksRetry           : True\r\nPendingCloseCancelledOnEditorFailure     : True\r\nBackgroundChangesTracked                 : True\r\nBackgroundRecoveryRestored               : True\r\nBackgroundSaveClearedDirtyState          : True\r\nViewportChangesIgnored                   : True\r\nDeletedShapeSaveClearedDirtyState        : True\r\nSilentEditorCloseTimedOut                : True\r\nLateCloseAcknowledgementIgnored          : True\r\nCloseRetryAfterTimeoutSucceeded          : True\r\nRecoveryRetriedAfterWriteFailure         : True\r\nSaveCancellationReleasedEditor           : True\r\nSaveRetryAfterCancellationSucceeded      : True\r\nEditorFailureDuringPngExportHandled      : True\r\nRecoveryExternalChangesProtected         : True\r\nLegacyRecoveryRequiresConflictResolution : True"
+    },
+    {
+      "suite": "recovery",
+      "status": "passed",
+      "output": "Result                    : Passed\r\nProcessId                 : 7072\r\nForcedTermination         : True\r\nDirtyUntitledTabsRestored : 2\r\nSnapshotValidatedByEditor : True"
+    },
+    {
+      "suite": "image-export",
+      "status": "passed",
+      "output": "Result                   : Passed\r\nProcessId                : 9036\r\nPngBytes                 : 1076992\r\nWidth                    : 14400\r\nHeight                   : 3880\r\nFullSceneBounds          : True\r\nEmbeddedImageInput       : True\r\nWebViewBinaryTransfer    : True\r\nTransactionalNativeWrite : True"
+    },
+    {
+      "suite": "multi-window",
+      "status": "passed",
+      "output": "Result                     : Passed\r\nProcessId                  : 26224\r\nIndependentWindows         : True\r\nLiveSessionMoved           : True\r\nWebViewIdentityPreserved   : True\r\nOriginPreserved            : True\r\nWindowHandlersRebound      : True\r\nEmptyDestinationClosed     : True\r\nUnsafeMoveRejected         : True\r\nDirtyStatePreserved        : True\r\nWatcherRebound             : True\r\nRepeatedMoveCleanup        : True\r\nSaveIsolation              : True\r\nSaveAsIsolation            : True\r\nExternalChangeIsolation    : True\r\nRecoveryIdentityPreserved  : True\r\nInitializationMoveRejected : True\r\nResumeMoveRejected         : True\r\nUnloadedMoveRejected       : True\r\nWebViewFailureMoveRejected : True\r\nWebViewFailureRecovered    : True"
+    },
+    {
+      "suite": "multi-exit",
+      "status": "passed",
+      "output": "Result                      : Passed\r\nProcessId                   : 24532\r\nCleanWindowsClosed          : 2\r\nProcessExited               : True\r\nAggregateWorkspacePersisted : True\r\nDirtyWindowsDiscarded       : 0"
+    },
+    {
+      "suite": "multi-exit-dirty",
+      "status": "passed",
+      "output": "Result                      : Passed\r\nProcessId                   : 26588\r\nCleanWindowsClosed          : 2\r\nProcessExited               : True\r\nAggregateWorkspacePersisted : True\r\nDirtyWindowsDiscarded       : 2"
+    }
+  ]
+}

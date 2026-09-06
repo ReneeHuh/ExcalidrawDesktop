@@ -1,0 +1,402 @@
+[
+  {
+    "Package": "nanoid",
+    "Severity": "high",
+    "Version": "3.3.3",
+    "Advisory": "GHSA-28wg-ghj8-5hjv",
+    "Fixed": ">=3.3.16",
+    "Title": "nanoid: non-secure generators can loop indefinitely with negative size",
+    "Path": "@excalidraw/excalidraw>nanoid",
+    "Url": "https://github.com/advisories/GHSA-28wg-ghj8-5hjv"
+  },
+  {
+    "Package": "nanoid",
+    "Severity": "high",
+    "Version": "4.0.2",
+    "Advisory": "GHSA-28wg-ghj8-5hjv",
+    "Fixed": ">=5.1.16",
+    "Title": "nanoid: non-secure generators can loop indefinitely with negative size",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>nanoid",
+    "Url": "https://github.com/advisories/GHSA-28wg-ghj8-5hjv"
+  },
+  {
+    "Package": "nanoid",
+    "Severity": "high",
+    "Version": "3.3.3",
+    "Advisory": "GHSA-2v37-7h3g-55p8",
+    "Fixed": ">=3.3.18",
+    "Title": "nanoid: custom generators can loop indefinitely when size is zero",
+    "Path": "@excalidraw/excalidraw>nanoid",
+    "Url": "https://github.com/advisories/GHSA-2v37-7h3g-55p8"
+  },
+  {
+    "Package": "nanoid",
+    "Severity": "high",
+    "Version": "4.0.2",
+    "Advisory": "GHSA-2v37-7h3g-55p8",
+    "Fixed": ">=5.1.6",
+    "Title": "nanoid: custom generators can loop indefinitely when size is zero",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>nanoid",
+    "Url": "https://github.com/advisories/GHSA-2v37-7h3g-55p8"
+  },
+  {
+    "Package": "mermaid",
+    "Severity": "moderate",
+    "Version": "10.9.3",
+    "Advisory": "GHSA-2v8p-3f2j-5mp7",
+    "Fixed": ">=10.9.8",
+    "Title": "Mermaid XY Charts are vulnerable to an infinite loop DoS",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid",
+    "Url": "https://github.com/advisories/GHSA-2v8p-3f2j-5mp7"
+  },
+  {
+    "Package": "@excalidraw/excalidraw",
+    "Severity": "moderate",
+    "Version": "0.18.0",
+    "Advisory": "GHSA-39h7-pwv7-rc3x",
+    "Fixed": ">=0.18.1",
+    "Title": "Excalidraw vulnerable to XSS via Mermaid sequence diagram labels (KaTeX rendering)",
+    "Path": "@excalidraw/excalidraw",
+    "Url": "https://github.com/advisories/GHSA-39h7-pwv7-rc3x"
+  },
+  {
+    "Package": "@excalidraw/mermaid-to-excalidraw",
+    "Severity": "moderate",
+    "Version": "1.1.2",
+    "Advisory": "GHSA-39h7-pwv7-rc3x",
+    "Fixed": ">=1.1.3",
+    "Title": "Excalidraw vulnerable to XSS via Mermaid sequence diagram labels (KaTeX rendering)",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw",
+    "Url": "https://github.com/advisories/GHSA-39h7-pwv7-rc3x"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-39q2-94rc-95cp",
+    "Fixed": ">=3.4.0",
+    "Title": "DOMPurify's ADD_TAGS function form bypasses FORBID_TAGS due to short-circuit evaluation",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-39q2-94rc-95cp"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-55q2-fjhq-7xh7",
+    "Fixed": ">=3.4.13",
+    "Title": "DOMPurify: IN_PLACE hook removal leaves a detached subtree executable, causing XSS",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-55q2-fjhq-7xh7"
+  },
+  {
+    "Package": "vitest",
+    "Severity": "critical",
+    "Version": "3.0.6",
+    "Advisory": "GHSA-5xrq-8626-4rwp",
+    "Fixed": ">=3.2.6",
+    "Title": "When Vitest UI server is listening, arbitrary file can be read and executed",
+    "Path": "vitest",
+    "Url": "https://github.com/advisories/GHSA-5xrq-8626-4rwp"
+  },
+  {
+    "Package": "mermaid",
+    "Severity": "moderate",
+    "Version": "10.9.3",
+    "Advisory": "GHSA-6m6c-36f7-fhxh",
+    "Fixed": ">=10.9.6",
+    "Title": "Mermaid Gantt Charts are vulnerable to an Infinite Loop DoS",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid",
+    "Url": "https://github.com/advisories/GHSA-6m6c-36f7-fhxh"
+  },
+  {
+    "Package": "mermaid",
+    "Severity": "moderate",
+    "Version": "10.9.3",
+    "Advisory": "GHSA-6x64-9x62-f2gx",
+    "Fixed": ">=10.9.8",
+    "Title": "Mermaid allows CSS injection applying to sibling elements of the diagram",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid",
+    "Url": "https://github.com/advisories/GHSA-6x64-9x62-f2gx"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-76mc-f452-cxcm",
+    "Fixed": ">=3.4.7",
+    "Title": "DOMPurify: Hook mutation of `data.allowedTags` / `data.allowedAttributes` permanently pollutes `DEFAULT_ALLOWED_TAGS` / `DEFAULT_ALLOWED_ATTR`",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-76mc-f452-cxcm"
+  },
+  {
+    "Package": "mermaid",
+    "Severity": "moderate",
+    "Version": "10.9.3",
+    "Advisory": "GHSA-7rqq-prvp-x9jh",
+    "Fixed": ">=10.9.4",
+    "Title": "Mermaid improperly sanitizes sequence diagram labels leading to XSS",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid",
+    "Url": "https://github.com/advisories/GHSA-7rqq-prvp-x9jh"
+  },
+  {
+    "Package": "mermaid",
+    "Severity": "moderate",
+    "Version": "10.9.3",
+    "Advisory": "GHSA-87f9-hvmw-gh4p",
+    "Fixed": ">=10.9.6",
+    "Title": "Mermaid: Improper sanitization of configuration leads to CSS injection",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid",
+    "Url": "https://github.com/advisories/GHSA-87f9-hvmw-gh4p"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "low",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-c2j3-45gr-mqc4",
+    "Fixed": ">=3.4.12",
+    "Title": "DOMPurify: `CUSTOM_ELEMENT_HANDLING` bypasses `afterSanitizeElements` for allowed custom elements.",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-c2j3-45gr-mqc4"
+  },
+  {
+    "Package": "mermaid",
+    "Severity": "low",
+    "Version": "10.9.3",
+    "Advisory": "GHSA-c4c3-pg64-4m4v",
+    "Fixed": ">=10.9.8",
+    "Title": "Mermaid configuration APIs allow prototype pollution",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid",
+    "Url": "https://github.com/advisories/GHSA-c4c3-pg64-4m4v"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-cj63-jhhr-wcxv",
+    "Fixed": ">=3.3.2",
+    "Title": "DOMPurify USE_PROFILES prototype pollution allows event handlers",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-cj63-jhhr-wcxv"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-cjmm-f4jc-qw8r",
+    "Fixed": ">=3.3.2",
+    "Title": "DOMPurify ADD_ATTR predicate skips URI validation",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-cjmm-f4jc-qw8r"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-cmwh-pvxp-8882",
+    "Fixed": ">=3.4.11",
+    "Title": "DOMPurify: Permanent `ALLOWED_ATTR` pollution via `setConfig()` bypassing the hook clone-guard (incomplete fix of the 3.4.7 hook-pollution patch)",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-cmwh-pvxp-8882"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-crv5-9vww-q3g8",
+    "Fixed": ">=3.4.0",
+    "Title": "DOMPurify has a SAFE_FOR_TEMPLATES bypass in RETURN_DOM mode",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-crv5-9vww-q3g8"
+  },
+  {
+    "Package": "mermaid",
+    "Severity": "moderate",
+    "Version": "10.9.3",
+    "Advisory": "GHSA-ghcm-xqfw-q4vr",
+    "Fixed": ">=10.9.6",
+    "Title": "Mermaid: Improper sanitization of `classDef` in state diagrams leads to HTML injection",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid",
+    "Url": "https://github.com/advisories/GHSA-ghcm-xqfw-q4vr"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "low",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-gvmj-g25r-r7wr",
+    "Fixed": ">=3.4.8",
+    "Title": "DOMPurify: SAFE_FOR_TEMPLATES bypass - template expressions survive sanitization inside <template> content when using DOM output modes",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-gvmj-g25r-r7wr"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-h7mw-gpvr-xq4m",
+    "Fixed": ">=3.4.0",
+    "Title": "DOMPurify: FORBID_TAGS bypassed by function-based ADD_TAGS predicate (asymmetry with FORBID_ATTR fix)",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-h7mw-gpvr-xq4m"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-h8r8-wccr-v5f2",
+    "Fixed": ">=3.3.2",
+    "Title": "DOMPurify is vulnerable to mutation-XSS via Re-Contextualization ",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-h8r8-wccr-v5f2"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-hpcv-96wg-7vj8",
+    "Fixed": ">=3.4.6",
+    "Title": "DOMPurify: Cross-realm IN_PLACE sanitization leaves executable markup intact via realm-bound `instanceof` checks",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-hpcv-96wg-7vj8"
+  },
+  {
+    "Package": "nanoid",
+    "Severity": "moderate",
+    "Version": "3.3.3",
+    "Advisory": "GHSA-mwcw-c2x4-8c55",
+    "Fixed": ">=3.3.8",
+    "Title": "Predictable results in nanoid generation when given non-integer values",
+    "Path": "@excalidraw/excalidraw>nanoid",
+    "Url": "https://github.com/advisories/GHSA-mwcw-c2x4-8c55"
+  },
+  {
+    "Package": "nanoid",
+    "Severity": "moderate",
+    "Version": "4.0.2",
+    "Advisory": "GHSA-mwcw-c2x4-8c55",
+    "Fixed": ">=5.0.9",
+    "Title": "Predictable results in nanoid generation when given non-integer values",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>nanoid",
+    "Url": "https://github.com/advisories/GHSA-mwcw-c2x4-8c55"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-r47g-fvhr-h676",
+    "Fixed": ">=3.4.6",
+    "Title": "DOMPurify: IN_PLACE mode preserves attributes of a clobbered root element, allowing XSS via attacker-controlled root DOM",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-r47g-fvhr-h676"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-rp9w-3fw7-7cwq",
+    "Fixed": ">=3.4.7",
+    "Title": "DOMPurify IN_PLACE Sanitization Bypass via Attached Shadow Root Inside <template>.content",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-rp9w-3fw7-7cwq"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-v2wj-7wpq-c8vv",
+    "Fixed": ">=3.3.2",
+    "Title": "DOMPurify contains a Cross-site Scripting vulnerability",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-v2wj-7wpq-c8vv"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-v8jm-5vwx-cfxm",
+    "Fixed": ">=3.2.7",
+    "Title": "DOMPurify contains a Cross-site Scripting vulnerability",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-v8jm-5vwx-cfxm"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-v9jr-rg53-9pgp",
+    "Fixed": ">=3.4.0",
+    "Title": "DOMPurify: Prototype Pollution to XSS Bypass via CUSTOM_ELEMENT_HANDLING Fallback",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-v9jr-rg53-9pgp"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "moderate",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-vhxf-7vqr-mrjg",
+    "Fixed": ">=3.2.4",
+    "Title": "DOMPurify allows Cross-site Scripting (XSS)",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-vhxf-7vqr-mrjg"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "low",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-vxr8-fq34-vvx9",
+    "Fixed": ">=3.4.9",
+    "Title": "DOMPurify: Trusted Types policy survives `clearConfig()` and can poison later `RETURN_TRUSTED_TYPE` output",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-vxr8-fq34-vvx9"
+  },
+  {
+    "Package": "uuid",
+    "Severity": "moderate",
+    "Version": "9.0.1",
+    "Advisory": "GHSA-w5hq-g745-h8pq",
+    "Fixed": ">=11.1.1",
+    "Title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>uuid",
+    "Url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq"
+  },
+  {
+    "Package": "dompurify",
+    "Severity": "low",
+    "Version": "3.1.6",
+    "Advisory": "GHSA-x4vx-rjvf-j5p4",
+    "Fixed": "<0.0.0",
+    "Title": "DOMPurify: `IN_PLACE` mode trusts attacker-controlled `nodeName` on live non-form nodes, allowing script retention and XSS via attacker-supplied DOM objects",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid>dompurify",
+    "Url": "https://github.com/advisories/GHSA-x4vx-rjvf-j5p4"
+  },
+  {
+    "Package": "mermaid",
+    "Severity": "moderate",
+    "Version": "10.9.3",
+    "Advisory": "GHSA-xcj9-5m2h-648r",
+    "Fixed": ">=10.9.6",
+    "Title": "Mermaid: Improper sanitization of `classDefs` in diagrams leads to CSS injection",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>mermaid",
+    "Url": "https://github.com/advisories/GHSA-xcj9-5m2h-648r"
+  },
+  {
+    "Package": "nanoid",
+    "Severity": "high",
+    "Version": "3.3.3",
+    "Advisory": "GHSA-xwg4-73v4-xw9w",
+    "Fixed": ">=3.3.12",
+    "Title": "nanoid: Integer Overflow or Wraparound",
+    "Path": "@excalidraw/excalidraw>nanoid",
+    "Url": "https://github.com/advisories/GHSA-xwg4-73v4-xw9w"
+  },
+  {
+    "Package": "nanoid",
+    "Severity": "high",
+    "Version": "4.0.2",
+    "Advisory": "GHSA-xwg4-73v4-xw9w",
+    "Fixed": ">=5.1.11",
+    "Title": "nanoid: Integer Overflow or Wraparound",
+    "Path": "@excalidraw/excalidraw>@excalidraw/mermaid-to-excalidraw>nanoid",
+    "Url": "https://github.com/advisories/GHSA-xwg4-73v4-xw9w"
+  }
+]

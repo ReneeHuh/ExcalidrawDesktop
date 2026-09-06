@@ -28,6 +28,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -141,6 +142,20 @@
                     x:Name="VersionText"
                     VerticalAlignment="Center" />
             </controls:SettingsCard>
+            <InfoBar
+                x:Name="SettingsPersistenceInfoBar"
+                x:Uid="SettingsPersistenceInfoBar"
+                Grid.Row="13"
+                IsClosable="False"
+                IsOpen="False"
+                Severity="Error"
+                Title="Settings could not be saved"
+                Message="The selected preference is active for this session, but could not be saved. Check the settings location and retry."
+                >
+                <InfoBar.ActionButton>
+                    <Button x:Uid="SettingsPersistenceRetryButton" Click="OnSettingsPersistenceRetry" />
+                </InfoBar.ActionButton>
+            </InfoBar>
         </Grid>
     </ScrollViewer>
 </Page>

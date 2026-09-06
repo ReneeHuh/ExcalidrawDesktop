@@ -94,6 +94,11 @@ unsaved drawing. Saving stays disabled until restoration finishes. If unsaved
 recovery data is missing or unreadable, the tab stays in its failure view and
 the saved file remains unchanged.
 
+Recovery also checks the saved file against the timestamp, size, and byte hash recorded
+with the snapshot. If the file changed, or an older snapshot has no trustworthy byte hash,
+normal saving requires conflict resolution. Use **Save As** to keep both drawings,
+**Reload** to use the disk version, or keep editing without overwriting the file.
+
 This project is an independent desktop host for the open-source
 [Excalidraw](https://github.com/excalidraw/excalidraw) editor. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and licensing
@@ -111,6 +116,37 @@ launched directly without registering an MSIX package. The native shell owns
 windows, tabs, file dialogs, persistence, recovery, and OS integration. A local
 React entry point hosts the public `@excalidraw/excalidraw` package inside
 WebView2 and communicates with the shell through a typed JSON bridge.
+
+`MainWindow` owns window and tab UI. `EditorSessionController` manages WebView
+lifecycle, `DocumentLifecycleController` handles opening, recovery, and disk
+conflicts, and `WindowCloseController` coordinates saving and closing. The latter
+controllers and `ImageExportController`, which handles PNG exports, use small host
+interfaces to request window operations; they do not depend on the `MainWindow`
+class. Desktop smoke-test state is compiled only in Debug builds.
+
+Drawing revisions include each visible element's identity, version, version nonce,
+and stacking order, along with saved drawing settings. Recovery snapshots use an
+acknowledged bridge request; failed writes retry with increasing delays up to 30
+seconds and capture the latest drawing. Saving or loading another drawing resets
+the recovery scheduler so stale acknowledgements cannot suppress a new snapshot.
+
+Close-save requests wait up to 30 seconds for the editor, excluding time spent in
+the native Save As picker. A timeout keeps the drawing open and releases the close
+controls. Responses are tied to their request so late acknowledgements cannot
+finish a newer close attempt.
+
+Editor save requests also have a 30-second bridge timeout, paused by native picker
+progress. Cancellation releases the editor's busy state and cancels native work
+before commit. A transaction that has already started committing finishes and
+updates its file baseline before another native save can run.
+
+### Automated checks
+
+[Desktop checks](.github/workflows/ci.yml) runs on pull requests and pushes to
+`main`, and can be started manually in GitHub Actions. It runs the core and web
+tests, TypeScript and localization checks, and Debug and Release desktop builds
+with warnings treated as errors. Native UI smoke tests remain local checks because
+they require an interactive Windows desktop.
 
 Excalidraw is consumed as an exact-version npm dependency. Its upstream source
 repository is not copied into this repository, and the generated web bundle is

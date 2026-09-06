@@ -18,7 +18,8 @@ public sealed record PickedDocument(
     string CanonicalPath,
     string FileName,
     string Content,
-    DesktopFileStamp Stamp);
+    DesktopFileStamp Stamp,
+    string ContentHash);
 
 public enum ExternalFileState
 {
@@ -55,20 +56,30 @@ public sealed class DocumentService
     private StorageFile? activeFile;
     private StorageFile? pendingOpenFile;
     private DesktopFileStamp? activeFileStamp;
+    private string? activeContentHash;
     private DesktopFileStamp? pendingOpenFileStamp;
+    private string? pendingOpenContentHash;
     private string? activeCanonicalPath;
     private string? pendingCanonicalPath;
     private bool pendingNewDocument;
+    public Guid? PendingOpenId { get; private set; }
 
     public Func<string, bool>? IsPathOwnedByAnotherSession { get; set; }
+    /// <summary>Application-wide reservation for an in-flight open/save destination.</summary>
+    public Func<string, IDisposable?>? TryReservePath { get; set; }
 
 #if DEBUG
     internal StorageFile? SaveFileOverrideForSmoke { get; set; }
+    internal Func<CancellationToken, Task>? BeforeSaveWriteForSmoke { get; set; }
 #endif
 
     public string? DocumentPath => activeCanonicalPath ?? pendingCanonicalPath;
 
     public bool HasActiveFile => activeFile is not null;
+
+    public RecoveryFileBaseline? RecoveryBaseline =>
+        activeCanonicalPath is { } path && activeFileStamp is { } stamp
+            ? new RecoveryFileBaseline(path, stamp, activeContentHash) : null;
 
     public DocumentService(Window window, FrameworkElement dialogRoot)
     {
@@ -86,6 +97,7 @@ public sealed class DocumentService
     {
         pendingOpenFile = null;
         pendingOpenFileStamp = null;
+        pendingOpenContentHash = null;
         pendingCanonicalPath = null;
         pendingNewDocument = false;
 
@@ -121,7 +133,8 @@ public sealed class DocumentService
         picker.FileTypeFilter.Add(".excalidraw");
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(window));
 
-        var file = await picker.PickSingleFileAsync();
+        var file = await WindowModalCoordinator.For(window).RunAsync(
+            async () => await picker.PickSingleFileAsync());
         if (file is null)
         {
             return null;
@@ -174,9 +187,19 @@ public sealed class DocumentService
                     "The selected drawing exceeds the 50 MB desktop document limit.");
             }
 
-            var content = await FileIO.ReadTextAsync(
-                file,
-                Windows.Storage.Streams.UnicodeEncoding.Utf8);
+            ExactFileBaseline? exactBaseline = null;
+            string content;
+            if (!string.IsNullOrWhiteSpace(file.Path) && File.Exists(file.Path))
+            {
+                exactBaseline = await ExactFileBaseline.CaptureAsync(file.Path);
+                content = exactBaseline.Utf8Content;
+            }
+            else
+            {
+                content = await FileIO.ReadTextAsync(
+                    file,
+                    Windows.Storage.Streams.UnicodeEncoding.Utf8);
+            }
             ExcalidrawDocumentValidator.Validate(content);
             var canonicalPath = DesktopDocumentPath.Normalize(file.Path) ??
                 throw new BridgeProtocolException(
@@ -187,7 +210,8 @@ public sealed class DocumentService
                 canonicalPath,
                 file.Name,
                 content,
-                ReadFileStamp(file, properties));
+                exactBaseline?.Stamp ?? ReadFileStamp(file, properties),
+                exactBaseline?.ContentHash ?? RecoveryFileBaseline.ComputeContentHash(content));
         }
         catch (BridgeProtocolException)
         {
@@ -209,24 +233,27 @@ public sealed class DocumentService
 
     public void StageOpen(PickedDocument document)
     {
-        activeFile = document.File;
-        activeFileStamp = document.Stamp;
-        activeCanonicalPath = document.CanonicalPath;
         pendingOpenFile = document.File;
         pendingOpenFileStamp = document.Stamp;
+        pendingOpenContentHash = document.ContentHash;
         pendingCanonicalPath = document.CanonicalPath;
         pendingNewDocument = false;
+        PendingOpenId = Guid.NewGuid();
     }
 
-    public async Task RestoreActiveFileAsync(string? path)
+    public async Task RestoreActiveFileAsync(string? path, DesktopFileStamp? expectedStamp,
+        string? expectedContentHash = null)
     {
         activeFile = null;
         activeFileStamp = null;
+        activeContentHash = null;
         activeCanonicalPath = null;
         pendingOpenFile = null;
         pendingOpenFileStamp = null;
+        pendingOpenContentHash = null;
         pendingCanonicalPath = null;
         pendingNewDocument = false;
+        PendingOpenId = null;
         var canonicalPath = DesktopDocumentPath.Normalize(path);
         if (canonicalPath is null || !File.Exists(canonicalPath))
         {
@@ -237,8 +264,10 @@ public sealed class DocumentService
         {
             activeFile = await StorageFile.GetFileFromPathAsync(canonicalPath);
             activeCanonicalPath = canonicalPath;
-            var properties = await activeFile.GetBasicPropertiesAsync();
-            activeFileStamp = ReadFileStamp(activeFile, properties);
+            // Reading today's file stamp here would hide edits made after the
+            // recovery snapshot. A missing baseline must remain unknown.
+            activeFileStamp = expectedStamp;
+            activeContentHash = expectedContentHash;
         }
         catch (Exception exception) when (
             exception is FileNotFoundException or
@@ -251,17 +280,24 @@ public sealed class DocumentService
         }
     }
 
-    public bool ConfirmOpened(string fileName)
+    public bool ConfirmOpened(string fileName, Guid? loadId = null)
     {
         if (pendingOpenFile is null ||
-            !string.Equals(pendingOpenFile.Name, fileName, StringComparison.Ordinal))
+            !string.Equals(pendingOpenFile.Name, fileName, StringComparison.Ordinal) ||
+            (loadId is not { } id || PendingOpenId != id))
         {
             return false;
         }
 
+        activeFile = pendingOpenFile;
+        activeFileStamp = pendingOpenFileStamp;
+        activeContentHash = pendingOpenContentHash;
+        activeCanonicalPath = pendingCanonicalPath;
         pendingOpenFile = null;
         pendingOpenFileStamp = null;
+        pendingOpenContentHash = null;
         pendingCanonicalPath = null;
+        PendingOpenId = null;
         return true;
     }
 
@@ -296,8 +332,10 @@ public sealed class DocumentService
 
         pendingOpenFile = activeFile;
         pendingOpenFileStamp = activeFileStamp;
+        pendingOpenContentHash = activeContentHash;
         pendingCanonicalPath = activeCanonicalPath;
         pendingNewDocument = false;
+        PendingOpenId = Guid.NewGuid();
         return true;
     }
 
@@ -326,6 +364,7 @@ public sealed class DocumentService
 
         activeFile = null;
         activeFileStamp = null;
+        activeContentHash = null;
         activeCanonicalPath = null;
         pendingOpenFile = null;
         pendingOpenFileStamp = null;
@@ -334,8 +373,31 @@ public sealed class DocumentService
         return true;
     }
 
-    public async Task<DocumentSaveResult> SaveAsync(string content, bool saveAs)
+    public bool IsSaving { get; private set; }
+    public event Action<bool>? SavePickerChanged;
+
+    public async Task<DocumentSaveResult> SaveAsync(string content, bool saveAs,
+        CancellationToken cancellationToken = default)
     {
+        if (IsSaving)
+        {
+            throw new BridgeProtocolException("DocumentSaveInProgress", "Wait for the current save to finish.");
+        }
+        IsSaving = true;
+        try
+        {
+            return await SaveCoreAsync(content, saveAs, cancellationToken);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private async Task<DocumentSaveResult> SaveCoreAsync(string content, bool saveAs,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         ValidateContentForSave(content);
 
         if (!saveAs && activeFile is not null &&
@@ -347,7 +409,7 @@ public sealed class DocumentService
         }
 
         var file = saveAs || activeFile is null
-            ? await PickSaveFileAsync()
+            ? await PickSaveFileAsync(cancellationToken)
             : activeFile;
         if (file is null)
         {
@@ -365,16 +427,54 @@ public sealed class DocumentService
 
         try
         {
-            await WriteAtomicallyAsync(file, content);
+            IDisposable? pathReservation = null;
+            if (canonicalPath is not null && TryReservePath is { } reserve)
+            {
+                pathReservation = reserve(canonicalPath);
+                if (pathReservation is null)
+                {
+                    throw new BridgeProtocolException(
+                        "DocumentAlreadyOpen",
+                        "That drawing is already being opened or saved. Choose a different file name.");
+                }
+            }
+            using (pathReservation)
+            {
+            // The save picker and any caller hooks can yield to external
+            // writers. Check again immediately before opening the transaction.
+            if (!saveAs && activeFile is not null &&
+                await CheckExternalFileStateAsync() is not ExternalFileState.None)
+            {
+                throw new BridgeProtocolException(
+                    "DocumentChangedExternally",
+                    "The drawing changed outside Excalidraw Desktop. Resolve the conflict before saving.");
+            }
+#if DEBUG
+            if (BeforeSaveWriteForSmoke is { } beforeWrite)
+            {
+                await beforeWrite(cancellationToken);
+            }
+#endif
+            cancellationToken.ThrowIfCancellationRequested();
+            await WriteAtomicallyAsync(
+                file,
+                content,
+                cancellationToken,
+                !saveAs && activeFileStamp is not null &&
+                    !string.IsNullOrWhiteSpace(activeContentHash)
+                    ? activeContentHash : null);
             activeFile = file;
             activeCanonicalPath = canonicalPath;
             var properties = await file.GetBasicPropertiesAsync();
             activeFileStamp = ReadFileStamp(file, properties);
+            activeContentHash = RecoveryFileBaseline.ComputeContentHash(content);
             pendingOpenFile = null;
             pendingOpenFileStamp = null;
+            pendingOpenContentHash = null;
             pendingCanonicalPath = null;
             pendingNewDocument = false;
             return new DocumentSaveResult("saved", file.Name);
+            }
         }
         catch (UnauthorizedAccessException)
         {
@@ -392,7 +492,7 @@ public sealed class DocumentService
 
     public async Task<ExternalFileState> CheckExternalFileStateAsync()
     {
-        if (activeFile is null || activeFileStamp is null)
+        if (activeFile is null)
         {
             return ExternalFileState.None;
         }
@@ -414,12 +514,27 @@ public sealed class DocumentService
             var currentStamp = new DesktopFileStamp(
                 fileInfo.LastWriteTimeUtc,
                 (ulong)fileInfo.Length);
-            return activeFileStamp.DiffersFrom(currentStamp)
-                ? ExternalFileState.Modified
-                : ExternalFileState.None;
+            if (activeFileStamp is null || string.IsNullOrWhiteSpace(activeContentHash) ||
+                activeFileStamp.DiffersFrom(currentStamp))
+            {
+                return ExternalFileState.Modified;
+            }
+
+            // Timestamps and lengths are not an identity. Hash the current
+            // bytes when an older baseline contains one, catching same-size
+            // replacements that preserve the filesystem stamp.
+            if (!string.IsNullOrWhiteSpace(activeContentHash))
+            {
+                var current = await ExactFileBaseline.CaptureAsync(activeFile.Path);
+                if (!string.Equals(current.ContentHash, activeContentHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    return ExternalFileState.Modified;
+                }
+            }
+            return ExternalFileState.None;
         }
         catch (Exception exception) when (
-            exception is FileNotFoundException or IOException)
+            exception is FileNotFoundException or IOException or UnauthorizedAccessException)
         {
             return ExternalFileState.Deleted;
         }
@@ -452,7 +567,9 @@ public sealed class DocumentService
         return new DesktopFileStamp(fallback.DateModified, fallback.Size);
     }
 
-    private async Task<StorageFile?> PickSaveFileAsync()
+    public bool IsSavePickerOpen { get; private set; }
+
+    private async Task<StorageFile?> PickSaveFileAsync(CancellationToken cancellationToken)
     {
 #if DEBUG
         if (SaveFileOverrideForSmoke is { } smokeFile)
@@ -472,7 +589,18 @@ public sealed class DocumentService
             DesktopResources.Get("ExcalidrawDrawingType", "Excalidraw drawing"),
             new[] { ".excalidraw" });
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(window));
-        return await picker.PickSaveFileAsync();
+        IsSavePickerOpen = true;
+        SavePickerChanged?.Invoke(true);
+        try
+        {
+            return await WindowModalCoordinator.For(window).RunAsync(
+                async () => await picker.PickSaveFileAsync().AsTask(cancellationToken));
+        }
+        finally
+        {
+            IsSavePickerOpen = false;
+            SavePickerChanged?.Invoke(false);
+        }
     }
 
     private static void ValidateContentForSave(string content)
@@ -480,25 +608,13 @@ public sealed class DocumentService
         ExcalidrawDocumentValidator.ValidateForSave(content, MaxDocumentBytes);
     }
 
-    private static async Task WriteAtomicallyAsync(StorageFile file, string content)
-    {
-        using var transaction = await file.OpenTransactedWriteAsync();
-        transaction.Stream.Size = 0;
-        transaction.Stream.Seek(0);
-
-        using (var writer = new DataWriter(transaction.Stream)
-        {
-            UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8,
-        })
-        {
-            writer.WriteString(content);
-            await writer.StoreAsync();
-            await writer.FlushAsync();
-            writer.DetachStream();
-        }
-
-        await transaction.CommitAsync();
-    }
+    private static async Task WriteAtomicallyAsync(
+        StorageFile file,
+        string content,
+        CancellationToken cancellationToken,
+        string? expectedContentHash = null)
+        => await TransactedDocumentWriter.WriteAsync(
+            file, content, cancellationToken, expectedContentHash);
 
     public async Task<CloseDecision> PromptToSaveBeforeCloseAsync()
     {
@@ -517,7 +633,8 @@ public sealed class DocumentService
             DefaultButton = ContentDialogButton.Primary,
         };
 
-        return await dialog.ShowAsync() switch
+        return await WindowModalCoordinator.For(window).RunAsync(
+            async () => await dialog.ShowAsync()) switch
         {
             ContentDialogResult.Primary => CloseDecision.Save,
             ContentDialogResult.Secondary => CloseDecision.Discard,
@@ -541,6 +658,7 @@ public sealed class DocumentService
             DefaultButton = ContentDialogButton.Close,
         };
 
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+        return await WindowModalCoordinator.For(window).RunAsync(
+            async () => await dialog.ShowAsync()) == ContentDialogResult.Primary;
     }
 }

@@ -1,6 +1,8 @@
 #if DEBUG
 using System.Text.Json;
 using ExcalidrawDesktop.App.Models;
+using ExcalidrawDesktop.App.Services;
+using ExcalidrawDesktop.Core;
 
 namespace ExcalidrawDesktop.App;
 
@@ -14,12 +16,12 @@ public sealed partial class MainWindow
         try
         {
             await File.WriteAllTextAsync(path, original);
-            AttachDocumentToSession(session,
+            documents.AttachDocumentToSession(session,
                 await session.DocumentService.OpenPathAsync(path), select: true);
             await WaitForRetrySmokeReadyAsync(session, isDirty: false);
 
             await UpdateDirtySmokeAppStateAsync(session, new { viewBackgroundColor = "#ff0000" });
-            if (!await WaitUntilAsync(() => session.IsDirty, TimeSpan.FromSeconds(5)))
+            if (!await AsyncWait.UntilAsync(() => session.IsDirty, TimeSpan.FromSeconds(5)))
             {
                 throw new InvalidOperationException("A background-only edit was not marked dirty.");
             }
@@ -47,7 +49,7 @@ public sealed partial class MainWindow
             // A second settings edit has the same element version but needs a
             // new snapshot, which Retry must restore without touching the file.
             await UpdateDirtySmokeAppStateAsync(session, new { viewBackgroundColor = "#00ff00" });
-            if (!await WaitUntilAsync(() => session.RecoveryUpdatedAt != snapshotTime,
+            if (!await AsyncWait.UntilAsync(() => session.RecoveryUpdatedAt != snapshotTime,
                     TimeSpan.FromSeconds(8)))
             {
                 throw new InvalidOperationException("A second background edit did not update recovery.");
@@ -62,7 +64,7 @@ public sealed partial class MainWindow
             }
 
             RequestSessionSave(session);
-            if (!await WaitUntilAsync(() => !session.IsDirty && !session.IsBridgeDispatching,
+            if (!await AsyncWait.UntilAsync(() => !session.IsDirty && !session.IsBridgeDispatching,
                     TimeSpan.FromSeconds(10)) ||
                 ReadDirtySmokeBackground(await File.ReadAllTextAsync(path)) != "#00ff00")
             {
@@ -76,14 +78,50 @@ public sealed partial class MainWindow
             }
 
             await UpdateDirtySmokeAppStateAsync(session, new { viewBackgroundColor = "#0000ff" });
-            if (!await WaitUntilAsync(() => session.IsDirty, TimeSpan.FromSeconds(5)))
+            if (!await AsyncWait.UntilAsync(() => session.IsDirty, TimeSpan.FromSeconds(5)))
             {
                 throw new InvalidOperationException("A new background edit was not detected after saving.");
             }
             await UpdateDirtySmokeAppStateAsync(session, new { viewBackgroundColor = "#00ff00" });
-            if (!await WaitUntilAsync(() => !session.IsDirty, TimeSpan.FromSeconds(5)))
+            if (!await AsyncWait.UntilAsync(() => !session.IsDirty, TimeSpan.FromSeconds(5)))
             {
                 throw new InvalidOperationException("Reverting the background did not clear dirty state.");
+            }
+
+            session.TryPostEditorMessage(BridgeEventJson.Create("app.automationEditRequested",
+                new { elementId = "dirty-deletion-smoke" }));
+            if (!await AsyncWait.UntilAsync(() => session.IsDirty, TimeSpan.FromSeconds(5)))
+            {
+                throw new InvalidOperationException("Adding the deletion fixture did not mark the drawing dirty.");
+            }
+            RequestSessionSave(session);
+            if (!await AsyncWait.UntilAsync(() => !session.IsDirty && !session.IsBridgeDispatching,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException("The shape could not be saved before deletion.");
+            }
+            await session.CoreWebView!.ExecuteScriptAsync(
+                "window.__EXCALIDRAW_DESKTOP_SMOKE__.deleteAllElements()");
+            if (!await AsyncWait.UntilAsync(() => session.IsDirty, TimeSpan.FromSeconds(5)))
+            {
+                throw new InvalidOperationException("Deleting the last shape did not mark the drawing dirty.");
+            }
+            RequestSessionSave(session);
+            if (!await AsyncWait.UntilAsync(() => !session.IsDirty && !session.IsBridgeDispatching,
+                    TimeSpan.FromSeconds(10)))
+            {
+                throw new InvalidOperationException("Saving a deleted shape did not clear dirty state.");
+            }
+            using var saved = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            if (saved.RootElement.GetProperty("elements").GetArrayLength() != 0)
+            {
+                throw new InvalidOperationException("The saved file still contains a deleted shape.");
+            }
+            await UpdateDirtySmokeAppStateAsync(session, new { scrollX = 321 });
+            await Task.Delay(300);
+            if (session.IsDirty)
+            {
+                throw new InvalidOperationException("Viewport activity marked a saved deletion dirty.");
             }
         }
         finally

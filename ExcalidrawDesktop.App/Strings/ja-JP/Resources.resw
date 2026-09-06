@@ -178,4 +178,12 @@
   <data name="EditorRetryFailed" xml:space="preserve"><value>図面を復元できませんでした</value></data>
   <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>この未保存の図面の復元データが見つからないか、読み取れません。図面ファイルは変更されていません。</value></data>
   <data name="EditorRetryFileGuidance" xml:space="preserve"><value>再試行するか、図面ファイルを開き直してください。図面ファイルは変更されていません。</value></data>
+  <data name="StatusRecoveryFailed" xml:space="preserve"><value>復元を利用できません — 名前を付けて保存…</value></data>
+  <data name="RecoveredDrawingName" xml:space="preserve"><value>復元された図面</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>起動時の復元に失敗しました</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>一部の図面を復元できませんでした。復元データは保持されています。</value></data>
+  <data name="CloseWindowButton" xml:space="preserve"><value>ウィンドウを閉じる</value></data>
+  <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>設定を保存できませんでした</value></data>
+  <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>選択した設定はこのセッションで有効ですが、保存できませんでした。設定の場所を確認して再試行してください。</value></data>
+  <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>再試行</value></data>
 </root>

@@ -131,6 +131,42 @@ public sealed class MultiWindowWorkspaceStateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ReloadingADamagedFileDoesNotLeaveAnOutdatedWriteCache()
+    {
+        var path = Path.Combine(testDirectory, "cache.json");
+        var store = new MultiWindowWorkspaceStateStore(path);
+        await store.SaveAsync(MultiWindowWorkspaceState.Empty);
+        await File.WriteAllTextAsync(path, "[]");
+        Assert.Equal(MultiWindowWorkspaceState.Empty, await store.LoadAsync());
+        await store.SaveAsync(MultiWindowWorkspaceState.Empty);
+        Assert.Contains("Windows", await File.ReadAllTextAsync(path));
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("42")]
+    [InlineData("{\"version\":\"3\"}")]
+    [InlineData("{\"version\":null}")]
+    [InlineData("{\"version\":true}")]
+    [InlineData("{\"version\":2147483648}")]
+    [InlineData("{\"version\":3,\"recentFiles\":[],\"windows\":[null]}")]
+    [InlineData("{\"version\":3,\"recentFiles\":[],\"windows\":[{\"id\":\"main\",\"tabs\":[null]}]}")]
+    [InlineData("{\"version\":3,\"recentFiles\":[null],\"windows\":[]}")]
+    [InlineData("{\"version\":3,\"recentFiles\":[],\"windows\":[{\"id\":\"main\",\"tabs\":null}]}")]
+    [InlineData("{\"version\":2,\"recentFiles\":[],\"tabs\":[null]}")]
+    [InlineData("{\"version\":1,\"recentFiles\":[null],\"tabs\":[]}")]
+    public async Task DamagedWorkspaceDataFallsBackToAnEmptyWorkspace(string content)
+    {
+        Directory.CreateDirectory(testDirectory);
+        var path = Path.Combine(testDirectory, "damaged.json");
+        await File.WriteAllTextAsync(path, content);
+        Assert.Equal(MultiWindowWorkspaceState.Empty,
+            await new MultiWindowWorkspaceStateStore(path).LoadAsync());
+    }
+
+    [Fact]
     public async Task RejectsDuplicateWindowIdsAndUnknownVersions()
     {
         Directory.CreateDirectory(testDirectory);
@@ -145,6 +181,39 @@ public sealed class MultiWindowWorkspaceStateStoreTests : IDisposable
             path,
             "{\"version\":99,\"recentFiles\":[],\"windows\":[]}" );
         Assert.Equal(MultiWindowWorkspaceState.Empty, await store.LoadAsync());
+    }
+
+    [Fact]
+    public async Task SalvagesSafeEntriesAndDeduplicatesRecoveryIds()
+    {
+        Directory.CreateDirectory(testDirectory);
+        var id = Guid.NewGuid().ToString("N");
+        var path = Path.Combine(testDirectory, "salvage.json");
+        await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(
+            new MultiWindowWorkspaceState(3, new[] { "bad\0path", "recent.excalidraw" }, "a",
+                new[] { new WorkspaceWindowState("a", null, false, id, new[] {
+                    new WorkspaceTabState("bad\0path", false, id),
+                    new WorkspaceTabState(null, false, id),
+                    new WorkspaceTabState(null, true, "invalid") }) })));
+        var store = new MultiWindowWorkspaceStateStore(path);
+        var state = await store.LoadAsync();
+        var window = Assert.Single(state.Windows);
+        Assert.Equal(2, window.Tabs.Count);
+        Assert.Equal(MultiWindowWorkspaceStateStore.LoadStatus.Corrupt, store.LastLoadStatus);
+        Assert.DoesNotContain("bad\0path", state.RecentFiles);
+    }
+
+    [Fact]
+    public async Task ClassifiesMissingAndUnsupportedWorkspaceWithoutThrowing()
+    {
+        var missing = new MultiWindowWorkspaceStateStore(Path.Combine(testDirectory, "missing.json"));
+        Assert.Equal(MultiWindowWorkspaceState.Empty, await missing.LoadAsync());
+        Assert.Equal(MultiWindowWorkspaceStateStore.LoadStatus.Missing, missing.LastLoadStatus);
+        Directory.CreateDirectory(testDirectory);
+        var path = Path.Combine(testDirectory, "new.json");
+        await File.WriteAllTextAsync(path, "{\"version\":99,\"windows\":[]}");
+        var unsupported = new MultiWindowWorkspaceStateStore(path);
+        Assert.Equal(MultiWindowWorkspaceState.Empty, await unsupported.LoadAsync());
     }
 
     public void Dispose()

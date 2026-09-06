@@ -97,9 +97,44 @@ public partial class App : Application
 
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        try
+        {
+            await LaunchAsync(args);
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLogService.Error("application.launch_failed", exception);
+            var failureWindow = new Window { Title = DesktopResources.Get("StartupFailureTitle", "Excalidraw Desktop could not start") };
+            var close = new Microsoft.UI.Xaml.Controls.Button
+            {
+                Content = DesktopResources.Get("CloseWindowButton", "Close window"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+            };
+            close.Click += (_, _) => failureWindow.Close();
+            var content = new Microsoft.UI.Xaml.Controls.StackPanel { Padding = new Thickness(24), Spacing = 16 };
+            content.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock
+            {
+                Text = DesktopResources.Get("StartupFailureMessage", "The application could not finish starting. Check that its data folder is accessible, then reopen the application. Your recovery files have been kept."),
+                TextWrapping = TextWrapping.Wrap,
+            });
+            content.Children.Add(close);
+            failureWindow.Content = content;
+            failureWindow.Activate();
+        }
+    }
+
+    private async Task LaunchAsync(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+    {
         DiagnosticLogService.Info("application.launch_requested");
+        var smokeOptions = ResolveSmokeOptions(args.Arguments);
+        var isSmokeTest = Environment.GetEnvironmentVariable("EXCALIDRAW_DESKTOP_SMOKE_TEST") == "1" ||
+            smokeOptions != DesktopSmokeOptions.None;
+        var instanceKey = isSmokeTest
+            ? "smoke-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(DesktopPaths.DataRoot)))
+            : "main";
         var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
-        var mainInstance = AppInstance.FindOrRegisterForKey("main");
+        var mainInstance = AppInstance.FindOrRegisterForKey(instanceKey);
         if (!mainInstance.IsCurrent)
         {
             DiagnosticLogService.Info("application.activation_redirected");
@@ -110,10 +145,9 @@ public partial class App : Application
 
         // Only the surviving main instance repairs file associations; a
         // redirected launch must not touch the registry on its way out.
-        EnsureFileTypeRegistration();
+        if (!isSmokeTest) EnsureFileTypeRegistration();
         dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         mainInstance.Activated += OnInstanceActivated;
-        var smokeOptions = ResolveSmokeOptions(args.Arguments);
         workspaceCoordinator = new ApplicationWorkspaceCoordinator(
             smokeOptions.WorkspaceStatePath,
             startupPreferences);

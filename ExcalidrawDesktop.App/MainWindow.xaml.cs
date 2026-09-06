@@ -35,12 +35,14 @@ public sealed partial class MainWindow : Window
         "Web");
     private readonly ApplicationWorkspaceCoordinator workspaceCoordinator;
     private readonly EditorSessionController editorSessions;
+    private readonly DocumentLifecycleController documents;
+    private readonly WindowCloseController windowClose;
     private readonly bool restoreWorkspace;
     private readonly List<DocumentSession> sessions = [];
     private readonly List<string> recentFiles;
     private readonly Queue<string> pendingActivatedFiles = [];
     private readonly DispatcherTimer suspensionTimer = new();
-    private readonly ImageExportService imageExportService = new();
+    private readonly ImageExportController imageExports;
     private readonly RecoverySnapshotStore recoverySnapshotStore;
     private readonly DesktopSmokeOptions smoke;
     private DesktopPreferences desktopPreferences = DesktopPreferences.Default;
@@ -49,12 +51,13 @@ public sealed partial class MainWindow : Window
     private bool allowClose;
     private bool isWindowReady;
     private bool isWindowActive;
+#if DEBUG
     private bool titleBarRegistered;
+#endif
     private bool titleBarRootSubscribed;
     private MainWindow? pendingTearOutWindow;
     private bool settingsPageVisible;
     private bool windowClosePromptOpen;
-    private bool openPickerActive;
     private bool openingActivatedFiles;
     private bool jumpListUpdateQueued;
     private bool jumpListUpdateRunning;
@@ -75,6 +78,14 @@ public sealed partial class MainWindow : Window
             "StartingWindowTitle",
             "Excalidraw Desktop — Starting…");
         this.workspaceCoordinator = workspaceCoordinator;
+        documents = new DocumentLifecycleController(this, sessions, DocumentTabs, workspaceCoordinator);
+        windowClose = new WindowCloseController(this, sessions, DocumentTabs);
+        imageExports = new ImageExportController(this, sessions, documents);
+#if DEBUG
+        documents.SnapshotSavedForSmoke = OnRecoverySnapshotSavedForSmokeAsync;
+        imageExports.ExportCompletedForSmoke = OnImageExportCompletedForSmoke;
+        imageExports.ExportFailedForSmoke = OnImageExportFailedForSmoke;
+#endif
         editorSessions = new EditorSessionController(
             sessions,
             () => ActiveSession,
@@ -83,12 +94,21 @@ public sealed partial class MainWindow : Window
             smoke.RequiresEditorSmokeApi,
             workspaceCoordinator.RecoverySnapshotStore);
         editorSessions.StateChanged += OnEditorStateChanged;
+        editorSessions.CommandsBlocked = () => CommandsBlocked;
+        editorSessions.LibraryRequest = HandleLibraryRequestAsync;
+        workspaceCoordinator.LibraryChanged += OnSharedLibraryChanged;
         editorSessions.Ready += OnAppReady;
         editorSessions.Resumed += OnEditorResumed;
         editorSessions.Failed += OnEditorFailed;
-        editorSessions.TitleChanged += title => Title = title;
+        editorSessions.TitleChanged += (session, title) =>
+        {
+            if (ReferenceEquals(session, ActiveSession)) Title = title;
+        };
+        editorSessions.CloseBarrierReady += OnDirtyChanged;
+        editorSessions.DocumentLoadApplied += OnDocumentLoadApplied;
+        documents.DocumentLoadTimedOut += session => editorSessions.HandleLoadFailure(session);
         editorSessions.EditorRecreated += ConfigureEditorDropTarget;
-        editorSessions.ImageExportRequested += OnImageExportWebResourceRequested;
+        editorSessions.ImageExportRequested += imageExports.OnImageExportWebResourceRequested;
 #if DEBUG
         editorSessions.BeforeInitializeForSmoke = () =>
             smoke.RunMultiWindowSmoke && multiWindowInitializationRelease is { } release
@@ -106,6 +126,7 @@ public sealed partial class MainWindow : Window
             workspaceCoordinator.EffectiveLanguage,
             workspaceCoordinator.StartupLanguagePreference);
         AppSettingsPage.PreferencesChanged += OnPreferencesChanged;
+        AppSettingsPage.SettingsPersistenceRetryRequested += OnSettingsPersistenceRetry;
         MainLayout.ActualThemeChanged += OnActualThemeChanged;
         ApplyDesktopTheme();
         ToolTipService.SetToolTip(
@@ -167,14 +188,19 @@ public sealed partial class MainWindow : Window
         object? sender,
         PreferencesChangedEventArgs args)
     {
-        workspaceCoordinator.UpdatePreferences(args.Preferences);
+        if (!CommandsBlocked) workspaceCoordinator.UpdatePreferences(args.Preferences);
     }
+
+    private void OnSettingsPersistenceRetry(object? sender, EventArgs args) =>
+        workspaceCoordinator.UpdatePreferences(desktopPreferences);
 
     private void InitializeTitleBar()
     {
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(WindowDragRegion);
+#if DEBUG
         titleBarRegistered = true;
+#endif
 
         var titleBar = AppWindow.TitleBar;
         titleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
@@ -186,10 +212,15 @@ public sealed partial class MainWindow : Window
     internal void ApplySharedPreferences(DesktopPreferences preferences)
     {
         desktopPreferences = preferences;
+        var persistenceFailed = workspaceCoordinator.LastSettingsPersistenceResult?.Outcome ==
+            ApplicationWorkspaceCoordinator.SettingsPersistenceOutcome.AppliedInMemoryOnly;
+        if (!persistenceFailed) AppSettingsPage.ClearSettingsPersistenceFailure();
         AppSettingsPage.LoadPreferences(
             desktopPreferences,
             workspaceCoordinator.EffectiveLanguage,
             workspaceCoordinator.StartupLanguagePreference);
+        if (persistenceFailed)
+            AppSettingsPage.ShowSettingsPersistenceFailure();
         ApplyDesktopTheme();
 
         if (!preferences.SuspendInactiveTabs)
@@ -400,7 +431,7 @@ public sealed partial class MainWindow : Window
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            await ShowOpenErrorAsync(DesktopResources.Get(
+            await documents.ShowOpenErrorAsync(DesktopResources.Get(
                 "DroppedDrawingsOpenFailed",
                 "The dropped drawings could not be opened."));
         }
@@ -418,52 +449,12 @@ public sealed partial class MainWindow : Window
         {
             while (pendingActivatedFiles.TryDequeue(out var path))
             {
-                await OpenPathInTabAsync(path);
+                await documents.OpenPathInTabAsync(path);
             }
         }
         finally
         {
             openingActivatedFiles = false;
-        }
-    }
-
-    private async Task OpenPathInTabAsync(string path)
-    {
-        var canonicalPath = DesktopDocumentPath.Normalize(path);
-        var existing = workspaceCoordinator.FindSessionByPath(canonicalPath);
-        if (existing is not null)
-        {
-            workspaceCoordinator.ActivateSession(
-                existing.Value.Window,
-                existing.Value.Session);
-            AddRecentFile(path);
-            return;
-        }
-
-        try
-        {
-            var source = ActiveSession ?? sessions[0];
-            var document = await source.DocumentService.OpenPathAsync(path);
-            var target = ActiveSession is { IsDirty: false } active &&
-                active.DocumentService.DocumentPath is null
-                    ? active
-                    : CreateTab();
-            AttachDocumentToSession(target, document, select: true);
-        }
-        catch (BridgeProtocolException exception)
-        {
-            await ShowOpenErrorAsync(GetLocalizedDocumentError(
-                exception,
-                DesktopResources.Get(
-                    "ActivatedDrawingOpenFailed",
-                    "The activated drawing could not be opened.")));
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine(exception);
-            await ShowOpenErrorAsync(DesktopResources.Get(
-                "ActivatedDrawingOpenFailed",
-                "The activated drawing could not be opened."));
         }
     }
 
@@ -508,26 +499,32 @@ public sealed partial class MainWindow : Window
         session.DocumentService.AttachHost(this, session.Content);
         session.DocumentService.IsPathOwnedByAnotherSession = path =>
             workspaceCoordinator.IsPathOwnedByAnotherSession(session, path);
+        session.DocumentService.TryReservePath = path =>
+            workspaceCoordinator.TryReservePath(path, session, out var reservation) ? reservation : null;
         session.Dispatcher = new BridgeDispatcher(
             session.DocumentService,
             () => editorSessions.MarkReady(session),
-            () => OnCloseReady(session),
+            requestId => windowClose.OnCloseReady(session, requestId),
             isDirty => OnDirtyChanged(session, isDirty),
             () => OnDocumentCreated(session),
             fileName => OnDocumentOpened(session, fileName),
             () => OnDocumentRecovered(session),
-            content => OnRecoverySnapshotReceivedAsync(session, content),
-            () => _ = CheckExternalFileStateAsync(session, showPrompt: true),
-            () => OnCloseCancelled(session),
-            () => CreateTab(),
-            () => RequestOpenDocumentAsync(session),
+            content => documents.OnRecoverySnapshotReceivedAsync(session, content),
+            () => _ = documents.CheckExternalFileStateAsync(session, showPrompt: true),
+            requestId => windowClose.OnCloseCancelled(session, requestId),
+            () => NewTabFromInput("editor"),
+            () => documents.RequestOpenDocumentAsync(session),
             () => QueueCloseSession(session),
             next => SelectAdjacentTab(session, next),
             (exportId, message) =>
-                _ = FailImageExportAsync(session, exportId, message),
+                _ = imageExports.FailImageExportAsync(session, exportId, message),
             (langCode, direction) =>
                 OnEditorLanguageApplied(session, langCode, direction),
-            documentLoadFailed: () => editorSessions.HandleLoadFailure(session));
+            documentLoadFailed: () => editorSessions.HandleLoadFailure(session),
+            documentSaved: fileName => OnDocumentSaved(session, fileName))
+        {
+            IsCloseSavePending = requestId => session.CloseRequestId == requestId,
+        };
         EventHandler retryRequested = (_, _) => _ = editorSessions.RetryAsync(session);
         EventHandler closeRequested = (_, _) => QueueCloseSession(session);
         EventHandler webView2HelpRequested = (_, _) =>
@@ -543,6 +540,7 @@ public sealed partial class MainWindow : Window
             session.Content.WebView2HelpRequested -= webView2HelpRequested;
             session.TabItem.ContextFlyout = null;
             session.DocumentService.IsPathOwnedByAnotherSession = null;
+            session.DocumentService.TryReservePath = null;
         };
         ConfigureEditorDropTarget(session, session.Content.Editor);
     }
@@ -552,6 +550,7 @@ public sealed partial class MainWindow : Window
         WebView2 editor)
     {
         session.DetachEditorHandlers?.Invoke();
+        session.Content.IsEnabled = session.CloseBarrierId is null;
         DragEventHandler dragOver = OnFileDragOver;
         DragEventHandler drop = OnFileDrop;
         editor.AllowDrop = true;
@@ -569,7 +568,6 @@ public sealed partial class MainWindow : Window
             editor.RemoveHandler(UIElement.DropEvent, drop);
         };
     }
-
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
     {
@@ -599,7 +597,7 @@ public sealed partial class MainWindow : Window
             {
                 _ = editorSessions.InitializeAsync(session);
             }
-            _ = CheckExternalFileStateAsync(session, showPrompt: true);
+            _ = documents.CheckExternalFileStateAsync(session, showPrompt: true);
         }
     }
 
@@ -624,12 +622,14 @@ public sealed partial class MainWindow : Window
         suspensionTimer.Tick -= OnSuspensionTimerTick;
         Activated -= OnWindowActivated;
         Closed -= OnWindowClosed;
+        workspaceCoordinator.LibraryChanged -= OnSharedLibraryChanged;
         AppWindow.Closing -= OnAppWindowClosing;
         AppWindow.Changed -= OnAppWindowChanged;
         DocumentTabs.TabItemsChanged -= OnTabItemsChanged;
         pendingTearOutWindow?.CloseIfEmptyAfterMove();
         pendingTearOutWindow = null;
         AppSettingsPage.PreferencesChanged -= OnPreferencesChanged;
+        AppSettingsPage.SettingsPersistenceRetryRequested -= OnSettingsPersistenceRetry;
         MainLayout.ActualThemeChanged -= OnActualThemeChanged;
         if (titleBarXamlRoot is { } xamlRoot)
         {
@@ -664,167 +664,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void OnImageExportWebResourceRequested(
-        DocumentSession session,
-        CoreWebView2 coreWebView,
-        CoreWebView2WebResourceRequestedEventArgs args)
-    {
-        if (session.PendingImageExport is not { } pending ||
-            !sessions.Contains(session) ||
-            !ReferenceEquals(session.CoreWebView, coreWebView) ||
-            !ImageExportPolicy.IsMatchingUpload(
-                args.Request.Uri,
-                session.TabOrigin,
-                pending.ExportId))
-        {
-            return;
-        }
-
-        string? ReadHeader(string name)
-        {
-            try
-            {
-                return args.Request.Headers.GetHeader(name);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        var requestExportId = ReadHeader("X-Excalidraw-Export-Id");
-        var contentType = ReadHeader("Content-Type");
-        var requestOrigin = ReadHeader("Origin");
-        var requestedMethod = ReadHeader("Access-Control-Request-Method");
-        var requestedHeaders = ReadHeader("Access-Control-Request-Headers");
-
-        if (!string.Equals(
-                requestOrigin,
-                session.TabOrigin.Origin,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            args.Response = CreateImageExportResponse(
-                coreWebView,
-                403,
-                "Forbidden",
-                session.TabOrigin.Origin);
-            return;
-        }
-
-        if (string.Equals(
-                args.Request.Method,
-                "OPTIONS",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            var validPreflight = string.Equals(
-                    requestedMethod,
-                    "POST",
-                    StringComparison.OrdinalIgnoreCase) &&
-                requestedHeaders?.Contains(
-                    "x-excalidraw-export-id",
-                    StringComparison.OrdinalIgnoreCase) == true;
-            args.Response = CreateImageExportResponse(
-                coreWebView,
-                validPreflight ? 204 : 400,
-                validPreflight ? "No Content" : "Bad Request",
-                session.TabOrigin.Origin,
-                includePreflightHeaders: validPreflight);
-            return;
-        }
-
-        if (!string.Equals(
-                args.Request.Method,
-                "POST",
-                StringComparison.OrdinalIgnoreCase) ||
-            args.Request.Content is null ||
-            !string.Equals(
-                requestExportId,
-                pending.ExportId.ToString("D"),
-                StringComparison.OrdinalIgnoreCase) ||
-            contentType?.StartsWith("image/png", StringComparison.OrdinalIgnoreCase) != true)
-        {
-            args.Response = CreateImageExportResponse(
-                coreWebView,
-                400,
-                "Bad Request",
-                session.TabOrigin.Origin);
-            _ = FailImageExportAsync(
-                session,
-                pending.ExportId,
-                DesktopResources.Get(
-                    "InvalidPngExportData",
-                    "The editor sent invalid PNG export data."));
-            return;
-        }
-
-        var deferral = args.GetDeferral();
-        try
-        {
-            await ImageExportService.WritePngAsync(
-                pending.Destination,
-                args.Request.Content,
-                pending.Cancellation.Token);
-            if (session.PendingImageExport?.ExportId != pending.ExportId)
-            {
-                throw new OperationCanceledException();
-            }
-
-            CompleteImageExport(session, pending, pending.Destination.Name);
-            args.Response = CreateImageExportResponse(
-                coreWebView,
-                204,
-                "No Content",
-                session.TabOrigin.Origin);
-        }
-        catch (OperationCanceledException)
-        {
-            args.Response = CreateImageExportResponse(
-                coreWebView,
-                409,
-                "Cancelled",
-                session.TabOrigin.Origin);
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine($"PNG export failed: {exception}");
-            await FailImageExportAsync(
-                session,
-                pending.ExportId,
-                GetImageExportFailureMessage(exception));
-            args.Response = CreateImageExportResponse(
-                coreWebView,
-                500,
-                "Export Failed",
-                session.TabOrigin.Origin);
-        }
-        finally
-        {
-            deferral.Complete();
-        }
-    }
-
-    private static CoreWebView2WebResourceResponse CreateImageExportResponse(
-        CoreWebView2 coreWebView,
-        int statusCode,
-        string reasonPhrase,
-        string allowedOrigin,
-        bool includePreflightHeaders = false)
-    {
-        var headers = $"Access-Control-Allow-Origin: {allowedOrigin}\r\n" +
-            "Vary: Origin\r\nContent-Type: text/plain";
-        if (includePreflightHeaders)
-        {
-            headers += "\r\nAccess-Control-Allow-Methods: POST" +
-                "\r\nAccess-Control-Allow-Headers: Content-Type, X-Excalidraw-Export-Id" +
-                "\r\nAccess-Control-Max-Age: 600";
-        }
-        return coreWebView.Environment.CreateWebResourceResponse(
-            new InMemoryRandomAccessStream(),
-            statusCode,
-            reasonPhrase,
-            headers);
-    }
-
     private void OnEditorStateChanged(DocumentSession session)
     {
         UpdateTabHeader(session);
@@ -840,10 +679,11 @@ public sealed partial class MainWindow : Window
 
     private void OnEditorFailed(DocumentSession session)
     {
-        OnCloseCancelled(session);
+        session.Dispatcher.CancelPendingSave();
+        windowClose.OnCloseCancelled(session);
         if (session.PendingImageExport is { } pendingExport)
         {
-            _ = FailImageExportAsync(
+            _ = imageExports.FailImageExportAsync(
                 session,
                 pendingExport.ExportId,
                 DesktopResources.Get(
@@ -857,7 +697,7 @@ public sealed partial class MainWindow : Window
         SendEditorTheme(session);
         SendEditorLanguage(session);
         UpdateWindowTitle();
-        SendPendingDocumentLoad(session);
+        documents.SendPendingDocumentLoad(session);
         if (session.IsRestoringFromHibernation &&
             session.PendingDocumentLoad is null)
         {
@@ -878,185 +718,6 @@ public sealed partial class MainWindow : Window
         TryRunRecoverySnapshotSmoke();
 #endif
     }
-
-    private async Task RequestOpenDocumentAsync(DocumentSession source)
-    {
-        if (openPickerActive || !sessions.Contains(source))
-        {
-            return;
-        }
-
-        openPickerActive = true;
-        try
-        {
-            var document = await source.DocumentService.PickOpenDocumentAsync();
-            if (document is null)
-            {
-                return;
-            }
-
-            var existing = workspaceCoordinator.FindSessionByPath(
-                document.CanonicalPath);
-            if (existing is not null)
-            {
-                workspaceCoordinator.ActivateSession(
-                    existing.Value.Window,
-                    existing.Value.Session);
-                return;
-            }
-
-            var target = ActiveSession is { IsDirty: false } active &&
-                active.DocumentService.DocumentPath is null
-                    ? active
-                    : CreateTab();
-            AttachDocumentToSession(target, document, select: true);
-        }
-        catch (BridgeProtocolException exception)
-        {
-            await ShowOpenErrorAsync(GetLocalizedDocumentError(
-                exception,
-                DesktopResources.Get(
-                    "SelectedDrawingOpenFailed",
-                    "The selected drawing could not be opened.")));
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine(exception);
-            await ShowOpenErrorAsync(DesktopResources.Get(
-                "SelectedDrawingOpenFailed",
-                "The selected drawing could not be opened."));
-        }
-        finally
-        {
-            openPickerActive = false;
-        }
-    }
-
-    private void AttachDocumentToSession(
-        DocumentSession session,
-        PickedDocument document,
-        bool select)
-    {
-        session.DocumentService.StageOpen(document);
-        WatchExternalFile(session, document.CanonicalPath);
-        session.PendingDocumentLoad = new PendingEditorLoad(
-            document.FileName,
-            document.Content,
-            IsRecovery: false);
-        session.DisplayName = document.FileName;
-        UpdateTabHeader(session);
-        if (select)
-        {
-            DocumentTabs.SelectedItem = session.TabItem;
-        }
-
-        if (session.IsReady)
-        {
-            SendPendingDocumentLoad(session);
-        }
-    }
-
-    private void WatchExternalFile(DocumentSession session, string path)
-    {
-        session.DetachExternalFileWatcher();
-        var directory = Path.GetDirectoryName(path);
-        var fileName = Path.GetFileName(path);
-        if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName))
-        {
-            session.ExternalFileWatcher = null;
-            return;
-        }
-
-        var uiDispatcherQueue = DispatcherQueue;
-        var watcher = new FileSystemWatcher(directory, fileName)
-        {
-            NotifyFilter = NotifyFilters.FileName |
-                NotifyFilters.LastWrite |
-                NotifyFilters.Size,
-            EnableRaisingEvents = true,
-        };
-        FileSystemEventHandler changed = (_, _) =>
-            uiDispatcherQueue.TryEnqueue(() =>
-                _ = CheckExternalFileStateAsync(session, showPrompt: false));
-        RenamedEventHandler renamed = (_, _) =>
-            uiDispatcherQueue.TryEnqueue(() =>
-                _ = CheckExternalFileStateAsync(session, showPrompt: false));
-        watcher.Changed += changed;
-        watcher.Deleted += changed;
-        watcher.Renamed += renamed;
-        session.ExternalFileWatcher = watcher;
-        session.ExternalFileChangedHandler = changed;
-        session.ExternalFileRenamedHandler = renamed;
-    }
-
-    private void SendPendingDocumentLoad(DocumentSession session)
-    {
-        if (!session.IsReady ||
-            session.CoreWebView is null ||
-            session.PendingDocumentLoad is not { } document)
-        {
-            return;
-        }
-
-        session.TryPostEditorMessage(
-            BridgeEventJson.Create(
-                "document.loadRequested",
-                new
-                {
-                    fileName = document.FileName,
-                    content = document.Content,
-                    isRecovery = document.IsRecovery,
-                }));
-    }
-
-    private async Task ShowOpenErrorAsync(string message)
-    {
-        var dialog = new ContentDialog
-        {
-            XamlRoot = DocumentTabs.XamlRoot,
-            Title = DesktopResources.Get(
-                "OpenDrawingErrorTitle",
-                "Could not open drawing"),
-            Content = message,
-            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
-            DefaultButton = ContentDialogButton.Close,
-        };
-        await dialog.ShowAsync();
-    }
-
-    private static string GetLocalizedDocumentError(
-        BridgeProtocolException exception,
-        string fallback) => exception.Code switch
-        {
-            "DocumentNotFound" => DesktopResources.Get(
-                "DocumentNotFoundMessage",
-                "The drawing no longer exists at that location."),
-            "DocumentAccessDenied" => DesktopResources.Get(
-                "DocumentAccessDeniedMessage",
-                "Excalidraw Desktop does not have permission to access that drawing."),
-            "DocumentReadFailed" => DesktopResources.Get(
-                "DocumentReadFailedMessage",
-                "The drawing could not be read."),
-            "DocumentTooLarge" => DesktopResources.Get(
-                "DocumentTooLargeMessage",
-                "The selected drawing exceeds the 50 MB desktop document limit."),
-            "DocumentPathUnavailable" => DesktopResources.Get(
-                "DocumentPathUnavailableMessage",
-                "The selected drawing does not have a local file path."),
-            "DocumentChangedExternally" => DesktopResources.Get(
-                "DocumentChangedExternallyMessage",
-                "The drawing changed outside Excalidraw Desktop. Resolve the conflict before saving."),
-            "DocumentAlreadyOpen" => DesktopResources.Get(
-                "DocumentAlreadyOpenMessage",
-                "That drawing is already open in another tab. Choose a different file name."),
-            "DocumentWriteFailed" => DesktopResources.Get(
-                "DocumentWriteFailedMessage",
-                "The drawing could not be written to disk."),
-            "DocumentInvalid" => DesktopResources.Get(
-                "DocumentInvalidMessage",
-                "The selected file is not a valid Excalidraw drawing."),
-            _ => fallback,
-        };
 
     private async Task RestoreWorkspaceAsync()
     {
@@ -1101,7 +762,7 @@ public sealed partial class MainWindow : Window
                         {
                             if (!ReferenceEquals(target, initialSession))
                             {
-                                CloseSession(target);
+                                CloseSession(target, discardRecovery: false);
                             }
                             continue;
                         }
@@ -1111,7 +772,7 @@ public sealed partial class MainWindow : Window
                         {
                             if (!ReferenceEquals(target, initialSession))
                             {
-                                CloseSession(target);
+                                CloseSession(target, discardRecovery: false);
                             }
                             continue;
                         }
@@ -1119,14 +780,9 @@ public sealed partial class MainWindow : Window
                         ExcalidrawDocumentValidator.Validate(content);
                         target.RecoveryId = recoveryId;
                         target.RecoveryUpdatedAt = savedTab.RecoveryUpdatedAt;
-                        await target.DocumentService.RestoreActiveFileAsync(path);
-                        if (target.DocumentService.DocumentPath is { } recoveredPath)
-                        {
-                            WatchExternalFile(target, recoveredPath);
-                        }
                         var displayName = savedTab.DisplayName ??
-                            (path is null ? "Recovered drawing" : Path.GetFileName(path));
-                        AttachRecoveryToSession(target, displayName, content);
+                            (path is null ? DesktopResources.Get("RecoveredDrawingName", "Recovered drawing") : Path.GetFileName(path));
+                        await documents.RestoreRecoveryAsync(target, path, displayName, content);
                     }
                     else
                     {
@@ -1134,7 +790,7 @@ public sealed partial class MainWindow : Window
                         {
                             if (!ReferenceEquals(target, initialSession))
                             {
-                                CloseSession(target);
+                                CloseSession(target, discardRecovery: false);
                             }
                             continue;
                         }
@@ -1144,16 +800,16 @@ public sealed partial class MainWindow : Window
                             Guid.TryParseExact(cleanRecoveryId, "N", out _)
                                 ? cleanRecoveryId
                                 : target.RecoveryId;
-                        AttachDocumentToSession(target, document, select: false);
+                        documents.AttachDocumentToSession(target, document, select: false);
                     }
                     restoredSessions.Add(target);
                 }
                 catch (Exception exception)
                 {
-                    if (target is not null &&
-                        !ReferenceEquals(target, initialSession))
+                    if (target is not null)
                     {
-                        CloseSession(target);
+                        CloseSession(target, discardRecovery: false);
+                        if (ReferenceEquals(target, initialSession)) initialSession = sessions[0];
                     }
                     Debug.WriteLine($"Skipped workspace drawing '{path}': {exception}");
                     recentFiles.RemoveAll(recent =>
@@ -1184,219 +840,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void AttachRecoveryToSession(
-        DocumentSession session,
-        string displayName,
-        string content)
-    {
-        session.PendingDocumentLoad = new PendingEditorLoad(
-            displayName,
-            content,
-            IsRecovery: true);
-        session.DisplayName = displayName;
-        session.IsDirty = true;
-        UpdateTabHeader(session);
-    }
-
-    private async Task OpenRecentFileAsync(string path)
-    {
-        if (openPickerActive)
-        {
-            return;
-        }
-
-        openPickerActive = true;
-        try
-        {
-            var canonicalPath = DesktopDocumentPath.Normalize(path);
-            var existing = workspaceCoordinator.FindSessionByPath(canonicalPath);
-            if (existing is not null)
-            {
-                workspaceCoordinator.ActivateSession(
-                    existing.Value.Window,
-                    existing.Value.Session);
-                AddRecentFile(path);
-                return;
-            }
-
-            var source = ActiveSession ?? sessions[0];
-            var document = await source.DocumentService.OpenPathAsync(path);
-            var target = ActiveSession is { IsDirty: false } active &&
-                active.DocumentService.DocumentPath is null
-                    ? active
-                    : CreateTab();
-            AttachDocumentToSession(target, document, select: true);
-        }
-        catch (BridgeProtocolException exception)
-        {
-            if (exception.Code == "DocumentNotFound")
-            {
-                recentFiles.RemoveAll(recent =>
-                    DesktopDocumentPath.Equals(recent, path));
-                QueuePersistWorkspace();
-                QueueJumpListUpdate();
-            }
-            await ShowOpenErrorAsync(GetLocalizedDocumentError(
-                exception,
-                DesktopResources.Get(
-                    "RecentDrawingOpenFailed",
-                    "The recent drawing could not be opened.")));
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine(exception);
-            await ShowOpenErrorAsync(DesktopResources.Get(
-                "RecentDrawingOpenFailed",
-                "The recent drawing could not be opened."));
-        }
-        finally
-        {
-            openPickerActive = false;
-        }
-    }
-
-    private async Task CheckExternalFileStateAsync(
-        DocumentSession session,
-        bool showPrompt)
-    {
-        if (!sessions.Contains(session) ||
-            session.DocumentService.DocumentPath is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var state = await session.DocumentService.CheckExternalFileStateAsync();
-            if (!sessions.Contains(session))
-            {
-                return;
-            }
-
-            if (session.ExternalFileState != state &&
-                !ReferenceEquals(session, ActiveSession))
-            {
-                session.InactiveSince = DateTimeOffset.UtcNow;
-            }
-            session.ExternalFileState = state;
-            if (ReferenceEquals(session, ActiveSession))
-            {
-                UpdateWindowTitle();
-            }
-            if (showPrompt && state is not ExternalFileState.None)
-            {
-                await ShowExternalFileConflictAsync(session);
-            }
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine($"External file check failed: {exception}");
-        }
-    }
-
-    private async Task ShowExternalFileConflictAsync(DocumentSession session)
-    {
-        if (!sessions.Contains(session) ||
-            session.ExternalFileState is ExternalFileState.None ||
-            session.ExternalConflictPromptOpen)
-        {
-            return;
-        }
-
-        session.ExternalConflictPromptOpen = true;
-        DocumentTabs.SelectedItem = session.TabItem;
-        try
-        {
-            var requiresLocate = session.ExternalFileState is
-                ExternalFileState.Deleted or ExternalFileState.Moved;
-            var dialog = new ContentDialog
-            {
-                XamlRoot = DocumentTabs.XamlRoot,
-                Title = requiresLocate
-                    ? DesktopResources.Get(
-                        "DrawingFileMissingTitle",
-                        "Drawing file is missing")
-                    : DesktopResources.Get(
-                        "DrawingChangedOutsideTitle",
-                        "Drawing changed outside the app"),
-                Content = requiresLocate
-                    ? DesktopResources.Get(
-                        "DrawingFileMissingContent",
-                        "The backing file was moved or deleted. Locate it, save this tab to a new file, or keep editing without overwriting anything.")
-                    : DesktopResources.Get(
-                        "DrawingChangedOutsideContent",
-                        "Reload the disk version, save this tab to a different file, or keep editing. The existing file will not be overwritten automatically."),
-                PrimaryButtonText = requiresLocate
-                    ? DesktopResources.Get("LocateFileButton", "Locate file")
-                    : DesktopResources.Get("ReloadButton", "Reload"),
-                SecondaryButtonText = DesktopResources.Get("SaveAsButton", "Save As"),
-                CloseButtonText = DesktopResources.Get("KeepEditingButton", "Keep editing"),
-                DefaultButton = ContentDialogButton.Close,
-            };
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-                if (requiresLocate)
-                {
-                    await LocateExternalFileAsync(session);
-                }
-                else
-                {
-                    await ReloadExternalFileAsync(session);
-                }
-            }
-            else if (result == ContentDialogResult.Secondary)
-            {
-                session.TryPostEditorMessage(
-                    BridgeEventJson.Create(
-                        "document.saveRequested",
-                        new { reason = "externalConflict" }));
-            }
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine($"External conflict resolution failed: {exception}");
-            await ShowOpenErrorAsync(DesktopResources.Get(
-                "FileConflictResolutionFailed",
-                "The file conflict could not be resolved."));
-        }
-        finally
-        {
-            session.ExternalConflictPromptOpen = false;
-            UpdateWindowTitle();
-        }
-    }
-
-    private async Task ReloadExternalFileAsync(DocumentSession session)
-    {
-        var document = await session.DocumentService.ReloadActiveAsync();
-        session.ExternalFileState = ExternalFileState.None;
-        AttachDocumentToSession(session, document, select: true);
-    }
-
-    private async Task LocateExternalFileAsync(DocumentSession session)
-    {
-        var document = await session.DocumentService.PickOpenDocumentAsync();
-        if (document is null)
-        {
-            return;
-        }
-
-        var existing = workspaceCoordinator.FindSessionByPath(
-            document.CanonicalPath);
-        if (existing is not null &&
-            !ReferenceEquals(existing.Value.Session, session))
-        {
-            workspaceCoordinator.ActivateSession(
-                existing.Value.Window,
-                existing.Value.Session);
-            return;
-        }
-
-        session.ExternalFileState = ExternalFileState.None;
-        AttachDocumentToSession(session, document, select: true);
-    }
-
     private void PopulateRecentFilesMenu()
     {
         if (recentFiles.RemoveAll(path => !File.Exists(path)) > 0)
@@ -1423,7 +866,7 @@ public sealed partial class MainWindow : Window
             var item = new MenuFlyoutItem { Text = Path.GetFileName(path) };
             ToolTipService.SetToolTip(item, path);
             AutomationProperties.SetHelpText(item, path);
-            item.Click += (_, _) => _ = OpenRecentFileAsync(path);
+            item.Click += (_, _) => _ = documents.OpenRecentFileAsync(path);
             RecentFilesMenu.Items.Add(item);
         }
 
@@ -1527,41 +970,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnCloseReady(DocumentSession session)
-    {
-        if (!sessions.Contains(session) || session.IsDirty)
-        {
-            return;
-        }
-
-        if (session.WindowCloseSaveCompletion is { } saveCompletion)
-        {
-            session.WindowCloseSaveCompletion = null;
-            saveCompletion.TrySetResult(true);
-            return;
-        }
-
-        if (session.CloseAfterSave)
-        {
-            var completion = session.CloseCompletion;
-            session.CloseAfterSave = false;
-            session.CloseCompletion = null;
-            CloseSession(session);
-            completion?.TrySetResult(true);
-        }
-    }
-
-    private void OnCloseCancelled(DocumentSession session)
-    {
-        var saveCompletion = session.WindowCloseSaveCompletion;
-        var completion = session.CloseCompletion;
-        session.WindowCloseSaveCompletion = null;
-        session.CloseAfterSave = false;
-        session.CloseCompletion = null;
-        saveCompletion?.TrySetResult(false);
-        completion?.TrySetResult(false);
-    }
-
     private void OnDirtyChanged(DocumentSession session, bool isDirty)
     {
         if (!sessions.Contains(session))
@@ -1582,6 +990,7 @@ public sealed partial class MainWindow : Window
         }
 #endif
         session.IsDirty = isDirty;
+        session.DocumentStateVersion++;
         if (!ReferenceEquals(session, ActiveSession))
         {
             session.InactiveSince = DateTimeOffset.UtcNow;
@@ -1589,7 +998,8 @@ public sealed partial class MainWindow : Window
         if (!isDirty)
         {
             session.RecoveryUpdatedAt = null;
-            _ = DeleteRecoverySnapshotAsync(session);
+            session.RecoveryFailed = false;
+            _ = documents.DeleteRecoverySnapshotAsync(session, onlyIfClean: true);
         }
         UpdateTabHeader(session);
         UpdateWindowTitle();
@@ -1598,7 +1008,7 @@ public sealed partial class MainWindow : Window
 
     private void OnDocumentCreated(DocumentSession session)
     {
-        _ = DeleteRecoverySnapshotAsync(session);
+        _ = documents.DeleteRecoverySnapshotAsync(session);
         session.RecoveryId = Guid.NewGuid().ToString("N");
         session.RecoveryUpdatedAt = null;
         session.ExternalFileState = ExternalFileState.None;
@@ -1620,23 +1030,58 @@ public sealed partial class MainWindow : Window
             if (session.DocumentService.DocumentPath is { } restoredPath)
             {
                 AddRecentFile(restoredPath);
-                _ = CheckExternalFileStateAsync(session, showPrompt: false);
+                _ = documents.CheckExternalFileStateAsync(session, showPrompt: false);
             }
             return;
         }
 
         session.RecoveryUpdatedAt = null;
-        _ = DeleteRecoverySnapshotAsync(session);
+        _ = documents.DeleteRecoverySnapshotAsync(session, onlyIfClean: true);
         session.ExternalFileState = ExternalFileState.None;
         session.DisplayName = fileName;
         UpdateTabHeader(session);
         UpdateWindowTitle();
         if (session.DocumentService.DocumentPath is { } path)
         {
-            WatchExternalFile(session, path);
+            documents.WatchExternalFile(session, path);
             AddRecentFile(path);
-            _ = CheckExternalFileStateAsync(session, showPrompt: false);
+            _ = documents.CheckExternalFileStateAsync(session, showPrompt: false);
         }
+    }
+
+    private void OnDocumentLoadApplied(DocumentSession session, Guid loadId, string fileName, bool isRecovery)
+    {
+        if (session.PendingDocumentLoad is not { } pending || pending.LoadId != loadId ||
+            pending.FileName != fileName || pending.IsRecovery != isRecovery) return;
+        if (!isRecovery && !session.DocumentService.ConfirmOpened(fileName, loadId)) return;
+        session.PendingPathReservation?.Dispose();
+        session.PendingPathReservation = null;
+        if (isRecovery)
+        {
+            OnDocumentRecovered(session);
+            workspaceCoordinator.ReleasePreservedRecovery(session.RecoveryId);
+        }
+        else
+        {
+            OnDocumentOpened(session, fileName);
+        }
+    }
+
+    private void OnDocumentSaved(DocumentSession session, string fileName)
+    {
+        if (!sessions.Contains(session)) return;
+        // The saved revision can precede the current editor revision. Only a
+        // subsequent clean acknowledgement may delete recovery for this scene.
+        session.DisplayName = fileName;
+        session.ExternalFileState = ExternalFileState.None;
+        _ = documents.RefreshRecoveryBaselineAsync(session);
+        if (session.DocumentService.DocumentPath is { } path)
+        {
+            documents.WatchExternalFile(session, path);
+            AddRecentFile(path);
+        }
+        UpdateTabHeader(session);
+        UpdateWindowTitle();
     }
 
     private void OnDocumentRecovered(DocumentSession session)
@@ -1667,68 +1112,6 @@ public sealed partial class MainWindow : Window
         }
 #endif
         QueuePersistWorkspace();
-    }
-
-    private async Task OnRecoverySnapshotReceivedAsync(
-        DocumentSession session,
-        string content)
-    {
-        if (!sessions.Contains(session) || !session.IsDirty)
-        {
-            return;
-        }
-
-        await session.RecoveryGate.WaitAsync();
-        try
-        {
-            if (sessions.Contains(session) && session.IsDirty)
-            {
-                await recoverySnapshotStore.SaveAsync(session.RecoveryId, content);
-                session.RecoveryUpdatedAt = DateTimeOffset.UtcNow;
-                QueuePersistWorkspace();
-                if (ReferenceEquals(session, ActiveSession))
-                {
-                    UpdateWindowTitle();
-                }
-#if DEBUG
-                if (smoke.RunRecoverySmoke)
-                {
-                    recoverySnapshotsSaved++;
-                    if (recoverySnapshotsSaved == sessions.Count)
-                    {
-                        await PersistWorkspaceAsync();
-                        Title = "Excalidraw Desktop — Recovery snapshot saved";
-                    }
-                }
-#endif
-            }
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine($"Recovery snapshot failed: {exception}");
-        }
-        finally
-        {
-            session.RecoveryGate.Release();
-        }
-    }
-
-    private async Task DeleteRecoverySnapshotAsync(DocumentSession session)
-    {
-        var recoveryId = session.RecoveryId;
-        await session.RecoveryGate.WaitAsync();
-        try
-        {
-            await recoverySnapshotStore.DeleteAsync(recoveryId);
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine($"Recovery snapshot cleanup failed: {exception}");
-        }
-        finally
-        {
-            session.RecoveryGate.Release();
-        }
     }
 
     private void LogAction(
@@ -1764,6 +1147,7 @@ public sealed partial class MainWindow : Window
 
     private void OnAddTabButtonClick(TabView sender, object args)
     {
+        if (CommandsBlocked) return;
         LogAction("tab.new", "tab_button");
         CreateTab();
     }
@@ -1787,39 +1171,43 @@ public sealed partial class MainWindow : Window
     // drift between the two input paths; only the logged source differs.
     private void NewTabFromInput(string inputSource)
     {
+        if (CommandsBlocked) return;
         LogAction("tab.new", inputSource);
         CreateTab();
     }
 
     private void NewWindowFromInput(string inputSource)
     {
+        if (CommandsBlocked) return;
         LogAction("window.new", inputSource);
         workspaceCoordinator.CreateWindow();
     }
 
     private void OpenFromInput(string inputSource)
     {
+        if (CommandsBlocked) return;
         LogAction("document.open", inputSource);
-        if (ActiveSession is { } session)
-        {
-            _ = RequestOpenDocumentAsync(session);
-        }
+        var session = ActiveSession ?? lastDocumentSession ?? sessions.FirstOrDefault() ?? CreateTab();
+        _ = documents.RequestOpenDocumentAsync(session);
     }
 
     private void SaveFromInput(bool saveAs, string inputSource)
     {
+        if (CommandsBlocked) return;
         LogAction(saveAs ? "document.save_as" : "document.save", inputSource);
         RequestSaveFromFileMenu(saveAs);
     }
 
     private void SaveAllFromInput(string inputSource)
     {
+        if (CommandsBlocked) return;
         LogAction("document.save_all", inputSource);
         _ = SaveAllFromFileMenuAsync();
     }
 
     private void CloseActiveTabFromInput(string inputSource)
     {
+        if (CommandsBlocked) return;
         LogAction("tab.close", inputSource);
         if (settingsTabItem is not null &&
             ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem))
@@ -1842,251 +1230,14 @@ public sealed partial class MainWindow : Window
 
     private async void OnFileExportPngClick(object sender, RoutedEventArgs args)
     {
+        if (CommandsBlocked) return;
         LogAction("document.export_png", "menu");
-        await ExportActiveSessionAsPngAsync();
+        await imageExports.ExportActiveSessionAsPngAsync();
     }
-
-    private async Task ExportActiveSessionAsPngAsync()
-    {
-        if (openPickerActive ||
-            ActiveSession is not
-            {
-                IsReady: true,
-                IsExporting: false,
-                IsResuming: false,
-                IsRestoringFromHibernation: false,
-                CoreWebView: { } coreWebView,
-            } session)
-        {
-            return;
-        }
-
-        openPickerActive = true;
-        UpdateFileMenuState(session);
-        try
-        {
-            var destination = await imageExportService.PickDestinationAsync(
-                this,
-                session.DisplayName);
-            if (destination is null ||
-                !sessions.Contains(session) ||
-                !ReferenceEquals(session.CoreWebView, coreWebView))
-            {
-                return;
-            }
-
-            StartImageExport(session, coreWebView, destination);
-        }
-        catch (Exception exception)
-        {
-            DiagnosticLogService.Error(
-                "image_export.start_failed",
-                exception,
-                new { sessionId = session.RecoveryId });
-            Debug.WriteLine($"Could not start PNG export: {exception}");
-            if (session.PendingImageExport is { } pending)
-            {
-                await FailImageExportAsync(
-                    session,
-                    pending.ExportId,
-                    DesktopResources.Get(
-                        "PngExportStartFailed",
-                        "The PNG export could not be started."));
-            }
-            else
-            {
-                await ShowImageExportErrorAsync(
-                    DesktopResources.Get(
-                        "PngExportStartFailed",
-                        "The PNG export could not be started."));
-            }
-        }
-        finally
-        {
-            openPickerActive = false;
-            UpdateFileMenuState(ActiveSession);
-        }
-    }
-
-    private void StartImageExport(
-        DocumentSession session,
-        CoreWebView2 coreWebView,
-        StorageFile destination)
-    {
-        var exportId = Guid.NewGuid();
-        session.PendingImageExport = new PendingImageExport(
-            exportId,
-            destination,
-            new CancellationTokenSource());
-        session.ExportStatusMessage = null;
-        UpdateFileMenuState(session);
-        UpdateStatusBar(session);
-        if (!session.TryPostEditorMessage(
-            BridgeEventJson.Create(
-                "image.exportRequested",
-                new
-                {
-                    exportId = exportId.ToString("D"),
-                    uploadUrl = $"{ImageExportPolicy.GetUploadOrigin(session.TabOrigin)}" +
-                        $"/_desktop/export/{exportId:D}",
-                    maxDimension = ImageExportPolicy.MaxDimension,
-                    maxBytes = ImageExportPolicy.MaxPngBytes,
-                    scale = ImageExportPolicy.Scale,
-                    padding = ImageExportPolicy.Padding,
-                })))
-        {
-            _ = FailImageExportAsync(
-                session,
-                exportId,
-                DesktopResources.Get(
-                    "PngExportStartFailed",
-                    "The PNG export could not be started."));
-            return;
-        }
-        _ = WatchImageExportTimeoutAsync(
-            session,
-            exportId,
-            session.PendingImageExport.Cancellation.Token);
-    }
-
-    private void CompleteImageExport(
-        DocumentSession session,
-        PendingImageExport pending,
-        string fileName)
-    {
-        if (session.PendingImageExport?.ExportId != pending.ExportId)
-        {
-            return;
-        }
-
-        pending.Cancellation.Cancel();
-        pending.Cancellation.Dispose();
-        session.PendingImageExport = null;
-        session.ExportStatusMessage = DesktopResources.Format(
-            "ExportedFileFormat",
-            "Exported {0}",
-            fileName);
-        UpdateFileMenuState(ActiveSession);
-        UpdateStatusBar(session);
-#if DEBUG
-        if (smoke.RunImageExportSmoke &&
-            imageExportSmokeOutputPath is { } outputPath &&
-            DesktopDocumentPath.Equals(pending.Destination.Path, outputPath))
-        {
-            Title = "Excalidraw Desktop — Image export smoke passed";
-        }
-#endif
-        _ = ClearImageExportStatusAsync(session, session.ExportStatusMessage);
-    }
-
-    private async Task WatchImageExportTimeoutAsync(
-        DocumentSession session,
-        Guid exportId,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(TimeSpan.FromMinutes(2), cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-        if (sessions.Contains(session) &&
-            session.PendingImageExport?.ExportId == exportId)
-        {
-            await FailImageExportAsync(
-                session,
-                exportId,
-                DesktopResources.Get(
-                    "PngExportTimeout",
-                    "The PNG export took too long and was cancelled."));
-        }
-    }
-
-    private async Task ClearImageExportStatusAsync(
-        DocumentSession session,
-        string expectedMessage)
-    {
-        await Task.Delay(TimeSpan.FromSeconds(5));
-        if (sessions.Contains(session) &&
-            string.Equals(
-                session.ExportStatusMessage,
-                expectedMessage,
-                StringComparison.Ordinal))
-        {
-            session.ExportStatusMessage = null;
-            UpdateStatusBar(session);
-        }
-    }
-
-    private async Task FailImageExportAsync(
-        DocumentSession session,
-        Guid exportId,
-        string message)
-    {
-        if (session.PendingImageExport is not { } pending ||
-            pending.ExportId != exportId)
-        {
-            return;
-        }
-
-        pending.Cancellation.Cancel();
-        pending.Cancellation.Dispose();
-        session.PendingImageExport = null;
-        session.ExportStatusMessage = null;
-        UpdateFileMenuState(ActiveSession);
-        UpdateStatusBar(session);
-#if DEBUG
-        if (smoke.RunImageExportSmoke)
-        {
-            Title = $"Excalidraw Desktop — Image export smoke failed: {message}";
-            return;
-        }
-#endif
-        await ShowImageExportErrorAsync(message);
-    }
-
-    private async Task ShowImageExportErrorAsync(string message)
-    {
-        if (resourcesDisposed || DocumentTabs.XamlRoot is null)
-        {
-            return;
-        }
-
-        var dialog = new ContentDialog
-        {
-            XamlRoot = DocumentTabs.XamlRoot,
-            Title = DesktopResources.Get(
-                "PngExportErrorTitle",
-                "Could not export PNG"),
-            Content = message,
-            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
-            DefaultButton = ContentDialogButton.Close,
-        };
-        await dialog.ShowAsync();
-    }
-
-    private static string GetImageExportFailureMessage(Exception exception) =>
-        exception switch
-        {
-            BridgeProtocolException => exception.Message,
-            UnauthorizedAccessException =>
-                DesktopResources.Get(
-                    "PngExportAccessDenied",
-                    "Excalidraw Desktop does not have permission to write the selected location."),
-            IOException =>
-                DesktopResources.Get(
-                    "PngExportWriteFailed",
-                    "The PNG could not be written. Check the destination and available disk space."),
-            _ => DesktopResources.Get(
-                "PngExportDestinationFailed",
-                "The PNG could not be written to the selected location."),
-        };
 
     private void RequestSaveFromFileMenu(bool saveAs)
     {
-        if (ActiveSession is not { } session ||
+        if (CommandsBlocked || ActiveSession is not { } session ||
             !EditorSessionController.CanRequestSave(session))
         {
             return;
@@ -2103,6 +1254,7 @@ public sealed partial class MainWindow : Window
 
     private async Task SaveAllFromFileMenuAsync()
     {
+        if (CommandsBlocked) return;
         var dirtySessions = sessions.Where(session => session.IsDirty).ToArray();
         if (dirtySessions.Length == 0)
         {
@@ -2110,7 +1262,7 @@ public sealed partial class MainWindow : Window
         }
 
         var originallyActive = ActiveSession;
-        await SaveAllForWindowCloseAsync(dirtySessions);
+        await windowClose.SaveAllForWindowCloseAsync(dirtySessions);
         if (originallyActive is not null && sessions.Contains(originallyActive))
         {
             DocumentTabs.SelectedItem = originallyActive.TabItem;
@@ -2191,7 +1343,7 @@ public sealed partial class MainWindow : Window
         windowClosePromptOpen = true;
         try
         {
-            if (!await ResolveWindowCloseAsync())
+            if (!await windowClose.ResolveWindowCloseAsync())
             {
                 return false;
             }
@@ -2227,6 +1379,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             windowClosePromptOpen = false;
+            if (!resourcesDisposed) ExitCloseBarrier(sessions);
         }
     }
 
@@ -2244,6 +1397,7 @@ public sealed partial class MainWindow : Window
 
     private void ShowSettingsPage()
     {
+        if (CommandsBlocked) return;
         AppSettingsPage.LoadPreferences(
             desktopPreferences,
             workspaceCoordinator.EffectiveLanguage,
@@ -2415,6 +1569,7 @@ public sealed partial class MainWindow : Window
 
     private void QueueCloseSession(DocumentSession session)
     {
+        if (CommandsBlocked) return;
         _ = RequestCloseSessionAndReportAsync(session);
     }
 
@@ -2423,7 +1578,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            return await RequestCloseSessionAsync(session);
+            return await windowClose.RequestCloseSessionAsync(session);
         }
         catch (Exception exception)
         {
@@ -2590,89 +1745,9 @@ public sealed partial class MainWindow : Window
                 activeSession.Content.Editor.Focus(FocusState.Programmatic);
                 _ = editorSessions.InitializeAsync(activeSession);
             }
-            _ = CheckExternalFileStateAsync(activeSession, showPrompt: true);
+            _ = documents.CheckExternalFileStateAsync(activeSession, showPrompt: true);
         }
         QueuePersistWorkspace();
-    }
-
-    private async Task<bool> RequestCloseSessionAsync(DocumentSession session)
-    {
-        // Removing and disposing a TabViewItem while WinUI is routing the
-        // pointer/click event that targeted it can invalidate the input tree.
-        // Keep this deferral inside the shared close path so bulk and future
-        // callers receive the same protection.
-        if (!await YieldToDispatcherAsync())
-        {
-            return false;
-        }
-
-        if (!sessions.Contains(session) || session.ClosePromptOpen)
-        {
-            return false;
-        }
-
-        if (session.IsExporting)
-        {
-            await ShowImageExportErrorAsync(
-                DesktopResources.Get(
-                    "WaitForDrawingExport",
-                    "Wait for the current PNG export to finish before closing this drawing."));
-            return false;
-        }
-
-        if (!session.IsDirty)
-        {
-            CloseSession(session);
-            return true;
-        }
-
-        session.ClosePromptOpen = true;
-        DocumentTabs.SelectedItem = session.TabItem;
-        try
-        {
-            var canAutoSave = desktopPreferences.SaveDirtyDrawingsOnClose &&
-                EditorSessionController.CanRequestSave(session);
-            var decision = canAutoSave
-                ? CloseDecision.Save
-                : await session.DocumentService.PromptToSaveBeforeCloseAsync();
-            if (decision == CloseDecision.Discard)
-            {
-                CloseSession(session);
-                return true;
-            }
-
-            if (decision == CloseDecision.Save && EditorSessionController.CanRequestSave(session))
-            {
-                var completion = new TaskCompletionSource<bool>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
-                session.CloseCompletion = completion;
-                session.CloseAfterSave = true;
-                if (!session.TryPostEditorMessage(
-                    BridgeEventJson.Create(
-                        "document.saveRequested",
-                        new { reason = "close" })))
-                {
-                    session.CloseCompletion = null;
-                    session.CloseAfterSave = false;
-                    return false;
-                }
-                return await completion.Task;
-            }
-
-            return false;
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine(exception);
-            session.CloseAfterSave = false;
-            session.CloseCompletion?.TrySetResult(false);
-            session.CloseCompletion = null;
-            return false;
-        }
-        finally
-        {
-            session.ClosePromptOpen = false;
-        }
     }
 
     private Task<bool> YieldToDispatcherAsync()
@@ -2743,7 +1818,7 @@ public sealed partial class MainWindow : Window
         }
         if (session.DocumentService.DocumentPath is { } path)
         {
-            WatchExternalFile(session, path);
+            documents.WatchExternalFile(session, path);
         }
 
         session.IsMoving = false;
@@ -2772,6 +1847,7 @@ public sealed partial class MainWindow : Window
     }
 
     private bool CanMoveSession(DocumentSession session) =>
+        !CommandsBlocked && !WindowModalCoordinator.For(this).IsBusy &&
         sessions.Contains(session) &&
         session.IsReady &&
         !session.IsRetrying &&
@@ -2788,13 +1864,13 @@ public sealed partial class MainWindow : Window
             session.ClosePromptOpen ||
                 session.ExternalConflictPromptOpen ||
                 windowClosePromptOpen ||
-                openPickerActive,
+                documents.IsPickerActive,
             session.IsSuspensionChanging,
             session.IsResuming,
             session.IsUnloading,
             session.IsExporting));
 
-    private void CloseSession(DocumentSession session)
+    private void CloseSession(DocumentSession session, bool discardRecovery = true)
     {
         if (!sessions.Remove(session))
         {
@@ -2803,7 +1879,7 @@ public sealed partial class MainWindow : Window
 
         DocumentTabs.TabItems.Remove(session.TabItem);
         EditorHost.Children.Remove(session.Content);
-        _ = DeleteRecoverySnapshotAsync(session);
+        if (discardRecovery) _ = documents.DeleteRecoverySnapshotAsync(session);
         session.Dispose();
         if (ReferenceEquals(lastDocumentSession, session))
         {
@@ -2851,7 +1927,7 @@ public sealed partial class MainWindow : Window
         {
             Text = DesktopResources.Get("ContextNewTab", "New Tab"),
         };
-        newTab.Click += (_, _) => CreateTab();
+        newTab.Click += (_, _) => NewTabFromInput("context_menu");
 
         var copyPath = new MenuFlyoutItem
         {
@@ -3005,15 +2081,16 @@ public sealed partial class MainWindow : Window
             CloseButtonText = DesktopResources.Get("OkButton", "OK"),
             DefaultButton = ContentDialogButton.Close,
         };
-        await dialog.ShowAsync();
+        await WindowModalCoordinator.For(this).RunAsync(async () => await dialog.ShowAsync());
     }
 
     private async Task CloseSessionsAsync(IEnumerable<DocumentSession> targets)
     {
+        if (CommandsBlocked) return;
         foreach (var session in targets.ToArray())
         {
             if (sessions.Contains(session) &&
-                !await RequestCloseSessionAsync(session))
+                !await windowClose.RequestCloseSessionAsync(session))
             {
                 return;
             }
@@ -3058,7 +2135,7 @@ public sealed partial class MainWindow : Window
         windowClosePromptOpen = true;
         try
         {
-            if (await ResolveWindowCloseAsync())
+            if (await windowClose.ResolveWindowCloseAsync())
             {
                 allowClose = true;
                 Close();
@@ -3071,224 +2148,8 @@ public sealed partial class MainWindow : Window
         finally
         {
             windowClosePromptOpen = false;
+            if (!resourcesDisposed) ExitCloseBarrier(sessions);
         }
-    }
-
-    private async Task<bool> ResolveWindowCloseAsync()
-    {
-        if (sessions.Any(session => session.IsExporting))
-        {
-            await ShowImageExportErrorAsync(
-                DesktopResources.Get(
-                    "WaitForWindowExports",
-                    "Wait for PNG exports to finish before closing this window."));
-            return false;
-        }
-
-        var dirtySessions = sessions.Where(session => session.IsDirty).ToList();
-        if (dirtySessions.Count == 0)
-        {
-            await PersistWorkspaceAsync();
-            await workspaceCoordinator.PruneRecoverySnapshotsAsync();
-            return true;
-        }
-
-        if (desktopPreferences.SaveDirtyDrawingsOnClose &&
-            dirtySessions.All(EditorSessionController.CanRequestSave))
-        {
-            if (!await SaveAllForWindowCloseAsync(dirtySessions))
-            {
-                return false;
-            }
-            await PersistWorkspaceAsync();
-            await workspaceCoordinator.PruneRecoverySnapshotsAsync();
-            return true;
-        }
-
-        var names = string.Join(
-            Environment.NewLine,
-            dirtySessions.Select(session => $"• {session.DisplayName}"));
-        var reviewRequested = false;
-        var reviewButton = new Button
-        {
-            Content = DesktopResources.Get(
-                "ReviewTabsButton",
-                "Review tabs individually"),
-            HorizontalAlignment = HorizontalAlignment.Left,
-        };
-        AutomationProperties.SetAutomationId(reviewButton, "ReviewTabsButton");
-        AutomationProperties.SetName(
-            reviewButton,
-            DesktopResources.Get(
-                "ReviewTabsAutomationName",
-                "Review unsaved tabs individually"));
-        var content = new StackPanel { Spacing = 16 };
-        content.Children.Add(new TextBlock
-        {
-            Text = DesktopResources.Format(
-                "UnsavedDrawingsCountFormat",
-                "{0} drawing(s) have unsaved changes:\n\n{1}",
-                dirtySessions.Count,
-                names),
-            TextWrapping = TextWrapping.Wrap,
-        });
-        content.Children.Add(reviewButton);
-        var dialog = new ContentDialog
-        {
-            XamlRoot = DocumentTabs.XamlRoot,
-            Title = DesktopResources.Get("UnsavedDrawingsTitle", "Unsaved drawings"),
-            Content = content,
-            PrimaryButtonText = DesktopResources.Get("SaveAllButton", "Save all"),
-            SecondaryButtonText = DesktopResources.Get(
-                "DiscardAllButton",
-                "Discard all"),
-            CloseButtonText = DesktopResources.Get("CancelButton", "Cancel"),
-            DefaultButton = ContentDialogButton.Close,
-        };
-        reviewButton.Click += (_, _) =>
-        {
-            reviewRequested = true;
-            dialog.Hide();
-        };
-
-        var result = await dialog.ShowAsync();
-        if (reviewRequested)
-        {
-            DocumentTabs.SelectedItem = dirtySessions[0].TabItem;
-            return false;
-        }
-        if (result == ContentDialogResult.Primary)
-        {
-            if (!await SaveAllForWindowCloseAsync(dirtySessions))
-            {
-                return false;
-            }
-            await PersistWorkspaceAsync();
-            await workspaceCoordinator.PruneRecoverySnapshotsAsync();
-            return true;
-        }
-        if (result != ContentDialogResult.Secondary)
-        {
-            return false;
-        }
-
-        var discardedSessions = dirtySessions
-            .Where(session => sessions.Contains(session) && session.IsDirty)
-            .ToArray();
-        foreach (var discardedSession in discardedSessions)
-        {
-#if DEBUG
-            discardedSession.ForceDirtyForSmoke = false;
-#endif
-            discardedSession.IsDirty = false;
-        }
-        workspaceCoordinator.RecordWindowDiscarded(this);
-        try
-        {
-            await workspaceCoordinator.PersistWorkspaceAsync();
-            await workspaceCoordinator.PruneRecoverySnapshotsAsync();
-            return true;
-        }
-        catch
-        {
-            foreach (var discardedSession in discardedSessions)
-            {
-                discardedSession.IsDirty = true;
-                UpdateTabHeader(discardedSession);
-            }
-            throw;
-        }
-    }
-
-    private async Task<bool> SaveAllForWindowCloseAsync(
-        IEnumerable<DocumentSession> dirtySessions)
-    {
-        var completed = await WorkspaceTabOperations.RunSequentiallyAsync(
-            dirtySessions.ToArray(),
-            async session =>
-            {
-                if (!sessions.Contains(session) || !session.IsDirty)
-                {
-                    return true;
-                }
-
-                DocumentTabs.SelectedItem = session.TabItem;
-                return await RequestSaveForWindowCloseAsync(session);
-            });
-
-        return completed && sessions.All(session => !session.IsDirty);
-    }
-
-    private async Task<bool> RequestSaveForWindowCloseAsync(
-        DocumentSession session)
-    {
-        if (!sessions.Contains(session) || !session.IsDirty)
-        {
-            return true;
-        }
-
-        if (session.WindowCloseSaveCompletion is not null ||
-            session.CloseCompletion is not null)
-        {
-            return false;
-        }
-
-        // The caller selected the tab, which starts a lazy editor
-        // initialization for tabs restored from recovery; give it a bounded
-        // chance to become ready before deciding the save cannot run.
-        if (!EditorSessionController.CanRequestSave(session) &&
-            !await WaitUntilAsync(
-                () => !sessions.Contains(session) || EditorSessionController.CanRequestSave(session),
-                TimeSpan.FromSeconds(10)))
-        {
-            return false;
-        }
-
-        if (!sessions.Contains(session) || !EditorSessionController.CanRequestSave(session))
-        {
-            return !session.IsDirty;
-        }
-
-        var completion = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        session.WindowCloseSaveCompletion = completion;
-        try
-        {
-            if (!session.TryPostEditorMessage(
-                BridgeEventJson.Create(
-                    "document.saveRequested",
-                    new { reason = "close" })))
-            {
-                session.WindowCloseSaveCompletion = null;
-                return false;
-            }
-            return await completion.Task;
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine(exception);
-            session.WindowCloseSaveCompletion = null;
-            completion.TrySetResult(false);
-            return false;
-        }
-    }
-
-    private static async Task<bool> WaitUntilAsync(
-        Func<bool> condition,
-        TimeSpan timeout,
-        TimeSpan? pollInterval = null)
-    {
-        var deadline = DateTimeOffset.UtcNow + timeout;
-        do
-        {
-            if (condition())
-            {
-                return true;
-            }
-            await Task.Delay(pollInterval ?? TimeSpan.FromMilliseconds(50));
-        }
-        while (DateTimeOffset.UtcNow < deadline);
-        return condition();
     }
 
     private DocumentSession? ActiveSession =>
@@ -3587,6 +2448,11 @@ public sealed partial class MainWindow : Window
                 "File moved — Resolve");
             actionable = true;
         }
+        else if (session.IsDirty && session.RecoveryFailed)
+        {
+            status = DesktopResources.Get("StatusRecoveryFailed", "Recovery unavailable — Save As…");
+            actionable = true;
+        }
         else if (session.IsDirty)
         {
             status = session.RecoveryUpdatedAt is { } recoveredAt
@@ -3633,10 +2499,16 @@ public sealed partial class MainWindow : Window
 
     private async void OnStatusActionClick(object sender, RoutedEventArgs args)
     {
+        if (CommandsBlocked) return;
+        if (ActiveSession is { IsDirty: true, RecoveryFailed: true, ExternalFileState: ExternalFileState.None })
+        {
+            RequestSaveFromFileMenu(saveAs: true);
+            return;
+        }
         if (!settingsPageVisible &&
             ActiveSession is { ExternalFileState: not ExternalFileState.None } session)
         {
-            await ShowExternalFileConflictAsync(session);
+            await documents.ShowExternalFileConflictAsync(session);
         }
     }
 
@@ -3650,7 +2522,15 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        await Launcher.LaunchUriAsync(uri);
+        try
+        {
+            if (!await Launcher.LaunchUriAsync(uri))
+                DiagnosticLogService.Info("external_uri.not_launched");
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLogService.Error("external_uri.launch_failed", exception);
+        }
     }
 
 }

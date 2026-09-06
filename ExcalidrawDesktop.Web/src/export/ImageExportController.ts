@@ -1,5 +1,6 @@
 import { exportToBlob, getCommonBounds } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { abortable, abortError } from "../bridge/AbortableOperation";
 
 export type WholeDrawingExportRequest = {
   exportId: string;
@@ -13,8 +14,10 @@ export type WholeDrawingExportRequest = {
 type ImageExportDependencies = {
   exportToBlob: typeof exportToBlob;
   getCommonBounds: typeof getCommonBounds;
-  upload?: (path: string, blob: Blob, exportId: string) => Promise<void>;
+  upload?: (path: string, blob: Blob, exportId: string, signal?: AbortSignal) => Promise<void>;
 };
+
+const exportError = (code: string, message: string) => Object.assign(new Error(message), { code });
 
 const defaultDependencies: ImageExportDependencies = {
   exportToBlob,
@@ -26,10 +29,12 @@ export const exportWholeDrawingAsPng = async (
   request: WholeDrawingExportRequest,
   ownerWindow: Window,
   dependencies: ImageExportDependencies = defaultDependencies,
+  signal?: AbortSignal,
 ) => {
+  if (signal?.aborted) throw abortError();
   const elements = api.getSceneElements();
   if (elements.length === 0) {
-    throw new Error("Add something to the drawing before exporting it.");
+    throw exportError("ExportEmpty", "Add something to the drawing before exporting it.");
   }
 
   const [minX, minY, maxX, maxY] = dependencies.getCommonBounds(elements);
@@ -43,12 +48,12 @@ export const exportWholeDrawingAsPng = async (
     width > request.maxDimension ||
     height > request.maxDimension
   ) {
-    throw new Error(
+    throw exportError("ExportDimensionLimit",
       `The exported image would exceed the ${request.maxDimension}px dimension limit.`,
     );
   }
 
-  const blob = await dependencies.exportToBlob({
+  const blob = await abortable<Blob>(dependencies.exportToBlob({
     elements,
     files: api.getFiles(),
     appState: {
@@ -64,30 +69,36 @@ export const exportWholeDrawingAsPng = async (
       height: Math.ceil(sceneHeight * request.scale),
       scale: request.scale,
     }),
-  });
+  }), signal);
+  if (signal?.aborted) throw abortError();
   if (blob.type !== "image/png") {
-    throw new Error("The editor did not produce a PNG image.");
+    throw exportError("ExportInvalidImage", "The editor did not produce a PNG image.");
   }
   if (blob.size === 0 || blob.size > request.maxBytes) {
-    throw new Error(
+    throw exportError("ExportByteLimit",
       `The exported PNG is empty or exceeds the ${Math.floor(request.maxBytes / 1024 / 1024)} MB limit.`,
     );
   }
 
   if (dependencies.upload) {
-    await dependencies.upload(request.uploadUrl, blob, request.exportId);
+    if (signal) {
+      await abortable(dependencies.upload(request.uploadUrl, blob, request.exportId, signal), signal);
+    } else {
+      await dependencies.upload(request.uploadUrl, blob, request.exportId);
+    }
     return;
   }
 
-  const response = await ownerWindow.fetch(request.uploadUrl, {
+  const response = await abortable(ownerWindow.fetch(request.uploadUrl, {
     method: "POST",
     headers: {
       "Content-Type": "image/png",
       "X-Excalidraw-Export-Id": request.exportId,
     },
     body: blob,
-  });
+    signal,
+  }), signal);
   if (!response.ok) {
-    throw new Error("The PNG could not be written by the desktop host.");
+    throw exportError("ExportUploadFailed", "The PNG could not be written by the desktop host.");
   }
 };

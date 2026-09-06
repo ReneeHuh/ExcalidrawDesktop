@@ -43,7 +43,11 @@ internal sealed class EditorSessionController
     public event Action<DocumentSession>? Ready;
     public event Action<DocumentSession>? Resumed;
     public event Action<DocumentSession>? Failed;
-    public event Action<string>? TitleChanged;
+    public event Action<DocumentSession, string>? TitleChanged;
+    public event Action<DocumentSession, bool>? CloseBarrierReady;
+    public event Action<DocumentSession, Guid, string, bool>? DocumentLoadApplied;
+    public Func<bool>? CommandsBlocked { get; set; }
+    public Func<BridgeMessage, Task<object?>>? LibraryRequest { get; set; }
     public event Action<DocumentSession, WebView2>? EditorRecreated;
     public event Action<DocumentSession, CoreWebView2,
         CoreWebView2WebResourceRequestedEventArgs>? ImageExportRequested;
@@ -101,9 +105,11 @@ internal sealed class EditorSessionController
 
     public bool CanSuspend(DocumentSession session) =>
         sessions.Contains(session) &&
+        session.CloseBarrierId is null &&
         !ReferenceEquals(session, getActiveSession()) &&
         session.IsReady &&
         !session.IsDirty &&
+        !session.HasUnsavedLibrary &&
         !session.IsInitializing &&
         !session.IsRetrying &&
         !session.IsExporting &&
@@ -122,9 +128,11 @@ internal sealed class EditorSessionController
 
     public bool CanUnload(DocumentSession session) =>
         sessions.Contains(session) &&
+        session.CloseBarrierId is null &&
         !ReferenceEquals(session, getActiveSession()) &&
         session.IsReady &&
         !session.IsDirty &&
+        !session.HasUnsavedLibrary &&
         !session.IsInitializing &&
         !session.IsRetrying &&
         !session.IsExporting &&
@@ -232,9 +240,11 @@ internal sealed class EditorSessionController
 
     private bool CanUnloadSessionDuringTransition(DocumentSession session) =>
         sessions.Contains(session) &&
+        session.CloseBarrierId is null &&
         !ReferenceEquals(session, getActiveSession()) &&
         session.IsReady &&
         !session.IsDirty &&
+        !session.HasUnsavedLibrary &&
         !session.IsExporting &&
         !session.IsInitializing &&
         !session.IsUnloaded &&
@@ -344,10 +354,12 @@ internal sealed class EditorSessionController
 
     private bool CanSuspendSessionDuringTransition(DocumentSession session) =>
         sessions.Contains(session) &&
+        session.CloseBarrierId is null &&
         !ReferenceEquals(session, getActiveSession()) &&
         session.Content.Visibility != Visibility.Visible &&
         session.IsReady &&
         !session.IsDirty &&
+        !session.HasUnsavedLibrary &&
         !session.IsExporting &&
         !session.IsUnloading &&
         session.CoreWebView is not null &&
@@ -420,7 +432,7 @@ internal sealed class EditorSessionController
                 return;
             }
             var webView = session.Content.Editor;
-            TitleChanged?.Invoke(DesktopResources.Get(
+            TitleChanged?.Invoke(session, DesktopResources.Get(
                 "InitializingEditorTitle",
                 "Excalidraw Desktop — Initializing editor…"));
             var entryPointPath = Path.Combine(webAssetPath, "index.html");
@@ -443,6 +455,8 @@ internal sealed class EditorSessionController
             var entryPoint = enableSmokeApi
                 ? $"{session.TabOrigin.EntryPoint}?desktopSmoke=1"
                 : session.TabOrigin.EntryPoint;
+            session.NavigationPolicy = new EditorNavigationPolicy(entryPoint);
+            session.EditorNavigationId = null;
             webView.CoreWebView2.Navigate(entryPoint);
         }
         catch (Exception exception)
@@ -470,7 +484,7 @@ internal sealed class EditorSessionController
                         "EditorRetryGuidance",
                         "Retry the editor. If the problem continues, repair WebView2 or rebuild the desktop app. Your saved drawing is not changed."),
                 showWebView2Help: true);
-            TitleChanged?.Invoke(DesktopResources.Get(
+            TitleChanged?.Invoke(session, DesktopResources.Get(
                 "EditorStartupFailedTitle",
                 "Excalidraw Desktop — Editor startup failed"));
             Debug.WriteLine(exception);
@@ -519,8 +533,8 @@ internal sealed class EditorSessionController
             exportFilter,
             CoreWebView2WebResourceContext.All);
 
-        coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = true;
-        coreWebView.Settings.AreDefaultContextMenusEnabled = true;
+        coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = false;
+        coreWebView.Settings.AreDefaultContextMenusEnabled = false;
 #if DEBUG
         coreWebView.Settings.AreDevToolsEnabled = true;
 #else
@@ -638,13 +652,18 @@ internal sealed class EditorSessionController
             if (load is not null)
             {
                 ExcalidrawDocumentValidator.ValidateForSave(
-                    load.Content, DocumentService.MaxDocumentBytes);
-                if (!load.IsRecovery && !session.DocumentService.StageActiveFileReload())
+                    load.IsRecovery ? RecoveryFileBaseline.GetDocumentContent(load.Content) : load.Content,
+                    DocumentService.MaxDocumentBytes);
+                if (!load.IsRecovery && session.DocumentService.PendingOpenId is null &&
+                    !session.DocumentService.StageActiveFileReload())
                 {
                     throw new InvalidOperationException("The drawing has no file to reload.");
                 }
             }
-            session.PendingDocumentLoad = load;
+            session.PendingDocumentLoad = load is null ? null : load with
+            {
+                LoadId = session.DocumentService.PendingOpenId ?? Guid.NewGuid(),
+            };
             var editor = session.Content.RecreateEditor(DesktopResources.Get(
                 "RetryingEditor",
                 "Retrying editor…"));
@@ -733,13 +752,18 @@ internal sealed class EditorSessionController
         DocumentSession session,
         CoreWebView2NavigationStartingEventArgs args)
     {
-        if (session.TabOrigin.Matches(args.Uri) || args.Uri == "about:blank")
+        if (session.NavigationPolicy?.TryBeginNavigation(args.Uri) == true)
         {
+            session.EditorNavigationId = args.NavigationId;
+            session.IsReady = false;
             return;
         }
 
         args.Cancel = true;
-        await openExternalUri(args.Uri);
+        if (!session.TabOrigin.Matches(args.Uri) && args.Uri != "about:blank")
+        {
+            await TryOpenExternalUriAsync(args.Uri);
+        }
     }
 
     private async void OnNavigationCompleted(
@@ -748,7 +772,8 @@ internal sealed class EditorSessionController
         CoreWebView2NavigationCompletedEventArgs args)
     {
         if (!sessions.Contains(session) ||
-            !ReferenceEquals(session.CoreWebView, coreWebView))
+            !ReferenceEquals(session.CoreWebView, coreWebView) ||
+            session.EditorNavigationId != args.NavigationId)
         {
             return;
         }
@@ -767,7 +792,7 @@ internal sealed class EditorSessionController
                     "DrawingLoadFailureGuidance",
                     "Check the local app installation and retry. If other WebView2 apps also fail, use WebView2 help to repair the runtime."),
                 showWebView2Help: true);
-            TitleChanged?.Invoke(DesktopResources.Get(
+            TitleChanged?.Invoke(session, DesktopResources.Get(
                 "EditorStartupFailedTitle",
                 "Excalidraw Desktop — Editor startup failed"));
             return;
@@ -783,8 +808,17 @@ internal sealed class EditorSessionController
         }
 
 #if DEBUG
-        var diagnostics = await coreWebView.ExecuteScriptAsync(
-            "JSON.stringify({readyState:document.readyState,rootChildren:document.getElementById('root')?.childElementCount??-1,origin:location.origin,transport:!!window.chrome?.webview})");
+        string diagnostics;
+        try
+        {
+            diagnostics = await coreWebView.ExecuteScriptAsync(
+                "JSON.stringify({readyState:document.readyState,rootChildren:document.getElementById('root')?.childElementCount??-1,origin:location.origin,transport:!!window.chrome?.webview})");
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLogService.Error("editor.startup_diagnostics_failed", exception);
+            return;
+        }
         Debug.WriteLine($"Editor bridge startup diagnostics: {diagnostics}");
         session.Content.ShowFailure(
             $"The editor loaded but its desktop bridge did not become ready. {diagnostics}");
@@ -799,7 +833,7 @@ internal sealed class EditorSessionController
 #endif
         session.LastLifecycleFailure = "The desktop bridge did not become ready.";
         session.IsRetrying = false;
-        TitleChanged?.Invoke(DesktopResources.Get(
+        TitleChanged?.Invoke(session, DesktopResources.Get(
             "EditorStartupFailedTitle",
             "Excalidraw Desktop — Editor startup failed"));
     }
@@ -837,7 +871,7 @@ internal sealed class EditorSessionController
                 failureKind),
             showWebView2Help: true);
         StateChanged?.Invoke(session);
-        TitleChanged?.Invoke(DesktopResources.Get(
+        TitleChanged?.Invoke(session, DesktopResources.Get(
             "EditorProcessFailedTitle",
             "Excalidraw Desktop — Editor process failed"));
     }
@@ -846,7 +880,19 @@ internal sealed class EditorSessionController
         CoreWebView2NewWindowRequestedEventArgs args)
     {
         args.Handled = true;
-        await openExternalUri(args.Uri);
+        await TryOpenExternalUriAsync(args.Uri);
+    }
+
+    private async Task TryOpenExternalUriAsync(string uri)
+    {
+        try
+        {
+            await openExternalUri(uri);
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLogService.Error("editor.external_uri_failed", exception);
+        }
     }
 
     private void OnPermissionRequested(
@@ -875,6 +921,84 @@ internal sealed class EditorSessionController
         {
             session.BridgeDispatchDepth++;
             var message = BridgeMessageParser.Parse(args.WebMessageAsJson);
+            if (message.Kind == "event" && message.Method == "library.stateChanged")
+            {
+                if (message.Payload is { ValueKind: System.Text.Json.JsonValueKind.Object } libraryPayload &&
+                    libraryPayload.TryGetProperty("hasUnsavedChanges", out var unsaved) &&
+                    unsaved.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
+                    session.HasUnsavedLibrary = unsaved.GetBoolean();
+                return;
+            }
+            if (message.Kind == "request" && message.Method is "library.load" or "library.save" &&
+                LibraryRequest is { } libraryRequest)
+            {
+                try
+                {
+                    var response = await libraryRequest(message);
+                    session.TryPostEditorMessage(BridgeResponseJson.Success(message, response));
+                }
+                catch (BridgeProtocolException exception)
+                {
+                    session.TryPostEditorMessage(BridgeResponseJson.Error(message, exception.Code, exception.Message));
+                }
+                catch (Exception exception)
+                {
+                    DiagnosticLogService.Error("library.operation_failed", exception);
+                    session.TryPostEditorMessage(BridgeResponseJson.Error(message, "LibraryUnavailable",
+                        "The shared library could not be read or saved."));
+                }
+                return;
+            }
+            if (message.Kind == "event" && message.Method is "document.loadApplied" or "document.loadFailed" or "document.loadCancelled")
+            {
+                if (message.Payload is not { ValueKind: System.Text.Json.JsonValueKind.Object } payload ||
+                    !payload.TryGetProperty("loadId", out var id) ||
+                    id.ValueKind != System.Text.Json.JsonValueKind.String ||
+                    !Guid.TryParseExact(id.GetString(), "D", out var loadId) ||
+                    session.PendingDocumentLoad?.LoadId != loadId)
+                    return;
+                if (message.Method != "document.loadApplied")
+                {
+                    HandleLoadFailure(session);
+                    return;
+                }
+                if (payload.TryGetProperty("fileName", out var fileName) &&
+                    fileName.ValueKind == System.Text.Json.JsonValueKind.String &&
+                    payload.TryGetProperty("isRecovery", out var recovery) &&
+                    recovery.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
+                    DocumentLoadApplied?.Invoke(session, loadId, fileName.GetString()!, recovery.GetBoolean());
+                return;
+            }
+            if (message.Kind == "event" && message.Method == "document.closeBarrierReady")
+            {
+                if (message.Payload is { } payload &&
+                    payload.TryGetProperty("barrierId", out var id) &&
+                    Guid.TryParse(id.GetString(), out var barrierId) &&
+                    session.CloseBarrierId == barrierId &&
+                    payload.TryGetProperty("isDirty", out var dirty) &&
+                    dirty.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
+                {
+                    CloseBarrierReady?.Invoke(session, dirty.GetBoolean());
+                    session.CloseBarrierCompletion?.TrySetResult(
+                        !payload.TryGetProperty("canClose", out var canClose) ||
+                        canClose.ValueKind != System.Text.Json.JsonValueKind.False);
+                }
+                return;
+            }
+            if (message.Kind == "request" && CommandsBlocked?.Invoke() == true &&
+                message.Method is "document.new" or "document.open" or "document.save" or "document.saveAs")
+            {
+                var isCloseSave = message.Payload is { ValueKind: System.Text.Json.JsonValueKind.Object } payload &&
+                    payload.TryGetProperty("closeRequestId", out var id) &&
+                    id.ValueKind == System.Text.Json.JsonValueKind.String &&
+                    Guid.TryParse(id.GetString(), out var requestId) && session.CloseRequestId == requestId;
+                if (!isCloseSave)
+                {
+                    session.TryPostEditorMessage(BridgeResponseJson.Error(message,
+                        "DocumentClosing", "Finish or cancel closing before changing the drawing."));
+                    return;
+                }
+            }
             if (message.Kind == "request" &&
                 message.Method is "document.save" or "document.saveAs" &&
                 !CanRequestSave(session))
@@ -890,6 +1014,12 @@ internal sealed class EditorSessionController
         catch (BridgeProtocolException exception)
         {
             Debug.WriteLine($"Rejected bridge message ({exception.Code}): {exception.Message}");
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLogService.Error("editor.bridge_dispatch_failed", exception);
+            session.LastLifecycleFailure = exception.Message;
+            StateChanged?.Invoke(session);
         }
         finally
         {

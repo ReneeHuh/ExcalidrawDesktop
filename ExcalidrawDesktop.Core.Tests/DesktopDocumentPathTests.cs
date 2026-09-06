@@ -5,6 +5,12 @@ namespace ExcalidrawDesktop.Tests;
 public sealed class DesktopDocumentPathTests
 {
     [Fact]
+    public void NormalizeRejectsEmbeddedNull()
+    {
+        Assert.Null(DesktopDocumentPath.Normalize("bad\0path"));
+    }
+
+    [Fact]
     public void EqualsTreatsWindowsCaseAndRelativeSegmentsAsTheSameFile()
     {
         var path = Path.Combine(Path.GetTempPath(), "Drawings", "Scene.excalidraw");

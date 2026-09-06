@@ -57,6 +57,16 @@ internal sealed class DocumentSession : IDisposable
 
     public bool IsReady { get; set; }
 
+    public EditorNavigationPolicy? NavigationPolicy { get; set; }
+
+    public Guid? CloseBarrierId { get; set; }
+
+    public TaskCompletionSource<bool>? CloseBarrierCompletion { get; set; }
+
+    public long DocumentStateVersion { get; set; }
+
+    public bool RecoveryFailed { get; set; }
+
     public bool IsInitializing { get; set; }
 
     public bool IsRetrying { get; set; }
@@ -77,7 +87,11 @@ internal sealed class DocumentSession : IDisposable
 
     public int BridgeDispatchDepth { get; set; }
 
-    public bool IsBridgeDispatching => BridgeDispatchDepth > 0;
+    public bool HasUnsavedLibrary { get; set; }
+
+    public ulong? EditorNavigationId { get; set; }
+
+    public bool IsBridgeDispatching => BridgeDispatchDepth > 0 || DocumentService.IsSaving;
 
     public bool IsExporting => PendingImageExport is not null;
 
@@ -90,6 +104,8 @@ internal sealed class DocumentSession : IDisposable
     public string? LastLifecycleFailure { get; set; }
 
     public bool CloseAfterSave { get; set; }
+
+    public Guid? CloseRequestId { get; set; }
 
     public bool ClosePromptOpen { get; set; }
 
@@ -144,6 +160,8 @@ internal sealed class DocumentSession : IDisposable
 
     public PendingEditorLoad? PendingDocumentLoad { get; set; }
 
+    public IDisposable? PendingPathReservation { get; set; }
+
     public string HeaderText
     {
         get
@@ -160,6 +178,18 @@ internal sealed class DocumentSession : IDisposable
 
     public void Dispose()
     {
+        CloseBarrierCompletion?.TrySetResult(false);
+        CloseBarrierCompletion = null;
+        CloseBarrierId = null;
+        PendingPathReservation?.Dispose();
+        PendingPathReservation = null;
+        Dispatcher?.CancelPendingSave();
+        CloseRequestId = null;
+        CloseAfterSave = false;
+        CloseCompletion?.TrySetResult(false);
+        WindowCloseSaveCompletion?.TrySetResult(false);
+        CloseCompletion = null;
+        WindowCloseSaveCompletion = null;
         PendingImageExport?.Cancellation.Cancel();
         PendingImageExport?.Cancellation.Dispose();
         PendingImageExport = null;

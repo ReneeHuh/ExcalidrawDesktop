@@ -16,7 +16,7 @@ public sealed partial class MainWindow
         try
         {
             await File.WriteAllTextAsync(path, saved);
-            AttachDocumentToSession(
+            documents.AttachDocumentToSession(
                 session, await session.DocumentService.OpenPathAsync(path), select: true);
             await WaitForRetrySmokeReadyAsync(session, isDirty: false);
 
@@ -41,7 +41,7 @@ public sealed partial class MainWindow
             }
 
             RequestAutomationEdit(session, "retry-unsaved");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => session.IsDirty && session.RecoveryUpdatedAt is not null &&
                         !session.IsBridgeDispatching,
                     TimeSpan.FromSeconds(15)))
@@ -122,7 +122,7 @@ public sealed partial class MainWindow
 
     private static async Task WaitForRetrySmokeReadyAsync(DocumentSession session, bool isDirty)
     {
-        if (!await WaitUntilAsync(
+        if (!await AsyncWait.UntilAsync(
                 () => session.IsReady && !session.IsRetrying &&
                     session.PendingDocumentLoad is null &&
                     session.IsDirty == isDirty && !session.IsBridgeDispatching,

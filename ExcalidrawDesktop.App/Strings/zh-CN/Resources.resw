@@ -178,4 +178,12 @@
   <data name="EditorRetryFailed" xml:space="preserve"><value>无法恢复绘图</value></data>
   <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>此未保存绘图的恢复数据缺失或无法读取。未更改任何绘图文件。</value></data>
   <data name="EditorRetryFileGuidance" xml:space="preserve"><value>请重试或重新打开绘图文件。未更改任何绘图文件。</value></data>
+  <data name="StatusRecoveryFailed" xml:space="preserve"><value>恢复不可用 — 另存为…</value></data>
+  <data name="RecoveredDrawingName" xml:space="preserve"><value>已恢复的绘图</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>启动恢复失败</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>部分绘图无法恢复。恢复数据已保留。</value></data>
+  <data name="CloseWindowButton" xml:space="preserve"><value>关闭窗口</value></data>
+  <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>无法保存设置</value></data>
+  <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>所选首选项在本次会话中已生效，但无法保存。请检查设置位置后重试。</value></data>
+  <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>重试</value></data>
 </root>

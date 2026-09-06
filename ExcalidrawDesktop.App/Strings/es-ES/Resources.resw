@@ -178,4 +178,12 @@
   <data name="EditorRetryFailed" xml:space="preserve"><value>No se pudo restaurar el dibujo</value></data>
   <data name="EditorRetryRecoveryGuidance" xml:space="preserve"><value>Los datos de recuperación de este dibujo sin guardar no están disponibles o no se pueden leer. No se ha modificado ningún archivo de dibujo.</value></data>
   <data name="EditorRetryFileGuidance" xml:space="preserve"><value>Vuelve a intentarlo o abre de nuevo el archivo de dibujo. No se ha modificado ningún archivo de dibujo.</value></data>
+  <data name="StatusRecoveryFailed" xml:space="preserve"><value>Recuperación no disponible — Guardar como…</value></data>
+  <data name="RecoveredDrawingName" xml:space="preserve"><value>Dibujo recuperado</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>Error de recuperación al iniciar</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>No se pudieron restaurar algunos dibujos. Los datos de recuperación se conservaron.</value></data>
+  <data name="CloseWindowButton" xml:space="preserve"><value>Cerrar ventana</value></data>
+  <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>No se pudieron guardar los ajustes</value></data>
+  <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>La preferencia seleccionada está activa durante esta sesión, pero no se pudo guardar. Comprueba la ubicación de ajustes e inténtalo de nuevo.</value></data>
+  <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>Reintentar</value></data>
 </root>

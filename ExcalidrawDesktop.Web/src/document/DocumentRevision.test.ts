@@ -48,13 +48,56 @@ describe("getDocumentRevision", () => {
       .not.toBe(getDocumentRevision([], settings));
   });
 
+  it("stays clean after saving a scene containing deleted shapes", () => {
+    const visible = { version: 3, isDeleted: false } as never;
+    const deleted = { version: 7, isDeleted: true } as never;
+    const saved = getDocumentRevision([visible], settings);
+    expect(getDocumentRevision([visible, deleted], settings)).toBe(saved);
+    expect(getDocumentRevision([visible, deleted], { ...settings, scrollX: 100 }))
+      .toBe(saved);
+  });
+
+  it("tracks deleting the last shape and restoring it through undo", () => {
+    const visible = { version: 3, isDeleted: false } as never;
+    const deleted = { version: 4, isDeleted: true } as never;
+    expect(getDocumentRevision([deleted], settings))
+      .not.toBe(getDocumentRevision([visible], settings));
+    const savedEmpty = getDocumentRevision([], settings);
+    expect(getDocumentRevision([deleted], settings)).toBe(savedEmpty);
+    expect(getDocumentRevision([{ version: 5, isDeleted: false } as never], settings))
+      .not.toBe(savedEmpty);
+    expect(getDocumentRevision([{ version: 6, isDeleted: true } as never], settings))
+      .toBe(savedEmpty);
+  });
+
+  it("does not confuse a deletion plus an edit with the saved scene", () => {
+    const saved = [
+      { id: "a", version: 1, isDeleted: false },
+      { id: "b", version: 1, isDeleted: false },
+    ] as never;
+    const changed = [
+      { id: "a", version: 2, isDeleted: true },
+      { id: "b", version: 2, isDeleted: false },
+    ] as never;
+    expect(getDocumentRevision(changed, settings)).not.toBe(getDocumentRevision(saved, settings));
+  });
+
+  it("tracks replacement, stacking order, and equal-version edits", () => {
+    const a = { id: "a", version: 2, versionNonce: 10 } as never;
+    const b = { id: "b", version: 2, versionNonce: 20 } as never;
+    expect(getDocumentRevision([a], settings)).not.toBe(getDocumentRevision([b], settings));
+    expect(getDocumentRevision([a, b], settings)).not.toBe(getDocumentRevision([b, a], settings));
+    expect(getDocumentRevision([{ id: "a", version: 2, versionNonce: 11 } as never], settings))
+      .not.toBe(getDocumentRevision([a], settings));
+  });
+
   it("tracks every appState field exported by the installed editor", () => {
     // Start from the library's complete default state so this catches newly
     // exported settings when the editor dependency is upgraded.
     const appState = restoreAppState(settings, null);
     const exported = JSON.parse(serializeAsJSON([], appState, {}, "local")).appState;
     const tracked = JSON.parse(getDocumentRevision([], appState));
-    delete tracked.sceneVersion;
+    delete tracked.elements;
     expect(tracked).toEqual(exported);
   });
 });

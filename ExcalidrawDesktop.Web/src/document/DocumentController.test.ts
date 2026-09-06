@@ -171,7 +171,7 @@ describe("saveDocumentFromEditor", () => {
       revision: getDocumentRevision([], {}),
     });
     expect(serialize).toHaveBeenCalledWith([], {}, {}, "local");
-    expect(bridge.saveDocument).toHaveBeenCalledWith("serialized scene");
+    expect(bridge.saveDocument).toHaveBeenCalledWith("serialized scene", undefined);
     expect(bridge.saveDocumentAs).not.toHaveBeenCalled();
   });
 
@@ -191,7 +191,7 @@ describe("saveDocumentFromEditor", () => {
       }),
     ).resolves.toEqual({ status: "cancelled" });
     expect(bridge.saveDocument).not.toHaveBeenCalled();
-    expect(bridge.saveDocumentAs).toHaveBeenCalledWith("serialized scene");
+    expect(bridge.saveDocumentAs).toHaveBeenCalledWith("serialized scene", undefined);
   });
 
   it.each([false, true])("keeps the saved background baseline during an in-flight save (saveAs=%s)", async (saveAs) => {

@@ -16,6 +16,7 @@ namespace ExcalidrawDesktop.App;
 // Smoke-test scenarios, fixtures, and their per-window state.
 public sealed partial class MainWindow
 {
+#if DEBUG
     private readonly Stopwatch performanceStartup = Stopwatch.StartNew();
     private bool tabSmokeStarted;
     private bool titleBarSmokeStarted;
@@ -34,8 +35,20 @@ public sealed partial class MainWindow
     private bool recoverySmokeStarted;
     private int recoverySnapshotsSaved;
     private int recoveryTabsRestored;
-#if DEBUG
     private TaskCompletionSource? multiWindowInitializationRelease;
+
+    private async Task OnRecoverySnapshotSavedForSmokeAsync(DocumentSession session)
+    {
+        if (smoke.RunRecoverySmoke)
+        {
+            recoverySnapshotsSaved++;
+            if (recoverySnapshotsSaved == sessions.Count)
+            {
+                await PersistWorkspaceAsync();
+                Title = "Excalidraw Desktop — Recovery snapshot saved";
+            }
+        }
+    }
 #endif
 
     private void OnEditorLanguageApplied(
@@ -325,7 +338,7 @@ public sealed partial class MainWindow
                 throw new InvalidOperationException(
                     "A resuming drawing was allowed to enter a transfer.");
             }
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => !session.IsResuming,
                     TimeSpan.FromSeconds(5)))
             {
@@ -353,7 +366,7 @@ public sealed partial class MainWindow
                     "A recreating drawing was allowed to enter a transfer.");
             }
             await wakeTask;
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => session.IsReady &&
                         !session.IsRestoringFromHibernation &&
                         !session.IsResuming,
@@ -385,7 +398,7 @@ public sealed partial class MainWindow
             multiWindowInitializationRelease = new TaskCompletionSource(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             var retryTask = editorSessions.RetryAsync(session);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => session.IsInitializing,
                     TimeSpan.FromSeconds(5)) ||
                 workspaceCoordinator.MoveSessionToNewWindow(this, session) ||
@@ -397,7 +410,7 @@ public sealed partial class MainWindow
             multiWindowInitializationRelease.TrySetResult();
             multiWindowInitializationRelease = null;
             await retryTask;
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => session.IsReady && !session.IsInitializing,
                     TimeSpan.FromSeconds(20)) ||
                 session.CoreWebView is null ||
@@ -434,15 +447,15 @@ public sealed partial class MainWindow
             await File.WriteAllTextAsync(
                 saveAsPath,
                 CreateDocumentSafetyScene("multi-window-save-as-placeholder", 0));
-            AttachDocumentToSession(
+            documents.AttachDocumentToSession(
                 sourceSession,
                 await sourceSession.DocumentService.OpenPathAsync(sourcePath),
                 select: true);
-            AttachDocumentToSession(
+            documents.AttachDocumentToSession(
                 session,
                 await session.DocumentService.OpenPathAsync(movedPath),
                 select: false);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => sourceSession.PendingDocumentLoad is null &&
                         session.PendingDocumentLoad is null,
                     TimeSpan.FromSeconds(20)))
@@ -452,7 +465,7 @@ public sealed partial class MainWindow
             }
             var sourceWatcher = session.ExternalFileWatcher;
             DocumentTabs.SelectedItem = session.TabItem;
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => ReferenceEquals(ActiveSession, session),
                     TimeSpan.FromSeconds(5)))
             {
@@ -460,7 +473,7 @@ public sealed partial class MainWindow
                     "The transfer fixture could not activate its drawing.");
             }
             RequestAutomationEdit(session, "multi-window-moved-edited");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => session.IsDirty,
                     TimeSpan.FromSeconds(10)))
             {
@@ -468,7 +481,7 @@ public sealed partial class MainWindow
                     "The transferred drawing did not become dirty.");
             }
             DocumentTabs.SelectedItem = sourceSession.TabItem;
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => ReferenceEquals(ActiveSession, sourceSession),
                     TimeSpan.FromSeconds(5)))
             {
@@ -501,7 +514,7 @@ public sealed partial class MainWindow
             }
 
             RequestSessionSave(session);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => !session.IsDirty &&
                         FileContains(movedPath, "multi-window-moved-edited"),
                     TimeSpan.FromSeconds(20)) ||
@@ -515,7 +528,7 @@ public sealed partial class MainWindow
             }
 
             RequestAutomationEdit(sourceSession, "multi-window-source-edited");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => sourceSession.IsDirty,
                     TimeSpan.FromSeconds(10)))
             {
@@ -523,7 +536,7 @@ public sealed partial class MainWindow
                     "The source-window drawing did not become dirty.");
             }
             RequestSessionSave(sourceSession);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => !sourceSession.IsDirty &&
                         FileContains(sourcePath, "multi-window-source-edited"),
                     TimeSpan.FromSeconds(20)) ||
@@ -534,7 +547,7 @@ public sealed partial class MainWindow
             }
 
             RequestAutomationEdit(session, "multi-window-save-as-edited");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => session.IsDirty,
                     TimeSpan.FromSeconds(10)))
             {
@@ -544,7 +557,7 @@ public sealed partial class MainWindow
             session.DocumentService.SaveFileOverrideForSmoke =
                 await StorageFile.GetFileFromPathAsync(saveAsPath);
             RequestSessionSave(session, reason: "saveAs");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => !session.IsDirty &&
                         DesktopDocumentPath.Equals(
                             session.DocumentService.DocumentPath,
@@ -561,15 +574,15 @@ public sealed partial class MainWindow
                 "multi-window-external-modified",
                 300);
             await File.WriteAllTextAsync(saveAsPath, externallyModified);
-            await destination.CheckExternalFileStateAsync(session, showPrompt: false);
+            await destination.documents.CheckExternalFileStateAsync(session, showPrompt: false);
             if (session.ExternalFileState != ExternalFileState.Modified ||
                 sourceSession.ExternalFileState != ExternalFileState.None)
             {
                 throw new InvalidOperationException(
                     "An external modification crossed window ownership boundaries.");
             }
-            await destination.ReloadExternalFileAsync(session);
-            if (!await WaitUntilAsync(
+            await destination.documents.ReloadExternalFileAsync(session);
+            if (!await AsyncWait.UntilAsync(
                     () => session.PendingDocumentLoad is null,
                     TimeSpan.FromSeconds(20)))
             {
@@ -578,7 +591,7 @@ public sealed partial class MainWindow
             }
 
             File.Move(saveAsPath, renamedPath, overwrite: true);
-            await destination.CheckExternalFileStateAsync(session, showPrompt: false);
+            await destination.documents.CheckExternalFileStateAsync(session, showPrompt: false);
             if (session.ExternalFileState is not
                 (ExternalFileState.Moved or ExternalFileState.Deleted))
             {
@@ -586,25 +599,29 @@ public sealed partial class MainWindow
                     "The destination window did not detect an external move.");
             }
             File.Move(renamedPath, saveAsPath, overwrite: true);
-            await session.DocumentService.RestoreActiveFileAsync(saveAsPath);
-            destination.WatchExternalFile(session, saveAsPath);
+            var restored = await session.DocumentService.OpenPathAsync(saveAsPath);
+            await session.DocumentService.RestoreActiveFileAsync(
+                saveAsPath, restored.Stamp, restored.ContentHash);
+            destination.documents.WatchExternalFile(session, saveAsPath);
             session.ExternalFileState = ExternalFileState.None;
 
             var restoredContent = await File.ReadAllTextAsync(saveAsPath);
             File.Delete(saveAsPath);
-            await destination.CheckExternalFileStateAsync(session, showPrompt: false);
+            await destination.documents.CheckExternalFileStateAsync(session, showPrompt: false);
             if (session.ExternalFileState != ExternalFileState.Deleted)
             {
                 throw new InvalidOperationException(
                     "The destination window did not detect external deletion.");
             }
             await File.WriteAllTextAsync(saveAsPath, restoredContent);
-            await session.DocumentService.RestoreActiveFileAsync(saveAsPath);
-            destination.WatchExternalFile(session, saveAsPath);
+            restored = await session.DocumentService.OpenPathAsync(saveAsPath);
+            await session.DocumentService.RestoreActiveFileAsync(
+                saveAsPath, restored.Stamp, restored.ContentHash);
+            destination.documents.WatchExternalFile(session, saveAsPath);
             session.ExternalFileState = ExternalFileState.None;
 
             RequestAutomationEdit(session, "multi-window-recovery-edited");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => session.IsDirty && session.RecoveryUpdatedAt is not null,
                     TimeSpan.FromSeconds(20)) ||
                 await destination.recoverySnapshotStore.LoadAsync(
@@ -643,7 +660,7 @@ public sealed partial class MainWindow
                     "Recovery identity or content was lost during transfer.");
             }
             RequestSessionSave(session);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => !session.IsDirty &&
                         FileContains(saveAsPath, "multi-window-recovery-edited"),
                     TimeSpan.FromSeconds(20)))
@@ -962,7 +979,7 @@ public sealed partial class MainWindow
                 AppContext.BaseDirectory,
                 "titlebar-resource-cleanup.tmp");
             await File.WriteAllTextAsync(cleanupProbePath, "cleanup");
-            WatchExternalFile(second, cleanupProbePath);
+            documents.WatchExternalFile(second, cleanupProbePath);
             if (second.ExternalFileWatcher is null ||
                 second.ExternalFileChangedHandler is null ||
                 second.ExternalFileRenamedHandler is null)
@@ -1206,11 +1223,11 @@ public sealed partial class MainWindow
             await File.WriteAllTextAsync(
                 largeScenePath,
                 CreateLargeLifecycleScene(elementCount: 500));
-            AttachDocumentToSession(
+            documents.AttachDocumentToSession(
                 unloading,
                 await unloading.DocumentService.OpenPathAsync(largeScenePath),
                 select: false);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => unloading.PendingDocumentLoad is null,
                     TimeSpan.FromSeconds(20)) ||
                 unloading.IsDirty)
@@ -1236,7 +1253,9 @@ public sealed partial class MainWindow
             await File.WriteAllTextAsync(
                 largeScenePath,
                 CreateLargeLifecycleScene(elementCount: 500));
-            await unloading.DocumentService.RestoreActiveFileAsync(largeScenePath);
+            var largeScene = await unloading.DocumentService.OpenPathAsync(largeScenePath);
+            await unloading.DocumentService.RestoreActiveFileAsync(
+                largeScenePath, largeScene.Stamp, largeScene.ContentHash);
             unloading.ExternalFileState = ExternalFileState.None;
             unloading.LastLifecycleFailure = null;
 
@@ -1264,7 +1283,7 @@ public sealed partial class MainWindow
             for (var cycle = 0; cycle < 3; cycle++)
             {
                 DocumentTabs.SelectedItem = sleeping.TabItem;
-                if (!await WaitUntilAsync(
+                if (!await AsyncWait.UntilAsync(
                         () => ReferenceEquals(ActiveSession, sleeping) &&
                             unloading.Content.Visibility != Visibility.Visible,
                         TimeSpan.FromSeconds(5)))
@@ -1569,6 +1588,9 @@ public sealed partial class MainWindow
             DocumentTabs.SelectedItem = sessions[1].TabItem;
             await VerifyEditorRetrySmokeAsync(sessions[1]);
             await VerifyDocumentDirtySmokeAsync(sessions[1]);
+            await VerifyCloseTimeoutSmokeAsync(sessions[1]);
+            await VerifyRecoveryConflictSmokeAsync();
+            await VerifySaveRecoveryExportSmokeAsync(sessions[1]);
             Title = "Excalidraw Desktop — Tab smoke passed";
         }
         catch (Exception exception)
@@ -1779,15 +1801,15 @@ public sealed partial class MainWindow
             await File.WriteAllTextAsync(firstPath, firstInitial);
             await File.WriteAllTextAsync(secondPath, secondInitial);
 
-            AttachDocumentToSession(
+            documents.AttachDocumentToSession(
                 first,
                 await first.DocumentService.OpenPathAsync(firstPath),
                 select: true);
-            AttachDocumentToSession(
+            documents.AttachDocumentToSession(
                 second,
                 await second.DocumentService.OpenPathAsync(secondPath),
                 select: false);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => first.PendingDocumentLoad is null &&
                         second.PendingDocumentLoad is null,
                     TimeSpan.FromSeconds(20)))
@@ -1798,7 +1820,7 @@ public sealed partial class MainWindow
 
             await LoadAutomationSceneAsync(first, firstEdited);
             RequestSessionSave(first);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => FileContains(firstPath, "first-edited"),
                     TimeSpan.FromSeconds(10)) ||
                 !string.Equals(
@@ -1810,9 +1832,32 @@ public sealed partial class MainWindow
                     "Saving the first tab changed the wrong document.");
             }
 
+            // A browser reload must preserve the native target and the loaded
+            // scene; otherwise the next save could overwrite it with an empty
+            // editor. Exercise the real WebView reload path after a saved load.
+            var beforeReload = await ReadSmokeStateAsync(first);
+            first.CoreWebView!.Reload();
+            await Task.Delay(250);
+            if (!await AsyncWait.UntilAsync(
+                    () => first.IsReady && first.PendingDocumentLoad is null,
+                    TimeSpan.FromSeconds(20)))
+            {
+                throw new InvalidOperationException(
+                    "The editor did not recover after a browser reload.");
+            }
+            var afterReload = await ReadSmokeStateAsync(first);
+            if (!afterReload.ElementIds.SequenceEqual(beforeReload.ElementIds) ||
+                !string.Equals(afterReload.ViewBackgroundColor, beforeReload.ViewBackgroundColor,
+                    StringComparison.Ordinal) ||
+                !DesktopDocumentPath.Equals(first.DocumentService.DocumentPath, firstPath))
+            {
+                throw new InvalidOperationException(
+                    "Browser reload lost the loaded scene or native file target.");
+            }
+
             await LoadAutomationSceneAsync(second, secondEdited);
             RequestSessionSave(second);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => FileContains(secondPath, "second-edited"),
                     TimeSpan.FromSeconds(10)) ||
                 !FileContains(firstPath, "first-edited"))
@@ -1835,8 +1880,8 @@ public sealed partial class MainWindow
                 firstPath,
                 CreateDocumentSafetyScene("first-external", -300));
             Title = "Excalidraw Desktop — Document safety smoke: choose Reload";
-            await CheckExternalFileStateAsync(first, showPrompt: true);
-            if (!await WaitUntilAsync(
+            await documents.CheckExternalFileStateAsync(first, showPrompt: true);
+            if (!await AsyncWait.UntilAsync(
                     () => first.PendingDocumentLoad is null &&
                         first.ExternalFileState == ExternalFileState.None,
                     TimeSpan.FromSeconds(20)) ||
@@ -1848,7 +1893,7 @@ public sealed partial class MainWindow
             }
 
             RequestAutomationEdit(first, "first-conflict-save-as");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => first.IsDirty,
                     TimeSpan.FromSeconds(10)))
             {
@@ -1865,8 +1910,8 @@ public sealed partial class MainWindow
             first.DocumentService.SaveFileOverrideForSmoke =
                 await StorageFile.GetFileFromPathAsync(saveAsPath);
             Title = "Excalidraw Desktop — Document safety smoke: choose Save As";
-            await CheckExternalFileStateAsync(first, showPrompt: true);
-            if (!await WaitUntilAsync(
+            await documents.CheckExternalFileStateAsync(first, showPrompt: true);
+            if (!await AsyncWait.UntilAsync(
                     () => DesktopDocumentPath.Equals(
                             first.DocumentService.DocumentPath,
                             saveAsPath) &&
@@ -1883,7 +1928,7 @@ public sealed partial class MainWindow
             }
 
             RequestAutomationEdit(first, "first-keep-editing");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => first.IsDirty,
                     TimeSpan.FromSeconds(10)))
             {
@@ -1895,7 +1940,7 @@ public sealed partial class MainWindow
                 -400);
             await File.WriteAllTextAsync(saveAsPath, keepEditingDiskContent);
             Title = "Excalidraw Desktop — Document safety smoke: choose Keep Editing";
-            await CheckExternalFileStateAsync(first, showPrompt: true);
+            await documents.CheckExternalFileStateAsync(first, showPrompt: true);
             if (!first.IsDirty ||
                 first.ExternalFileState != ExternalFileState.Modified ||
                 !DesktopDocumentPath.Equals(
@@ -1911,8 +1956,8 @@ public sealed partial class MainWindow
             }
 
             var refreshedFirst = await first.DocumentService.OpenPathAsync(saveAsPath);
-            AttachDocumentToSession(first, refreshedFirst, select: true);
-            if (!await WaitUntilAsync(
+            documents.AttachDocumentToSession(first, refreshedFirst, select: true);
+            if (!await AsyncWait.UntilAsync(
                     () => first.PendingDocumentLoad is null,
                     TimeSpan.FromSeconds(20)))
             {
@@ -1921,7 +1966,7 @@ public sealed partial class MainWindow
             }
 
             File.Move(saveAsPath, movedPath, overwrite: true);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => first.ExternalFileState is
                         ExternalFileState.Moved or ExternalFileState.Deleted,
                     TimeSpan.FromSeconds(10)))
@@ -1931,7 +1976,7 @@ public sealed partial class MainWindow
             }
 
             File.Delete(secondPath);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => second.ExternalFileState == ExternalFileState.Deleted,
                     TimeSpan.FromSeconds(10)))
             {
@@ -1963,16 +2008,32 @@ public sealed partial class MainWindow
         DocumentSession session,
         string content)
     {
+        // Wait for the editor's actual scene rather than relying on a fixed
+        // delay, which races background WebView scheduling on inactive tabs.
+        using var expected = JsonDocument.Parse(content);
+        var ids = expected.RootElement.GetProperty("elements").EnumerateArray()
+            .Select(element => element.GetProperty("id").GetString()!).ToArray();
         session.TryPostEditorMessage(
             BridgeEventJson.Create(
                 "document.loadRequested",
                 new
                 {
+                    loadId = session.DocumentService.PendingOpenId ?? Guid.NewGuid(),
                     fileName = session.DisplayName,
                     content,
                     isRecovery = false,
                 }));
-        await Task.Delay(500);
+        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(10);
+        do
+        {
+            var state = await ReadSmokeStateAsync(session);
+            if (state.ElementIds.SequenceEqual(ids) &&
+                await session.CoreWebView!.ExecuteScriptAsync(
+                    "window.__EXCALIDRAW_DESKTOP_SMOKE__.isSaving()") == "false")
+                return;
+            await Task.Delay(50);
+        } while (DateTimeOffset.UtcNow < deadline);
+        throw new InvalidOperationException("The automation scene did not finish applying.");
     }
 
     private static string CreateDocumentSafetyScene(string id, int x) =>
@@ -2030,6 +2091,27 @@ public sealed partial class MainWindow
         }
     }
 
+#if DEBUG
+    private void OnImageExportCompletedForSmoke(string path)
+    {
+        if (smoke.RunImageExportSmoke && imageExportSmokeOutputPath is { } outputPath &&
+            DesktopDocumentPath.Equals(path, outputPath))
+        {
+            Title = "Excalidraw Desktop — Image export smoke passed";
+        }
+    }
+
+    private bool OnImageExportFailedForSmoke(string message)
+    {
+        if (!smoke.RunImageExportSmoke)
+        {
+            return false;
+        }
+        Title = $"Excalidraw Desktop — Image export smoke failed: {message}";
+        return true;
+    }
+#endif
+
     private void RequestSessionSave(
         DocumentSession session,
         string reason = "save")
@@ -2073,11 +2155,11 @@ public sealed partial class MainWindow
             var saveSession = sessions[1];
             var initialScene = CreateDocumentSafetyScene("close-save-initial", 0);
             await File.WriteAllTextAsync(savedPath, initialScene);
-            AttachDocumentToSession(
+            documents.AttachDocumentToSession(
                 saveSession,
                 await saveSession.DocumentService.OpenPathAsync(savedPath),
                 select: false);
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => saveSession.PendingDocumentLoad is null,
                     TimeSpan.FromSeconds(20)))
             {
@@ -2086,7 +2168,7 @@ public sealed partial class MainWindow
             }
 
             RequestAutomationEdit(cancelAndDiscardSession, "close-cancel-discard");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => cancelAndDiscardSession.IsDirty,
                     TimeSpan.FromSeconds(10)))
             {
@@ -2095,7 +2177,7 @@ public sealed partial class MainWindow
             }
 
             Title = "Excalidraw Desktop — Close decisions smoke: choose Cancel";
-            if (await RequestCloseSessionAsync(cancelAndDiscardSession) ||
+            if (await windowClose.RequestCloseSessionAsync(cancelAndDiscardSession) ||
                 !sessions.Contains(cancelAndDiscardSession) ||
                 !cancelAndDiscardSession.IsDirty)
             {
@@ -2104,7 +2186,7 @@ public sealed partial class MainWindow
             }
 
             Title = "Excalidraw Desktop — Close decisions smoke: choose Discard";
-            if (!await RequestCloseSessionAsync(cancelAndDiscardSession) ||
+            if (!await windowClose.RequestCloseSessionAsync(cancelAndDiscardSession) ||
                 sessions.Contains(cancelAndDiscardSession))
             {
                 throw new InvalidOperationException(
@@ -2112,7 +2194,7 @@ public sealed partial class MainWindow
             }
 
             RequestAutomationEdit(saveSession, "close-save-edited");
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => saveSession.IsDirty,
                     TimeSpan.FromSeconds(10)))
             {
@@ -2121,7 +2203,7 @@ public sealed partial class MainWindow
             }
 
             Title = "Excalidraw Desktop — Close decisions smoke: choose Save";
-            if (!await RequestCloseSessionAsync(saveSession) ||
+            if (!await windowClose.RequestCloseSessionAsync(saveSession) ||
                 sessions.Contains(saveSession) ||
                 !FileContains(savedPath, "close-save-edited"))
             {
@@ -2141,12 +2223,12 @@ public sealed partial class MainWindow
                 await File.WriteAllTextAsync(
                     windowClosePaths[index],
                     CreateDocumentSafetyScene($"window-close-initial-{index}", index));
-                AttachDocumentToSession(
+                documents.AttachDocumentToSession(
                     session,
                     await session.DocumentService.OpenPathAsync(windowClosePaths[index]),
                     select: false);
             }
-            if (!await WaitUntilAsync(
+            if (!await AsyncWait.UntilAsync(
                     () => sessions.All(session =>
                         session.IsReady && session.PendingDocumentLoad is null),
                     TimeSpan.FromSeconds(20)))
@@ -2160,7 +2242,7 @@ public sealed partial class MainWindow
                 DocumentTabs.SelectedItem = session.TabItem;
                 await Task.Delay(100);
                 RequestAutomationEdit(session, $"window-close-edited-{index}");
-                if (!await WaitUntilAsync(
+                if (!await AsyncWait.UntilAsync(
                         () => session.IsDirty,
                         TimeSpan.FromSeconds(10)))
                 {
@@ -2170,7 +2252,7 @@ public sealed partial class MainWindow
             }
 
             Title = "Excalidraw Desktop — Window close smoke: choose Cancel";
-            if (await ResolveWindowCloseAsync() ||
+            if (await windowClose.ResolveWindowCloseAsync() ||
                 sessions.Any(session => !session.IsDirty))
             {
                 throw new InvalidOperationException(
@@ -2179,7 +2261,7 @@ public sealed partial class MainWindow
 
             var firstDirtySession = sessions[0];
             Title = "Excalidraw Desktop — Window close smoke: choose Review Tabs";
-            if (await ResolveWindowCloseAsync() ||
+            if (await windowClose.ResolveWindowCloseAsync() ||
                 !ReferenceEquals(ActiveSession, firstDirtySession) ||
                 sessions.Any(session => !session.IsDirty))
             {
@@ -2188,7 +2270,7 @@ public sealed partial class MainWindow
             }
 
             Title = "Excalidraw Desktop — Window close smoke: choose Save All";
-            if (!await ResolveWindowCloseAsync() ||
+            if (!await windowClose.ResolveWindowCloseAsync() ||
                 sessions.Any(session => session.IsDirty) ||
                 windowClosePaths.Where((path, index) =>
                     !FileContains(path, $"window-close-edited-{index}")).Any())
@@ -2359,7 +2441,7 @@ public sealed partial class MainWindow
             await File.WriteAllBytesAsync(imageExportSmokeOutputPath, []);
 
             var document = await session.DocumentService.OpenPathAsync(scenePath);
-            AttachDocumentToSession(session, document, select: true);
+            documents.AttachDocumentToSession(session, document, select: true);
             var loadDeadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
             while (session.PendingDocumentLoad is not null &&
                 DateTimeOffset.UtcNow < loadDeadline)
@@ -2375,7 +2457,7 @@ public sealed partial class MainWindow
 
             var destination = await StorageFile.GetFileFromPathAsync(
                 imageExportSmokeOutputPath);
-            StartImageExport(session, coreWebView, destination);
+            imageExports.StartImageExport(session, coreWebView, destination);
         }
         catch (Exception exception)
         {

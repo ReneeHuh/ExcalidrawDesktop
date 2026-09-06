@@ -23,13 +23,15 @@ internal sealed class ImageExportService
         };
         picker.FileTypeChoices.Add("PNG image", new[] { ".png" });
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(window));
-        return await picker.PickSaveFileAsync();
+        return await WindowModalCoordinator.For(window).RunAsync(
+            async () => await picker.PickSaveFileAsync());
     }
 
     public static async Task WritePngAsync(
         StorageFile destination,
         IRandomAccessStream source,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action? commitStarted = null)
     {
         using var transaction = await destination.OpenTransactedWriteAsync();
         transaction.Stream.Size = 0;
@@ -81,6 +83,10 @@ internal sealed class ImageExportService
         }
 
         await output.FlushAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        // From this point the transacted write is irrevocable. Callers must
+        // keep the export in a committing state until CommitAsync returns.
+        commitStarted?.Invoke();
         await transaction.CommitAsync();
     }
 }

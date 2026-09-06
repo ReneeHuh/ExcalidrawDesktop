@@ -8,16 +8,33 @@ namespace ExcalidrawDesktop.App.Services;
 public sealed class BridgeDispatcher
 {
     private readonly DocumentService documentService;
+    private CancellationTokenSource? pendingSaveCancellation;
+    private string? pendingSaveRequestId;
+    private Guid? pendingCloseRequestId;
+    public Func<Guid, bool>? IsCloseSavePending { get; init; }
+
+    public void CancelPendingSave() => pendingSaveCancellation?.Cancel();
+
+    public void CancelCloseSave(Guid closeRequestId)
+    {
+        if (pendingCloseRequestId == closeRequestId)
+        {
+            CancelPendingSave();
+        }
+    }
     private readonly Action appReady;
-    private readonly Action closeReady;
+    private readonly Action<Guid> closeReady;
     private readonly Action<bool> dirtyChanged;
     private readonly Action documentCreated;
     private readonly Action<string> documentOpened;
+    // Save completion is separate from load completion: a save must not
+    // clear a recovery snapshot for edits made after the save started.
+    private readonly Action<string>? documentSaved;
     private readonly Action documentRecovered;
     private readonly Action? documentLoadFailed;
-    private readonly Func<string, Task> recoverySnapshotReceived;
+    private readonly Func<string, Task<bool>> recoverySnapshotReceived;
     private readonly Action externalConflictDetected;
-    private readonly Action closeCancelled;
+    private readonly Action<Guid> closeCancelled;
     private readonly Action newTabRequested;
     private readonly Func<Task> openTabRequested;
     private readonly Action closeTabRequested;
@@ -28,21 +45,22 @@ public sealed class BridgeDispatcher
     public BridgeDispatcher(
         DocumentService documentService,
         Action appReady,
-        Action closeReady,
+        Action<Guid> closeReady,
         Action<bool> dirtyChanged,
         Action documentCreated,
         Action<string> documentOpened,
         Action documentRecovered,
-        Func<string, Task> recoverySnapshotReceived,
+        Func<string, Task<bool>> recoverySnapshotReceived,
         Action externalConflictDetected,
-        Action closeCancelled,
+        Action<Guid> closeCancelled,
         Action newTabRequested,
         Func<Task> openTabRequested,
         Action closeTabRequested,
         Action<bool> selectAdjacentTabRequested,
         Action<Guid, string> imageExportFailed,
         Action<string, string>? languageApplied = null,
-        Action? documentLoadFailed = null)
+        Action? documentLoadFailed = null,
+        Action<string>? documentSaved = null)
     {
         this.documentService = documentService;
         this.appReady = appReady;
@@ -50,6 +68,7 @@ public sealed class BridgeDispatcher
         this.dirtyChanged = dirtyChanged;
         this.documentCreated = documentCreated;
         this.documentOpened = documentOpened;
+        this.documentSaved = documentSaved;
         this.documentRecovered = documentRecovered;
         this.recoverySnapshotReceived = recoverySnapshotReceived;
         this.externalConflictDetected = externalConflictDetected;
@@ -81,10 +100,11 @@ public sealed class BridgeDispatcher
             object? response = message.Method switch
             {
                 "app.ping" => new { host = "winui", ready = true },
+                "document.recoverySnapshot" => await SaveRecoverySnapshotAsync(message.Payload),
                 "document.new" => await NewDocumentAsync(message.Payload),
                 "document.open" => await OpenDocumentAsync(message.Payload),
-                "document.save" => await SaveDocumentAsync(message.Payload, saveAs: false),
-                "document.saveAs" => await SaveDocumentAsync(message.Payload, saveAs: true),
+                "document.save" => await SaveDocumentAsync(webView, message, saveAs: false),
+                "document.saveAs" => await SaveDocumentAsync(webView, message, saveAs: true),
                 _ => throw new BridgeProtocolException(
                     "BridgeMethodNotFound",
                     "The requested desktop bridge method is not available."),
@@ -139,6 +159,16 @@ public sealed class BridgeDispatcher
 
     private async Task DispatchEventAsync(BridgeMessage message)
     {
+        if (message.Method == "document.cancelSave" &&
+            message.Payload is { ValueKind: JsonValueKind.Object } cancelPayload &&
+            cancelPayload.TryGetProperty("requestId", out var cancelledSaveId) &&
+            cancelledSaveId.ValueKind == JsonValueKind.String &&
+            string.Equals(cancelledSaveId.GetString(), pendingSaveRequestId, StringComparison.Ordinal))
+        {
+            CancelPendingSave();
+            return;
+        }
+
         if (message.Method == "document.loadFailed")
         {
             documentLoadFailed?.Invoke();
@@ -167,15 +197,15 @@ public sealed class BridgeDispatcher
             return;
         }
 
-        if (message.Method == "app.closeReady")
+        if (message.Method == "app.closeReady" && ReadCloseRequestId(message.Payload) is { } readyId)
         {
-            closeReady();
+            closeReady(readyId);
             return;
         }
 
-        if (message.Method == "app.closeCancelled")
+        if (message.Method == "app.closeCancelled" && ReadCloseRequestId(message.Payload) is { } cancelledId)
         {
-            closeCancelled();
+            closeCancelled(cancelledId);
             return;
         }
 
@@ -229,19 +259,6 @@ public sealed class BridgeDispatcher
             return;
         }
 
-        if (message.Method == "document.recoverySnapshot" &&
-            message.Payload is { ValueKind: JsonValueKind.Object } recoveryPayload &&
-            recoveryPayload.TryGetProperty("content", out var recoveryContentElement) &&
-            recoveryContentElement.ValueKind == JsonValueKind.String &&
-            recoveryContentElement.GetString() is { } recoveryContent)
-        {
-            ExcalidrawDocumentValidator.ValidateForSave(
-                recoveryContent,
-                DocumentService.MaxDocumentBytes);
-            await recoverySnapshotReceived(recoveryContent);
-            return;
-        }
-
         if (message.Method == "image.exportFailed" &&
             message.Payload is { ValueKind: JsonValueKind.Object } exportPayload &&
             exportPayload.TryGetProperty("exportId", out var exportIdElement) &&
@@ -260,10 +277,23 @@ public sealed class BridgeDispatcher
             payload.TryGetProperty("fileName", out var fileNameElement) &&
             fileNameElement.ValueKind == JsonValueKind.String &&
             fileNameElement.GetString() is { Length: > 0 and <= 260 } fileName &&
-            documentService.ConfirmOpened(fileName))
+            ReadLoadId(payload) is { } loadId &&
+            documentService.ConfirmOpened(fileName, loadId))
         {
             documentOpened(fileName);
         }
+    }
+
+    private async Task<object> SaveRecoverySnapshotAsync(JsonElement? payload)
+    {
+        if (payload is not { ValueKind: JsonValueKind.Object } value ||
+            !value.TryGetProperty("content", out var contentElement) ||
+            contentElement.ValueKind != JsonValueKind.String || contentElement.GetString() is not { } content)
+        {
+            throw new BridgeProtocolException("BridgePayloadInvalid", "The recovery snapshot payload is invalid.");
+        }
+        ExcalidrawDocumentValidator.ValidateForSave(content, DocumentService.MaxDocumentBytes);
+        return new { status = await recoverySnapshotReceived(content) ? "stored" : "ignored" };
     }
 
     private async Task<DocumentNewResult> NewDocumentAsync(JsonElement? payload)
@@ -273,9 +303,11 @@ public sealed class BridgeDispatcher
     }
 
     private async Task<DocumentSaveResult> SaveDocumentAsync(
-        JsonElement? payload,
+        CoreWebView2 webView,
+        BridgeMessage message,
         bool saveAs)
     {
+        var payload = message.Payload;
         if (payload is not { ValueKind: JsonValueKind.Object } value ||
             !value.TryGetProperty("content", out var contentElement) ||
             contentElement.ValueKind != JsonValueKind.String ||
@@ -286,23 +318,51 @@ public sealed class BridgeDispatcher
                 $"The document.{(saveAs ? "saveAs" : "save")} payload is invalid.");
         }
 
-        DocumentSaveResult result;
+        var closeRequestId = ReadCloseRequestId(payload);
+        if (value.TryGetProperty("closeRequestId", out _) && closeRequestId is null)
+        {
+            throw new BridgeProtocolException("BridgePayloadInvalid", "The close save identifier is invalid.");
+        }
+        if (closeRequestId is { } closeId && IsCloseSavePending?.Invoke(closeId) != true)
+        {
+            return DocumentSaveResult.Cancelled;
+        }
+        if (pendingSaveCancellation is not null || documentService.IsSaving)
+        {
+            throw new BridgeProtocolException("DocumentSaveInProgress", "Wait for the current save to finish.");
+        }
+        using var cancellation = new CancellationTokenSource();
+        pendingSaveCancellation = cancellation;
+        pendingSaveRequestId = message.RequestId;
+        pendingCloseRequestId = closeRequestId;
+        void PickerChanged(bool isPickerOpen) => TryPostResponse(webView, BridgeEventJson.Create(
+            "document.saveProgress", new { requestId = message.RequestId, isPickerOpen }));
+        documentService.SavePickerChanged += PickerChanged;
         try
         {
-            result = await documentService.SaveAsync(content, saveAs);
+            var result = await documentService.SaveAsync(content, saveAs, cancellation.Token);
+            if (result.Status == "saved" && result.FileName is { } fileName)
+            {
+                (documentSaved ?? documentOpened)(fileName);
+            }
+            return result;
         }
-        catch (BridgeProtocolException exception) when (
-            exception.Code == "DocumentChangedExternally")
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return DocumentSaveResult.Cancelled;
+        }
+        catch (BridgeProtocolException exception) when (exception.Code == "DocumentChangedExternally")
         {
             externalConflictDetected();
             throw;
         }
-        if (result.Status == "saved" && result.FileName is { } fileName)
+        finally
         {
-            documentOpened(fileName);
+            documentService.SavePickerChanged -= PickerChanged;
+            pendingSaveCancellation = null;
+            pendingSaveRequestId = null;
+            pendingCloseRequestId = null;
         }
-
-        return result;
     }
 
     private async Task<DocumentOpenResult> OpenDocumentAsync(JsonElement? payload)
@@ -310,6 +370,19 @@ public sealed class BridgeDispatcher
         var hasUnsavedChanges = ReadDirtyFlag(payload, "document.open");
         return await documentService.OpenAsync(hasUnsavedChanges);
     }
+
+    private static Guid? ReadCloseRequestId(JsonElement? payload) =>
+        payload is { ValueKind: JsonValueKind.Object } value &&
+        value.TryGetProperty("closeRequestId", out var id) &&
+        id.ValueKind == JsonValueKind.String &&
+        Guid.TryParseExact(id.GetString(), "D", out var requestId)
+            ? requestId : null;
+
+    private static Guid? ReadLoadId(JsonElement payload) =>
+        payload.TryGetProperty("loadId", out var id) &&
+        id.ValueKind == JsonValueKind.String &&
+        Guid.TryParseExact(id.GetString(), "D", out var loadId)
+            ? loadId : null;
 
     private static bool ReadDirtyFlag(JsonElement? payload, string method)
     {

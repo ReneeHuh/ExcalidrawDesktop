@@ -39,4 +39,23 @@ describe("desktop localization", () => {
     expect(isSupportedLanguageCode("ar-SA")).toBe(true);
     expect(isSupportedLanguageCode("../../bad")).toBe(false);
   });
+
+  it("keeps export failure messages distinct in every supported language", () => {
+    for (const language of supportedLanguageCodes) {
+      const messages = ["ExportEmpty", "ExportDimensionLimit", "ExportByteLimit", "ExportInvalidImage", "ExportUploadFailed"]
+        .map((code) => getDesktopErrorString(language, code, "exportFailed"));
+      expect(messages.every(Boolean)).toBe(true);
+      expect(new Set(messages).size).toBe(messages.length);
+    }
+  });
+
+  it("provides localized retry, library, and recovery guidance", () => {
+    for (const language of supportedLanguageCodes) {
+      expect(getDesktopString(language, "settingsRetry")).toBeTruthy();
+      expect(getDesktopString(language, "libraryUnavailable")).toContain(language === "en" ? "Library" : "");
+      expect(getDesktopString(language, "recoveryUnavailable")).toBeTruthy();
+    }
+    expect(getDesktopErrorString("en", "ExportEmpty", "exportFailed")).toContain("Add something");
+    expect(getDesktopErrorString("en", "ExportByteLimit", "exportFailed")).toContain("100 MB");
+  });
 });

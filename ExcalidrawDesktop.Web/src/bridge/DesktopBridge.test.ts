@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopBridge, type WebViewTransport } from "./DesktopBridge";
 import type { BridgeMessage } from "./BridgeProtocol";
@@ -36,6 +36,7 @@ const createBridge = () => {
 };
 
 describe("DesktopBridge", () => {
+  afterEach(() => vi.useRealTimers());
   it("correlates and validates a cancelled document.open response", async () => {
     const { bridge, transport } = createBridge();
     const response = bridge.openDocument(true);
@@ -149,9 +150,9 @@ describe("DesktopBridge", () => {
       kind: "event",
       requestId: crypto.randomUUID(),
       method: "document.saveRequested",
-      payload: { reason: "close" },
+      payload: { reason: "close", closeRequestId: "11111111-1111-4111-8111-111111111111" },
     });
-    expect(listener).toHaveBeenCalledWith({ reason: "close" });
+    expect(listener).toHaveBeenCalledWith({ reason: "close", closeRequestId: "11111111-1111-4111-8111-111111111111" });
 
     unsubscribe();
     transport.respond({
@@ -159,9 +160,31 @@ describe("DesktopBridge", () => {
       kind: "event",
       requestId: crypto.randomUUID(),
       method: "document.saveRequested",
-      payload: { reason: "close" },
+      payload: { reason: "close", closeRequestId: "11111111-1111-4111-8111-111111111111" },
     });
     expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it.each([undefined, "invalid", 123])("ignores close requests with invalid IDs: %s", (closeRequestId) => {
+    const { bridge, transport } = createBridge();
+    const listener = vi.fn();
+    bridge.onSaveRequested(listener);
+    transport.respond({
+      version: 1, kind: "event", requestId: crypto.randomUUID(),
+      method: "document.saveRequested", payload: { reason: "close", closeRequestId },
+    });
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("echoes close IDs on both success and cancellation", () => {
+    const { bridge, transport } = createBridge();
+    const closeRequestId = crypto.randomUUID();
+    bridge.notifyCloseReady(closeRequestId);
+    bridge.notifyCloseCancelled(closeRequestId);
+    expect(transport.posted.slice(-2)).toMatchObject([
+      { method: "app.closeReady", payload: { closeRequestId } },
+      { method: "app.closeCancelled", payload: { closeRequestId } },
+    ]);
   });
 
   it.each(["save", "saveAs"] as const)(
@@ -304,6 +327,80 @@ describe("DesktopBridge", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it("requires a validated disk acknowledgement for recovery", async () => {
+    const { bridge, transport } = createBridge();
+    const response = bridge.saveRecoverySnapshot("snapshot");
+    const request = transport.posted[0];
+    expect(request).toMatchObject({ kind: "request", method: "document.recoverySnapshot" });
+    const rejected = expect(response).rejects.toThrow("payload is invalid");
+    transport.respond({ ...request, kind: "response", payload: { status: "saved" } });
+    await rejected;
+  });
+
+  it("times out unacknowledged recovery so the caller can retry", async () => {
+    vi.useFakeTimers();
+    const { bridge } = createBridge();
+    const response = expect(bridge.saveRecoverySnapshot("snapshot")).rejects.toMatchObject({ code: "BridgeTimeout" });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await response;
+  });
+
+  it("cancels a lost save and allows a new save without accepting its late reply", async () => {
+    vi.useFakeTimers();
+    const { bridge, transport } = createBridge();
+    const first = bridge.saveDocument("first");
+    const old = transport.posted[0];
+    const rejected = expect(first).rejects.toMatchObject({ code: "BridgeTimeout" });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejected;
+    expect(transport.posted[1]).toMatchObject({ method: "document.cancelSave", payload: { requestId: old.requestId } });
+    const second = bridge.saveDocument("second");
+    const current = transport.posted[2];
+    transport.respond({ ...old, kind: "response", payload: { status: "saved", fileName: "old.excalidraw" } });
+    transport.respond({ ...current, kind: "response", payload: { status: "saved", fileName: "new.excalidraw" } });
+    await expect(second).resolves.toMatchObject({ fileName: "new.excalidraw" });
+  });
+
+  it("pauses save deadlines only for the owning native picker", async () => {
+    vi.useFakeTimers();
+    const { bridge, transport } = createBridge();
+    const response = bridge.saveDocumentAs("drawing");
+    const request = transport.posted[0];
+    const progress = (isPickerOpen: boolean) => transport.respond({
+      version: 1, kind: "event", requestId: crypto.randomUUID(), method: "document.saveProgress",
+      payload: { requestId: request.requestId, isPickerOpen },
+    });
+    progress(true);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(transport.posted).toHaveLength(1);
+    progress(false);
+    const rejected = expect(response).rejects.toMatchObject({ code: "BridgeTimeout" });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejected;
+  });
+
+  it("propagates host close cancellation only to the matching save", async () => {
+    const { bridge, transport } = createBridge();
+    const closeRequestId = crypto.randomUUID();
+    const first = bridge.saveDocument("drawing", closeRequestId);
+    const rejected = expect(first).rejects.toMatchObject({ code: "SaveCancelled" });
+    transport.respond({ version: 1, kind: "event", requestId: crypto.randomUUID(),
+      method: "document.saveCancelled", payload: { closeRequestId } });
+    await rejected;
+    const second = bridge.saveDocument("new", crypto.randomUUID());
+    const current = transport.posted.at(-1)!;
+    transport.respond({ version: 1, kind: "event", requestId: crypto.randomUUID(),
+      method: "document.saveCancelled", payload: { closeRequestId } });
+    transport.respond({ ...current, kind: "response", payload: { status: "saved", fileName: "new.excalidraw" } });
+    await expect(second).resolves.toMatchObject({ status: "saved" });
+  });
+
+  it("settles a save when sending the request throws", async () => {
+    const { bridge, transport } = createBridge();
+    vi.spyOn(transport, "postMessage").mockImplementation(() => { throw new Error("closed transport"); });
+    await expect(bridge.saveDocument("drawing")).rejects.toMatchObject({ code: "BridgeUnavailable" });
+  });
+
   it("sends typed workspace tab events", () => {
     const { bridge, transport } = createBridge();
 
@@ -311,11 +408,10 @@ describe("DesktopBridge", () => {
     bridge.requestOpenDocument();
     bridge.requestSelectAdjacentTab("previous");
     bridge.requestCloseTab();
-    bridge.notifyCloseCancelled();
+    bridge.notifyCloseCancelled("11111111-1111-4111-8111-111111111111");
     bridge.notifyLanguageApplied("ar-SA", "rtl");
     bridge.notifyDocumentRecovered();
     bridge.notifyDocumentLoadFailed();
-    bridge.notifyRecoverySnapshot("snapshot");
 
     expect(transport.posted).toMatchObject([
       { kind: "event", method: "workspace.newTabRequested" },
@@ -334,11 +430,6 @@ describe("DesktopBridge", () => {
       },
       { kind: "event", method: "document.recovered" },
       { kind: "event", method: "document.loadFailed" },
-      {
-        kind: "event",
-        method: "document.recoverySnapshot",
-        payload: { content: "snapshot" },
-      },
     ]);
   });
 

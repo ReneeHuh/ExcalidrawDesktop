@@ -20,3 +20,33 @@ body {
 :root[data-theme="dark"] body {
   background: #121212;
 }
+
+.close-barrier-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 10000;
+  cursor: wait;
+  background: transparent;
+}
+
+.desktop-app {
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-surface {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.library-status {
+  padding: 8px 12px;
+  font: 14px system-ui, sans-serif;
+  background: #fff0cb;
+  color: #3a2900;
+}
+
+.library-status button {
+  margin-inline-start: 12px;
+}

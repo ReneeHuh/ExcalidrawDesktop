@@ -34,7 +34,11 @@ function Start-DesktopTestApplication {
     $previousDataRoot = [Environment]::GetEnvironmentVariable(
         "EXCALIDRAW_DESKTOP_DATA_ROOT",
         [EnvironmentVariableTarget]::Process)
+    $previousSmokeMode = [Environment]::GetEnvironmentVariable(
+        "EXCALIDRAW_DESKTOP_SMOKE_TEST", [EnvironmentVariableTarget]::Process)
     try {
+        [Environment]::SetEnvironmentVariable(
+            "EXCALIDRAW_DESKTOP_SMOKE_TEST", "1", [EnvironmentVariableTarget]::Process)
         [Environment]::SetEnvironmentVariable(
             "EXCALIDRAW_DESKTOP_DATA_ROOT",
             $Application.DataRoot,
@@ -43,6 +47,7 @@ function Start-DesktopTestApplication {
             FilePath = $Application.ExecutablePath
             WorkingDirectory = $Application.InstallLocation
             PassThru = $true
+            WindowStyle = "Hidden"
         }
         if (-not [string]::IsNullOrWhiteSpace($Arguments)) {
             $startParameters.ArgumentList = $Arguments
@@ -50,6 +55,8 @@ function Start-DesktopTestApplication {
         return Start-Process @startParameters
     }
     finally {
+        [Environment]::SetEnvironmentVariable(
+            "EXCALIDRAW_DESKTOP_SMOKE_TEST", $previousSmokeMode, [EnvironmentVariableTarget]::Process)
         [Environment]::SetEnvironmentVariable(
             "EXCALIDRAW_DESKTOP_DATA_ROOT",
             $previousDataRoot,
