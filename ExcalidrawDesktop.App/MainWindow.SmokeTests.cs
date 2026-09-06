@@ -710,11 +710,13 @@ public sealed partial class MainWindow
                     "A repeated transfer leaked an empty window.");
             }
 
+            await RunTearOutPresentationSmokeAsync(session);
             Title = "Excalidraw Desktop — Multi-window smoke passed";
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
+            DiagnosticLogService.Error("smoke.multi_window_failed", exception);
             Title = $"Excalidraw Desktop — Multi-window smoke failed: {exception.Message}";
         }
         finally

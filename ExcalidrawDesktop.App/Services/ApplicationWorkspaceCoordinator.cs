@@ -195,7 +195,17 @@ internal sealed class ApplicationWorkspaceCoordinator
             throw new InvalidOperationException(
                 "A new window cannot be created while the application is exiting.");
         }
-        return new MainWindow(this, restoreWorkspace: false, createInitialTab: false);
+        var window = new MainWindow(this, restoreWorkspace: false, createInitialTab: false);
+        try
+        {
+            window.PrepareTearOutWindow();
+            return window;
+        }
+        catch
+        {
+            window.CloseIfEmptyAfterMove();
+            throw;
+        }
     }
 
     public void RegisterWindow(
@@ -594,6 +604,7 @@ internal sealed class ApplicationWorkspaceCoordinator
             }
             destination.AttachMovedSession(transfer, index);
             destination.Activate();
+            destination.RevealTearOutWindow();
             mostRecentlyActiveWindow = destination;
             source.CloseIfEmptyAfterMove();
             QueuePersistWorkspace();

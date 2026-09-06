@@ -106,6 +106,9 @@ try {
                 DirtyStatePreserved = $true
                 WatcherRebound = $true
                 RepeatedMoveCleanup = $true
+                TearOutPreparationHiddenFromSwitchers = $true
+                CancelledTearOutCleanedUp = $true
+                TornOutWindowRevealed = $true
                 SaveIsolation = $true
                 SaveAsIsolation = $true
                 ExternalChangeIsolation = $true

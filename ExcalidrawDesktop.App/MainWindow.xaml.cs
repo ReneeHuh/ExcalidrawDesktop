@@ -1607,9 +1607,18 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        pendingTearOutWindow?.CloseIfEmptyAfterMove();
-        pendingTearOutWindow = workspaceCoordinator.CreateTearOutPlaceholder();
-        args.NewWindowId = pendingTearOutWindow.AppWindow.Id;
+        args.NewWindowId = PreparePendingTearOutWindow().AppWindow.Id;
+    }
+
+    private void OnPendingTearOutWindowClosed(object sender, WindowEventArgs args)
+    {
+        ((MainWindow)sender).Closed -= OnPendingTearOutWindowClosed;
+        if (ReferenceEquals(pendingTearOutWindow, sender))
+        {
+            // Native tear-out posts WM_CLOSE for an unused destination; it does
+            // not raise TabDragCompleted after an ordinary tab click.
+            pendingTearOutWindow = null;
+        }
     }
 
     private void OnTabItemsChanged(
@@ -1642,6 +1651,10 @@ public sealed partial class MainWindow : Window
         TabViewTabTearOutRequestedEventArgs args)
     {
         var destination = pendingTearOutWindow;
+        if (destination is not null)
+        {
+            destination.Closed -= OnPendingTearOutWindowClosed;
+        }
         pendingTearOutWindow = null;
         var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
         var session = tab is null ? null : FindSession(tab);
@@ -1837,7 +1850,7 @@ public sealed partial class MainWindow : Window
 
     internal void CloseIfEmptyAfterMove()
     {
-        if (sessions.Count != 0)
+        if (IsClosed || sessions.Count != 0)
         {
             return;
         }
