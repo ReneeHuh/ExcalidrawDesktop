@@ -88,6 +88,8 @@ internal sealed class DocumentSession : IDisposable
     public int BridgeDispatchDepth { get; set; }
 
     public bool HasUnsavedLibrary { get; set; }
+    // Approval belongs to this close attempt; cancellation keeps library edits intact.
+    public bool DiscardLibraryOnClose { get; set; }
 
     public ulong? EditorNavigationId { get; set; }
 
@@ -103,7 +105,6 @@ internal sealed class DocumentSession : IDisposable
 
     public string? LastLifecycleFailure { get; set; }
 
-    public bool CloseAfterSave { get; set; }
 
     public Guid? CloseRequestId { get; set; }
 
@@ -185,7 +186,6 @@ internal sealed class DocumentSession : IDisposable
         PendingPathReservation = null;
         Dispatcher?.CancelPendingSave();
         CloseRequestId = null;
-        CloseAfterSave = false;
         CloseCompletion?.TrySetResult(false);
         WindowCloseSaveCompletion?.TrySetResult(false);
         CloseCompletion = null;

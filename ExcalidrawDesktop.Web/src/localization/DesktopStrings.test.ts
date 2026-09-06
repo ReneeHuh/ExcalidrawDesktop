@@ -43,7 +43,7 @@ describe("desktop localization", () => {
   it("keeps export failure messages distinct in every supported language", () => {
     for (const language of supportedLanguageCodes) {
       const messages = ["ExportEmpty", "ExportDimensionLimit", "ExportByteLimit", "ExportInvalidImage", "ExportUploadFailed"]
-        .map((code) => getDesktopErrorString(language, code, "exportFailed"));
+        .map((code) => getDesktopErrorString(language, code, "exportFailed", { maxBytes: 25 * 1024 * 1024 }));
       expect(messages.every(Boolean)).toBe(true);
       expect(new Set(messages).size).toBe(messages.length);
     }
@@ -56,6 +56,8 @@ describe("desktop localization", () => {
       expect(getDesktopString(language, "recoveryUnavailable")).toBeTruthy();
     }
     expect(getDesktopErrorString("en", "ExportEmpty", "exportFailed")).toContain("Add something");
-    expect(getDesktopErrorString("en", "ExportByteLimit", "exportFailed")).toContain("100 MB");
+    expect(getDesktopErrorString("en", "ExportByteLimit", "exportFailed", { maxBytes: 25 * 1024 * 1024 })).toContain("25 MB");
+    expect(getDesktopErrorString("fr-FR", "ExportByteLimit", "exportFailed", { maxBytes: 25 * 1024 * 1024 })).toContain("25 Mo");
+    expect(getDesktopErrorString("en", "ExportByteLimit", "exportFailed")).not.toContain("100");
   });
 });

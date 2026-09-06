@@ -194,4 +194,21 @@
   <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>Settings could not be saved</value></data>
   <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>The selected preference is active for this session, but could not be saved. Check the settings location and retry.</value></data>
   <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>Retry</value></data>
+  <data name="UnsavedLibraryTitle" xml:space="preserve"><value>Unsaved library changes</value></data>
+  <data name="UnsavedLibraryCloseContent" xml:space="preserve"><value>Library changes could not be saved. Discard these library changes and continue closing, or cancel to retry saving them. Drawing changes will be handled separately.</value></data>
+  <data name="DiscardLibraryButton" xml:space="preserve"><value>Discard library changes</value></data>
+  <data name="CloseNotReadyTitle" xml:space="preserve"><value>Could not close drawing</value></data>
+  <data name="CloseNotReadyContent" xml:space="preserve"><value>The editor did not finish preparing to close. Try again, or retry the editor if it has stopped.</value></data>
+  <data name="LibraryRepairTitle" xml:space="preserve"><value>The saved library is damaged</value></data>
+  <data name="LibraryRepairContent" xml:space="preserve"><value>Reset the shared library to continue saving library changes? The damaged file will be kept as a .bak file beside library.json. Your drawings will not be changed.</value></data>
+  <data name="LibraryResetButton" xml:space="preserve"><value>Back up and reset</value></data>
+  <data name="FileVerificationTitle" xml:space="preserve"><value>File version could not be verified</value></data>
+  <data name="FileUnavailableContent" xml:space="preserve"><value>The file could not be read. It may be busy or access may be denied. Retry, save to a different file, or keep editing.</value></data>
+  <data name="FileBaselineUnknownContent" xml:space="preserve"><value>This recovered drawing has no saved file baseline. Save it to a different file to keep your changes, or reload the disk version to replace this tab. The app cannot verify whether the original file changed.</value></data>
+  <data name="StatusFileUnavailable" xml:space="preserve"><value>File unavailable — Retry</value></data>
+  <data name="StatusFileBaselineUnknown" xml:space="preserve"><value>File version unknown — Resolve</value></data>
+  <data name="TabStateFileUnavailable" xml:space="preserve"><value>file unavailable</value></data>
+  <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>file version unknown</value></data>
+  <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — File unavailable</value></data>
+  <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — File version unknown</value></data>
 </root>

@@ -30,6 +30,7 @@ try {
     }
 
     $package = Get-DesktopTestApplication
+    $package.DataRoot = Join-Path ([IO.Path]::GetTempPath()) ("ExcalidrawSmoke-tabbed-" + [Guid]::NewGuid().ToString("N"))
     $requestPath = Join-Path $package.InstallLocation "tab-smoke.request"
     $statePath = Join-Path $package.InstallLocation "tab-smoke-state.json"
     if ([System.IO.File]::Exists($statePath)) {

@@ -59,6 +59,26 @@ public sealed class TransactedDocumentWriterTests
     }
 
     [Fact]
+    public async Task TransactionRejectsSameStampReplacementAfterMetadataPreflight()
+    {
+        var (path, file) = await CreateFileAsync("before");
+        try
+        {
+            var baseline = await ExactFileBaseline.CaptureAsync(path);
+            var timestamp = File.GetLastWriteTimeUtc(path);
+            await File.WriteAllTextAsync(path, "change", Encoding.UTF8);
+            File.SetLastWriteTimeUtc(path, timestamp);
+            Assert.Equal(ExternalFileState.None, await ExternalFileCheck.CheckAsync(
+                path, baseline.Stamp, baseline.ContentHash, compareContent: false));
+            var error = await Assert.ThrowsAsync<BridgeProtocolException>(() =>
+                TransactedDocumentWriter.WriteAsync(file, "mine", CancellationToken.None, baseline.ContentHash));
+            Assert.Equal("DocumentChangedExternally", error.Code);
+            Assert.Equal("change", await File.ReadAllTextAsync(path));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
     public async Task CancelledBeforeWriteLeavesOriginalIntact()
     {
         var (path, file) = await CreateFileAsync("before");

@@ -63,6 +63,7 @@ public sealed partial class MainWindow : Window
     private bool jumpListUpdateRunning;
     private bool restoringWorkspace = true;
     private bool resourcesDisposed;
+    internal XamlRoot? DialogRoot => resourcesDisposed ? null : DocumentTabs.XamlRoot;
     private int untitledSequence;
     private XamlRoot? titleBarXamlRoot;
 
@@ -190,6 +191,7 @@ public sealed partial class MainWindow : Window
         PreferencesChangedEventArgs args)
     {
         if (!CommandsBlocked) workspaceCoordinator.UpdatePreferences(args.Preferences);
+        else ApplySharedPreferences(desktopPreferences);
     }
 
     private void OnSettingsPersistenceRetry(object? sender, EventArgs args) =>
@@ -2068,20 +2070,9 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task ShowFileLocationErrorAsync(string message)
-    {
-        var dialog = new ContentDialog
-        {
-            XamlRoot = DocumentTabs.XamlRoot,
-            Title = DesktopResources.Get(
-                "FileLocationUnavailableTitle",
-                "File location unavailable"),
-            Content = message,
-            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
-            DefaultButton = ContentDialogButton.Close,
-        };
-        await WindowModalCoordinator.For(this).RunAsync(async () => await dialog.ShowAsync());
-    }
+    private Task ShowFileLocationErrorAsync(string message) =>
+        WindowModalCoordinator.For(this).ShowMessageAsync(
+            DesktopResources.Get("FileLocationUnavailableTitle", "File location unavailable"), message);
 
     private async Task CloseSessionsAsync(IEnumerable<DocumentSession> targets)
     {
@@ -2307,9 +2298,12 @@ public sealed partial class MainWindow : Window
         }
         if (session.ExternalFileState is not ExternalFileState.None)
         {
-            accessibilityStates.Add(DesktopResources.Get(
-                "TabStateChangedOnDisk",
-                "changed on disk"));
+            accessibilityStates.Add(session.ExternalFileState switch
+            {
+                ExternalFileState.Unavailable => DesktopResources.Get("TabStateFileUnavailable", "file unavailable"),
+                ExternalFileState.UnknownBaseline => DesktopResources.Get("TabStateFileVersionUnknown", "file version unknown"),
+                _ => DesktopResources.Get("TabStateChangedOnDisk", "changed on disk"),
+            });
         }
 
         AutomationProperties.SetName(
@@ -2359,9 +2353,12 @@ public sealed partial class MainWindow : Window
                 dirtyMarker);
         if (active.ExternalFileState is not ExternalFileState.None)
         {
-            Title += DesktopResources.Get(
-                "ChangedOnDiskTitleSuffix",
-                " — Changed on disk");
+            Title += active.ExternalFileState switch
+            {
+                ExternalFileState.Unavailable => DesktopResources.Get("FileUnavailableTitleSuffix", " — File unavailable"),
+                ExternalFileState.UnknownBaseline => DesktopResources.Get("FileVersionUnknownTitleSuffix", " — File version unknown"),
+                _ => DesktopResources.Get("ChangedOnDiskTitleSuffix", " — Changed on disk"),
+            };
         }
     }
 
@@ -2425,6 +2422,16 @@ public sealed partial class MainWindow : Window
             session.IsSuspended || session.IsSuspensionChanging)
         {
             status = DesktopResources.Get("StatusSleeping", "Sleeping");
+        }
+        else if (session.ExternalFileState == ExternalFileState.Unavailable)
+        {
+            status = DesktopResources.Get("StatusFileUnavailable", "File unavailable — Retry");
+            actionable = true;
+        }
+        else if (session.ExternalFileState == ExternalFileState.UnknownBaseline)
+        {
+            status = DesktopResources.Get("StatusFileBaselineUnknown", "File version unknown — Resolve");
+            actionable = true;
         }
         else if (session.ExternalFileState == ExternalFileState.Modified)
         {

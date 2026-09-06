@@ -2181,6 +2181,10 @@ public sealed partial class MainWindow
                     "The cancel/discard drawing did not become dirty.");
             }
 
+            await VerifyLibraryRepairRecoveryAsync(cancelAndDiscardSession, saveSession);
+            await VerifyExportCloseScopeAsync(cancelAndDiscardSession, savedPath);
+            VerifyFileVerificationLabels(saveSession);
+            await VerifyLibraryCloseCancellationAsync(cancelAndDiscardSession);
             Title = "Excalidraw Desktop — Close decisions smoke: choose Cancel";
             if (await windowClose.RequestCloseSessionAsync(cancelAndDiscardSession) ||
                 !sessions.Contains(cancelAndDiscardSession) ||
@@ -2284,6 +2288,7 @@ public sealed partial class MainWindow
                     "Save All did not save every owning drawing.");
             }
 
+            await VerifyLibraryDiscardCloseAsync();
             Title = "Excalidraw Desktop — Close decisions smoke passed";
             await File.WriteAllTextAsync(
                 Path.Combine(AppContext.BaseDirectory, "close-decisions-smoke.result"),

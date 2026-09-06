@@ -1,0 +1,20 @@
+{
+  "Result": "Passed",
+  "LibraryCorruptionAfterLoadReachedRepair": true,
+  "LibraryRepairCancelSuppressedLaterTab": true,
+  "LibraryRepairRetryPreservedAllItems": true,
+  "StaleRepairApprovalReloadedValidLibrary": true,
+  "ExportCloseMessagesMatchedScope": true,
+  "FileVerificationLabelsMatchedState": true,
+  "ProcessId": 8576,
+  "CancelPreservedDirtyDrawing": true,
+  "LibraryCancelPreservedPendingChanges": true,
+  "DrawingCancelRevokedLibraryDiscard": true,
+  "LibraryRetrySavedAfterCancellingClose": true,
+  "LibraryDiscardApprovedWindowClose": true,
+  "DiscardClosedDirtyDrawing": true,
+  "SaveWroteOwningFileAndClosed": true,
+  "WindowCancelPreservedAllDirtyDrawings": true,
+  "ReviewSelectedFirstDirtyDrawing": true,
+  "SaveAllWroteEveryOwningFile": true
+}

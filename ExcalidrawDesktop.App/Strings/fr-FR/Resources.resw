@@ -186,4 +186,21 @@
   <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>Impossible d’enregistrer les paramètres</value></data>
   <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>La préférence sélectionnée est active pour cette session, mais n’a pas pu être enregistrée. Vérifiez l’emplacement des paramètres et réessayez.</value></data>
   <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>Réessayer</value></data>
+  <data name="UnsavedLibraryTitle" xml:space="preserve"><value>Modifications de bibliothèque non enregistrées</value></data>
+  <data name="UnsavedLibraryCloseContent" xml:space="preserve"><value>Les modifications de la bibliothèque n’ont pas pu être enregistrées. Abandonnez-les pour poursuivre la fermeture ou annulez pour réessayer de les enregistrer. Les modifications du dessin seront traitées séparément.</value></data>
+  <data name="DiscardLibraryButton" xml:space="preserve"><value>Abandonner les modifications</value></data>
+  <data name="CloseNotReadyTitle" xml:space="preserve"><value>Impossible de fermer le dessin</value></data>
+  <data name="CloseNotReadyContent" xml:space="preserve"><value>L’éditeur n’a pas terminé sa préparation à la fermeture. Réessayez ou relancez l’éditeur s’il s’est arrêté.</value></data>
+  <data name="LibraryRepairTitle" xml:space="preserve"><value>La bibliothèque enregistrée est endommagée</value></data>
+  <data name="LibraryRepairContent" xml:space="preserve"><value>Réinitialiser la bibliothèque partagée pour pouvoir enregistrer les modifications ? Le fichier endommagé sera conservé dans un fichier .bak à côté de library.json. Vos dessins ne seront pas modifiés.</value></data>
+  <data name="LibraryResetButton" xml:space="preserve"><value>Sauvegarder et réinitialiser</value></data>
+  <data name="FileVerificationTitle" xml:space="preserve"><value>Impossible de vérifier la version du fichier</value></data>
+  <data name="FileUnavailableContent" xml:space="preserve"><value>Le fichier n’a pas pu être lu. Il est peut-être occupé ou son accès est refusé. Réessayez, enregistrez dans un autre fichier ou poursuivez la modification.</value></data>
+  <data name="FileBaselineUnknownContent" xml:space="preserve"><value>Ce dessin récupéré n’a pas de version de fichier de référence. Enregistrez-le dans un autre fichier pour conserver vos modifications ou rechargez la version du disque pour remplacer cet onglet. L’application ne peut pas vérifier si le fichier d’origine a changé.</value></data>
+  <data name="StatusFileUnavailable" xml:space="preserve"><value>Fichier indisponible — Réessayer</value></data>
+  <data name="StatusFileBaselineUnknown" xml:space="preserve"><value>Version du fichier inconnue — Résoudre</value></data>
+  <data name="TabStateFileUnavailable" xml:space="preserve"><value>fichier indisponible</value></data>
+  <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>version du fichier inconnue</value></data>
+  <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — Fichier indisponible</value></data>
+  <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — Version du fichier inconnue</value></data>
 </root>

@@ -24,7 +24,8 @@ function Invoke-DialogButton {
     param(
         [Parameter(Mandatory)] [System.Diagnostics.Process] $Process,
         [Parameter(Mandatory)] [string] $ButtonAutomationId,
-        [Parameter(Mandatory)] [DateTime] $DeadlineUtc
+        [Parameter(Mandatory)] [DateTime] $DeadlineUtc,
+        [string] $ExpectedDialogText
     )
 
     $processCondition = [System.Windows.Automation.PropertyCondition]::new(
@@ -62,6 +63,13 @@ function Invoke-DialogButton {
                 [System.Windows.Automation.TreeScope]::Descendants,
                 $buttonIdCondition)
             if ($candidate -and $candidate.Current.IsEnabled) {
+                if ($ExpectedDialogText) {
+                    $textCondition = [System.Windows.Automation.PropertyCondition]::new(
+                        [System.Windows.Automation.AutomationElement]::NameProperty, $ExpectedDialogText)
+                    if (-not $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $textCondition)) {
+                        throw "The dialog did not contain the expected text: $ExpectedDialogText"
+                    }
+                }
                 $button = $candidate
                 break
             }
@@ -91,6 +99,7 @@ try {
     }
 
     $package = Get-DesktopTestApplication
+    $package.DataRoot = Join-Path ([IO.Path]::GetTempPath()) ("ExcalidrawSmoke-close-" + [Guid]::NewGuid().ToString("N"))
     $installRoot = [System.IO.Path]::GetFullPath(
         $package.InstallLocation).TrimEnd('\') + '\'
     $requestPath = Join-Path $package.InstallLocation "close-decisions-smoke.request"
@@ -112,10 +121,20 @@ try {
     $startedProcess = Start-DesktopTestApplication -Application $package
     $deadlineUtc = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
+    Wait-DesktopWindowTitle -Process $startedProcess -ExpectedTitle "Excalidraw Desktop — Library repair smoke: approve stale repair" -DeadlineUtc $deadlineUtc -FailurePrefix "Excalidraw Desktop — Close decisions smoke failed:"
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc -ExpectedDialogText "Wait for the current PNG export to finish before closing this drawing."
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc -ExpectedDialogText "Wait for PNG exports to finish before closing this window."
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "SecondaryButton" -DeadlineUtc $deadlineUtc
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "CloseButton" -DeadlineUtc $deadlineUtc
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "ReviewTabsButton" -DeadlineUtc $deadlineUtc
+    Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
     Invoke-DialogButton -Process $startedProcess -ButtonAutomationId "PrimaryButton" -DeadlineUtc $deadlineUtc
     while ([DateTime]::UtcNow -lt $deadlineUtc -and
         -not [System.IO.File]::Exists($resultPath)) {
@@ -131,8 +150,18 @@ try {
 
     [pscustomobject]@{
         Result = "Passed"
+        LibraryCorruptionAfterLoadReachedRepair = $true
+        LibraryRepairCancelSuppressedLaterTab = $true
+        LibraryRepairRetryPreservedAllItems = $true
+        StaleRepairApprovalReloadedValidLibrary = $true
+        ExportCloseMessagesMatchedScope = $true
+        FileVerificationLabelsMatchedState = $true
         ProcessId = $startedProcess.Id
         CancelPreservedDirtyDrawing = $true
+        LibraryCancelPreservedPendingChanges = $true
+        DrawingCancelRevokedLibraryDiscard = $true
+        LibraryRetrySavedAfterCancellingClose = $true
+        LibraryDiscardApprovedWindowClose = $true
         DiscardClosedDirtyDrawing = $true
         SaveWroteOwningFileAndClosed = $true
         WindowCancelPreservedAllDirtyDrawings = $true

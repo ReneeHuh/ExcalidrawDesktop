@@ -186,4 +186,21 @@
   <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>設定を保存できませんでした</value></data>
   <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>選択した設定はこのセッションで有効ですが、保存できませんでした。設定の場所を確認して再試行してください。</value></data>
   <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>再試行</value></data>
+  <data name="UnsavedLibraryTitle" xml:space="preserve"><value>未保存のライブラリ変更</value></data>
+  <data name="UnsavedLibraryCloseContent" xml:space="preserve"><value>ライブラリの変更を保存できませんでした。変更を破棄して閉じる操作を続けるか、キャンセルして保存を再試行してください。図面の変更は別途確認します。</value></data>
+  <data name="DiscardLibraryButton" xml:space="preserve"><value>ライブラリの変更を破棄</value></data>
+  <data name="CloseNotReadyTitle" xml:space="preserve"><value>図面を閉じられませんでした</value></data>
+  <data name="CloseNotReadyContent" xml:space="preserve"><value>エディターが閉じる準備を完了できませんでした。もう一度お試しください。エディターが停止した場合は再試行してください。</value></data>
+  <data name="LibraryRepairTitle" xml:space="preserve"><value>保存されたライブラリが破損しています</value></data>
+  <data name="LibraryRepairContent" xml:space="preserve"><value>ライブラリの変更を保存できるよう、共有ライブラリをリセットしますか？破損したファイルは library.json の隣に .bak ファイルとして保存されます。図面は変更されません。</value></data>
+  <data name="LibraryResetButton" xml:space="preserve"><value>バックアップしてリセット</value></data>
+  <data name="FileVerificationTitle" xml:space="preserve"><value>ファイルのバージョンを確認できませんでした</value></data>
+  <data name="FileUnavailableContent" xml:space="preserve"><value>ファイルを読み取れませんでした。使用中か、アクセスが拒否されている可能性があります。再試行するか、別のファイルに保存するか、編集を続けてください。</value></data>
+  <data name="FileBaselineUnknownContent" xml:space="preserve"><value>この復元された図面には、基準となる保存ファイルのバージョンがありません。変更を保持するには別のファイルに保存してください。このタブを置き換えるにはディスク上のバージョンを再読み込みしてください。元のファイルが変更されたかは確認できません。</value></data>
+  <data name="StatusFileUnavailable" xml:space="preserve"><value>ファイルを利用できません — 再試行</value></data>
+  <data name="StatusFileBaselineUnknown" xml:space="preserve"><value>ファイルのバージョンが不明 — 確認</value></data>
+  <data name="TabStateFileUnavailable" xml:space="preserve"><value>ファイルを利用できません</value></data>
+  <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>ファイルのバージョンが不明</value></data>
+  <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — ファイルを利用できません</value></data>
+  <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — ファイルのバージョンが不明</value></data>
 </root>

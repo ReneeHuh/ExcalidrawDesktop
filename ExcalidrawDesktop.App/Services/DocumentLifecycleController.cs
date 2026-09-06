@@ -74,22 +74,29 @@ internal sealed class DocumentLifecycleController
         AttachRecoveryToSession(session, displayName, content);
     }
 
-    public async Task OpenPathInTabAsync(string path)
-    {
-        if (host.CommandsBlocked) return;
-        var canonicalPath = DesktopDocumentPath.Normalize(path);
-        var existing = workspaceCoordinator.FindSessionByPath(canonicalPath);
-        if (existing is not null)
-        {
-            workspaceCoordinator.ActivateSession(
-                existing.Value.Window,
-                existing.Value.Session);
-            host.AddRecentFile(path);
-            return;
-        }
+    public Task OpenPathInTabAsync(string path) => OpenPathInTabCoreAsync(path, fromRecent: false);
 
+    private DocumentSession GetOpenTarget() => host.ActiveSession is { IsDirty: false } active &&
+        active.DocumentService.DocumentPath is null && active.PendingDocumentLoad is null &&
+        !active.DocumentService.IsSaving ? active : host.CreateTab();
+
+    private async Task OpenPathInTabCoreAsync(string path, bool fromRecent)
+    {
+        if (host.CommandsBlocked || (fromRecent && IsPickerActive)) return;
+        if (fromRecent) IsPickerActive = true;
+        var fallback = fromRecent
+            ? DesktopResources.Get("RecentDrawingOpenFailed", "The recent drawing could not be opened.")
+            : DesktopResources.Get("ActivatedDrawingOpenFailed", "The activated drawing could not be opened.");
         try
         {
+            var canonicalPath = DesktopDocumentPath.Normalize(path);
+            var existing = workspaceCoordinator.FindSessionByPath(canonicalPath);
+            if (existing is not null)
+            {
+                workspaceCoordinator.ActivateSession(existing.Value.Window, existing.Value.Session);
+                host.AddRecentFile(path);
+                return;
+            }
             if (!workspaceCoordinator.TryReservePath(path, new object(), out var reservation))
                 throw new BridgeProtocolException("DocumentAlreadyOpen", "The drawing is already being opened or saved.");
             using var openReservation = new ReservationTransfer(reservation!);
@@ -102,28 +109,24 @@ internal sealed class DocumentLifecycleController
                 workspaceCoordinator.ActivateSession(existing.Value.Window, existing.Value.Session);
                 return;
             }
-            var target = host.ActiveSession is { IsDirty: false } active &&
-                active.DocumentService.DocumentPath is null && active.PendingDocumentLoad is null &&
-                !active.DocumentService.IsSaving
-                    ? active
-                    : host.CreateTab();
-            AttachDocumentToSession(target, document, select: true, openReservation.Take());
+            AttachDocumentToSession(GetOpenTarget(), document, select: true, openReservation.Take());
         }
         catch (BridgeProtocolException exception)
         {
-            await ShowOpenErrorAsync(GetLocalizedDocumentError(
-                exception,
-                DesktopResources.Get(
-                    "ActivatedDrawingOpenFailed",
-                    "The activated drawing could not be opened.")));
+            if (fromRecent && exception.Code == "DocumentNotFound")
+            {
+                recentFiles.RemoveAll(recent => DesktopDocumentPath.Equals(recent, path));
+                host.QueuePersistWorkspace();
+                host.QueueJumpListUpdate();
+            }
+            await ShowOpenErrorAsync(GetLocalizedDocumentError(exception, fallback));
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            await ShowOpenErrorAsync(DesktopResources.Get(
-                "ActivatedDrawingOpenFailed",
-                "The activated drawing could not be opened."));
+            await ShowOpenErrorAsync(fallback);
         }
+        finally { if (fromRecent) IsPickerActive = false; }
     }
 
     public async Task RequestOpenDocumentAsync(DocumentSession source)
@@ -153,11 +156,7 @@ internal sealed class DocumentLifecycleController
                 return;
             }
 
-            var target = host.ActiveSession is { IsDirty: false } active &&
-                active.DocumentService.DocumentPath is null && active.PendingDocumentLoad is null &&
-                !active.DocumentService.IsSaving
-                    ? active
-                    : host.CreateTab();
+            var target = GetOpenTarget();
             AttachDocumentToSession(target, document, select: true);
         }
         catch (BridgeProtocolException exception)
@@ -293,25 +292,18 @@ internal sealed class DocumentLifecycleController
         }
     }
 
-    public async Task ShowOpenErrorAsync(string message)
-    {
-        var dialog = new ContentDialog
-        {
-            XamlRoot = documentTabs.XamlRoot,
-            Title = DesktopResources.Get(
-                "OpenDrawingErrorTitle",
-                "Could not open drawing"),
-            Content = message,
-            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
-            DefaultButton = ContentDialogButton.Close,
-        };
-        await host.Modals.RunAsync(async () => await dialog.ShowAsync());
-    }
+    public Task ShowOpenErrorAsync(string message) => host.Modals.ShowMessageAsync(
+        DesktopResources.Get("OpenDrawingErrorTitle", "Could not open drawing"), message);
+
+    private static string FileUnavailableMessage() => DesktopResources.Get("FileUnavailableContent", "The file could not be read. It may be busy or access may be denied. Retry, save to a different file, or keep editing.");
+    private static string FileBaselineUnknownMessage() => DesktopResources.Get("FileBaselineUnknownContent", "This recovered drawing has no saved file baseline. Save it to a different file to keep your changes, or reload the disk version to replace this tab. The app cannot verify whether the original file changed.");
 
     public static string GetLocalizedDocumentError(
         BridgeProtocolException exception,
         string fallback) => exception.Code switch
         {
+            "DocumentUnavailable" => FileUnavailableMessage(),
+            "DocumentBaselineUnknown" => FileBaselineUnknownMessage(),
             "DocumentNotFound" => DesktopResources.Get(
                 "DocumentNotFoundMessage",
                 "The drawing no longer exists at that location."),
@@ -356,67 +348,7 @@ internal sealed class DocumentLifecycleController
         host.UpdateTabHeader(session);
     }
 
-    public async Task OpenRecentFileAsync(string path)
-    {
-        if (host.CommandsBlocked || IsPickerActive)
-        {
-            return;
-        }
-
-        IsPickerActive = true;
-        try
-        {
-            var canonicalPath = DesktopDocumentPath.Normalize(path);
-            var existing = workspaceCoordinator.FindSessionByPath(canonicalPath);
-            if (existing is not null)
-            {
-                workspaceCoordinator.ActivateSession(
-                    existing.Value.Window,
-                    existing.Value.Session);
-                host.AddRecentFile(path);
-                return;
-            }
-
-            if (!workspaceCoordinator.TryReservePath(path, new object(), out var reservation))
-                throw new BridgeProtocolException("DocumentAlreadyOpen", "The drawing is already being opened or saved.");
-            using var openReservation = new ReservationTransfer(reservation!);
-            var source = host.ActiveSession ?? sessions[0];
-            var document = await source.DocumentService.OpenPathAsync(path);
-            if (host.CommandsBlocked) return;
-            var target = host.ActiveSession is { IsDirty: false } active &&
-                active.DocumentService.DocumentPath is null && active.PendingDocumentLoad is null &&
-                !active.DocumentService.IsSaving
-                    ? active
-                    : host.CreateTab();
-            AttachDocumentToSession(target, document, select: true, openReservation.Take());
-        }
-        catch (BridgeProtocolException exception)
-        {
-            if (exception.Code == "DocumentNotFound")
-            {
-                recentFiles.RemoveAll(recent =>
-                    DesktopDocumentPath.Equals(recent, path));
-                host.QueuePersistWorkspace();
-                host.QueueJumpListUpdate();
-            }
-            await ShowOpenErrorAsync(GetLocalizedDocumentError(
-                exception,
-                DesktopResources.Get(
-                    "RecentDrawingOpenFailed",
-                    "The recent drawing could not be opened.")));
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine(exception);
-            await ShowOpenErrorAsync(DesktopResources.Get(
-                "RecentDrawingOpenFailed",
-                "The recent drawing could not be opened."));
-        }
-        finally
-        {
-            IsPickerActive = false;
-        }
-    }
+    public Task OpenRecentFileAsync(string path) => OpenPathInTabCoreAsync(path, fromRecent: true);
 
     public async Task CheckExternalFileStateAsync(
         DocumentSession session,
@@ -471,28 +403,35 @@ internal sealed class DocumentLifecycleController
         documentTabs.SelectedItem = session.TabItem;
         try
         {
-            var requiresLocate = session.ExternalFileState is
-                ExternalFileState.Deleted or ExternalFileState.Moved;
+            (string Title, string Content, string Button, Func<Task> Apply) prompt = session.ExternalFileState switch
+            {
+                ExternalFileState.Unavailable => (
+                    DesktopResources.Get("FileVerificationTitle", "File version could not be verified"),
+                    FileUnavailableMessage(),
+                    DesktopResources.Get("SettingsPersistenceRetryButton.Content", "Retry"),
+                    () => CheckExternalFileStateAsync(session, showPrompt: false)),
+                ExternalFileState.UnknownBaseline => (
+                    DesktopResources.Get("FileVerificationTitle", "File version could not be verified"),
+                    FileBaselineUnknownMessage(),
+                    DesktopResources.Get("ReloadButton", "Reload"),
+                    () => ReloadExternalFileAsync(session)),
+                ExternalFileState.Deleted or ExternalFileState.Moved => (
+                    DesktopResources.Get("DrawingFileMissingTitle", "Drawing file is missing"),
+                    DesktopResources.Get("DrawingFileMissingContent", "The backing file was moved or deleted. Locate it, save this tab to a new file, or keep editing without overwriting anything."),
+                    DesktopResources.Get("LocateFileButton", "Locate file"),
+                    () => LocateExternalFileAsync(session)),
+                _ => (
+                    DesktopResources.Get("DrawingChangedOutsideTitle", "Drawing changed outside the app"),
+                    DesktopResources.Get("DrawingChangedOutsideContent", "Reload the disk version, save this tab to a different file, or keep editing. The existing file will not be overwritten automatically."),
+                    DesktopResources.Get("ReloadButton", "Reload"),
+                    () => ReloadExternalFileAsync(session)),
+            };
             var dialog = new ContentDialog
             {
                 XamlRoot = documentTabs.XamlRoot,
-                Title = requiresLocate
-                    ? DesktopResources.Get(
-                        "DrawingFileMissingTitle",
-                        "Drawing file is missing")
-                    : DesktopResources.Get(
-                        "DrawingChangedOutsideTitle",
-                        "Drawing changed outside the app"),
-                Content = requiresLocate
-                    ? DesktopResources.Get(
-                        "DrawingFileMissingContent",
-                        "The backing file was moved or deleted. Locate it, save this tab to a new file, or keep editing without overwriting anything.")
-                    : DesktopResources.Get(
-                        "DrawingChangedOutsideContent",
-                        "Reload the disk version, save this tab to a different file, or keep editing. The existing file will not be overwritten automatically."),
-                PrimaryButtonText = requiresLocate
-                    ? DesktopResources.Get("LocateFileButton", "Locate file")
-                    : DesktopResources.Get("ReloadButton", "Reload"),
+                Title = prompt.Title,
+                Content = prompt.Content,
+                PrimaryButtonText = prompt.Button,
                 SecondaryButtonText = DesktopResources.Get("SaveAsButton", "Save As"),
                 CloseButtonText = DesktopResources.Get("KeepEditingButton", "Keep editing"),
                 DefaultButton = ContentDialogButton.Close,
@@ -501,14 +440,7 @@ internal sealed class DocumentLifecycleController
             if (!sessions.Contains(session) || host.CommandsBlocked) return;
             if (result == ContentDialogResult.Primary)
             {
-                if (requiresLocate)
-                {
-                    await LocateExternalFileAsync(session);
-                }
-                else
-                {
-                    await ReloadExternalFileAsync(session);
-                }
+                await prompt.Apply();
             }
             else if (result == ContentDialogResult.Secondary)
             {

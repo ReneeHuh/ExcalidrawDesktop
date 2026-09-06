@@ -4,7 +4,6 @@ import {
   type BridgeMessage,
   type BridgeRequestMap,
   type BridgeRequestMethod,
-  type DocumentOpenResponse,
   type DocumentNewResponse,
   type DocumentSaveResponse,
   type HostEventMap,
@@ -162,9 +161,6 @@ export class DesktopBridge {
     this.notify("library.stateChanged", { hasUnsavedChanges });
   }
 
-  public notifyDocumentOpened(fileName: string) {
-    this.notify("document.opened", { fileName });
-  }
 
   public notifyDocumentRecovered() {
     this.notify("document.recovered", undefined);
@@ -248,24 +244,14 @@ export class DesktopBridge {
     return this.request("app.ping", undefined, 10_000);
   }
 
-  public loadLibrary() {
+  public loadLibrary(retryRepair = false) {
     if (!this.transport) return Promise.resolve({ status: "unavailable" as const });
-    return this.request("library.load", undefined, 10_000);
+    return this.request("library.load", retryRepair ? { retryRepair: true } : undefined, 10_000);
   }
 
   public saveLibrary(content: string, expectedRevision: string) {
     if (!this.transport) return Promise.reject(new DesktopBridgeError("LibraryUnavailable", "The shared library is unavailable."));
     return this.request("library.save", { content, expectedRevision }, 10_000);
-  }
-
-  public openDocument(
-    hasUnsavedChanges: boolean,
-  ): Promise<DocumentOpenResponse> {
-    if (!this.transport) {
-      return Promise.resolve({ status: "cancelled" });
-    }
-
-    return this.request("document.open", { hasUnsavedChanges });
   }
 
   public newDocument(hasUnsavedChanges: boolean): Promise<DocumentNewResponse> {
@@ -382,7 +368,7 @@ export class DesktopBridge {
               () => pendingRequest.cancel?.("BridgeTimeout"), timeoutMilliseconds);
           }
         };
-        if (method === "document.save" || method === "document.saveAs") {
+        if (method === "document.save" || method === "document.saveAs" || method === "library.load") {
           pendingRequest.setPickerOpen = (open) => open ? clearTimer() : startTimer();
         }
         startTimer();

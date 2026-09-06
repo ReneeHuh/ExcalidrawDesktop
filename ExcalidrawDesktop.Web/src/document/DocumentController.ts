@@ -20,19 +20,10 @@ export type DocumentEditorApi = Pick<
 
 type SceneLoader = typeof loadFromBlob;
 
-type OpenDocumentOptions = {
-  api: DocumentEditorApi;
-  bridge: Pick<DesktopBridge, "notifyDocumentOpened" | "openDocument">;
-  hasUnsavedChanges: boolean;
-  loadScene?: SceneLoader;
-};
-
 type LoadDocumentOptions = {
   api: DocumentEditorApi;
-  bridge: Pick<DesktopBridge, "notifyDocumentOpened">;
   fileName: string;
   content: string;
-  notifyOpened?: boolean;
   loadScene?: SceneLoader;
   isCancelled?: () => boolean;
 };
@@ -46,32 +37,10 @@ export const requestNewDocument = (
   hasUnsavedChanges: boolean,
 ) => bridge.newDocument(hasUnsavedChanges);
 
-export const openDocumentIntoEditor = async ({
-  api,
-  bridge,
-  hasUnsavedChanges,
-  loadScene = loadFromBlob,
-}: OpenDocumentOptions): Promise<OpenDocumentResult> => {
-  const response = await bridge.openDocument(hasUnsavedChanges);
-  if (response.status === "cancelled") {
-    return response;
-  }
-
-  return loadDocumentContentIntoEditor({
-    api,
-    bridge,
-    fileName: response.fileName,
-    content: response.content,
-    loadScene,
-  });
-};
-
 export const loadDocumentContentIntoEditor = async ({
   api,
-  bridge,
   fileName,
   content,
-  notifyOpened = true,
   loadScene = loadFromBlob,
   isCancelled = () => false,
 }: LoadDocumentOptions): Promise<OpenDocumentResult> => {
@@ -92,9 +61,6 @@ export const loadDocumentContentIntoEditor = async ({
     captureUpdate: CaptureUpdateAction.NEVER,
   });
   api.history.clear();
-  if (notifyOpened) {
-    bridge.notifyDocumentOpened(fileName);
-  }
 
   return {
     status: "opened",

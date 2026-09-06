@@ -54,6 +54,13 @@ internal sealed class ApplicationWorkspaceCoordinator
 
     public Task<LibraryLoadResult> LoadLibraryAsync() => libraryStore.LoadAsync();
 
+    public async Task<LibraryLoadResult> RepairLibraryAsync(string expectedRevision)
+    {
+        var result = await libraryStore.RepairAsync(expectedRevision);
+        LibraryChanged?.Invoke(result);
+        return result;
+    }
+
     public async Task<LibrarySaveResult> SaveLibraryAsync(string content, string expectedRevision)
     {
         var result = await libraryStore.SaveAsync(content, expectedRevision);
@@ -148,12 +155,26 @@ internal sealed class ApplicationWorkspaceCoordinator
             .Where(id => !referenced.Contains(id)).Take(50).ToArray();
         if (orphanIds.Length > 0)
         {
+            var usedPaths = state.Windows.SelectMany(window => window.Tabs)
+                .Select(tab => DesktopDocumentPath.Normalize(tab.Path)).OfType<string>()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var orphanTabs = new List<WorkspaceTabState>();
+            foreach (var id in orphanIds)
+            {
+                string? path = null;
+                if (await RecoverySnapshotStore.LoadAsync(id) is { } content &&
+                    RecoveryFileBaseline.ReadEmbedded(content) is { } baseline &&
+                    DesktopDocumentPath.Normalize(baseline.Path) is { } candidate && usedPaths.Add(candidate))
+                    path = candidate;
+                // Keep unreadable or duplicate-path snapshots as independent recovery tabs.
+                orphanTabs.Add(new WorkspaceTabState(path, true, id));
+            }
             var windows = RestoredWindows.ToList();
             if (windows.Count == 0)
                 windows.Add(new WorkspaceWindowState("recovery", null, false, orphanIds[0], Array.Empty<WorkspaceTabState>()));
             var target = windows[0];
             var tabs = target.Tabs.ToList();
-            tabs.AddRange(orphanIds.Select(id => new WorkspaceTabState(null, true, id)));
+            tabs.AddRange(orphanTabs);
             windows[0] = target with { Tabs = tabs, ActiveRecoveryId = target.ActiveRecoveryId ?? orphanIds[0] };
             RestoredWindows = windows;
         }

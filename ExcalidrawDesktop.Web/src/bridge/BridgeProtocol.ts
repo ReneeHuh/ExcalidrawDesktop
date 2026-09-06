@@ -19,10 +19,6 @@ export type PingResponse = {
   ready: true;
 };
 
-export type DocumentOpenResponse =
-  | { status: "cancelled" }
-  | { status: "opened"; fileName: string; content: string };
-
 export type DocumentSaveResponse =
   | { status: "cancelled" }
   | { status: "saved"; fileName: string };
@@ -33,7 +29,7 @@ export type DocumentNewResponse =
 
 export type BridgeRequestMap = {
   "library.load": {
-    payload: undefined;
+    payload: { retryRepair: boolean } | undefined;
     response: { status: "loaded"; content: string; revision: string } | { status: "unavailable" };
   };
   "library.save": {
@@ -47,10 +43,6 @@ export type BridgeRequestMap = {
   "app.ping": {
     payload: undefined;
     response: PingResponse;
-  };
-  "document.open": {
-    payload: { hasUnsavedChanges: boolean };
-    response: DocumentOpenResponse;
   };
   "document.new": {
     payload: { hasUnsavedChanges: boolean };
@@ -80,7 +72,6 @@ export type BridgeEventMap = {
   "document.created": undefined;
   "document.dirtyChanged": { isDirty: boolean };
   "library.stateChanged": { hasUnsavedChanges: boolean };
-  "document.opened": { fileName: string };
   "document.recovered": undefined;
   "document.loadFailed": { loadId: string };
   "document.loadApplied": { loadId: string; fileName: string; isRecovery: boolean };
@@ -178,29 +169,6 @@ export const parseBridgeResponse = <Method extends BridgeRequestMethod>(
   if (method === "document.recoverySnapshot" && isRecord(payload) &&
       (payload.status === "stored" || payload.status === "ignored")) {
     return { status: payload.status } as BridgeRequestMap[Method]["response"];
-  }
-
-  if (method === "document.open") {
-    if (!isRecord(payload)) {
-      throw new Error("The document.open response payload is invalid.");
-    }
-
-    if (payload.status === "cancelled") {
-      return { status: "cancelled" } as BridgeRequestMap[Method]["response"];
-    }
-
-    if (
-      payload.status === "opened" &&
-      typeof payload.fileName === "string" &&
-      payload.fileName.length > 0 &&
-      typeof payload.content === "string"
-    ) {
-      return {
-        status: "opened",
-        fileName: payload.fileName,
-        content: payload.content,
-      } as BridgeRequestMap[Method]["response"];
-    }
   }
 
   if (method === "document.new") {

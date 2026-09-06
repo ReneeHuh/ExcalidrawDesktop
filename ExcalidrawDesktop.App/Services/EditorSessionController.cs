@@ -47,7 +47,7 @@ internal sealed class EditorSessionController
     public event Action<DocumentSession, bool>? CloseBarrierReady;
     public event Action<DocumentSession, Guid, string, bool>? DocumentLoadApplied;
     public Func<bool>? CommandsBlocked { get; set; }
-    public Func<BridgeMessage, Task<object?>>? LibraryRequest { get; set; }
+    public Func<DocumentSession, BridgeMessage, Task<object?>>? LibraryRequest { get; set; }
     public event Action<DocumentSession, WebView2>? EditorRecreated;
     public event Action<DocumentSession, CoreWebView2,
         CoreWebView2WebResourceRequestedEventArgs>? ImageExportRequested;
@@ -860,6 +860,7 @@ internal sealed class EditorSessionController
         session.IsRetrying = false;
         session.IsSuspended = false;
         session.LastLifecycleFailure = failureKind;
+        session.CloseBarrierCompletion?.TrySetResult(false);
         Failed?.Invoke(session);
         session.Content.ShowFailure(
             DesktopResources.Get(
@@ -934,7 +935,7 @@ internal sealed class EditorSessionController
             {
                 try
                 {
-                    var response = await libraryRequest(message);
+                    var response = await libraryRequest(session, message);
                     session.TryPostEditorMessage(BridgeResponseJson.Success(message, response));
                 }
                 catch (BridgeProtocolException exception)
@@ -971,27 +972,26 @@ internal sealed class EditorSessionController
             }
             if (message.Kind == "event" && message.Method == "document.closeBarrierReady")
             {
-                if (message.Payload is { } payload &&
-                    payload.TryGetProperty("barrierId", out var id) &&
-                    Guid.TryParse(id.GetString(), out var barrierId) &&
-                    session.CloseBarrierId == barrierId &&
-                    payload.TryGetProperty("isDirty", out var dirty) &&
-                    dirty.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
+                var acknowledgement = CloseBarrierAcknowledgement.Read(message.Payload);
+                if (acknowledgement is null)
                 {
-                    CloseBarrierReady?.Invoke(session, dirty.GetBoolean());
-                    session.CloseBarrierCompletion?.TrySetResult(
-                        !payload.TryGetProperty("canClose", out var canClose) ||
-                        canClose.ValueKind != System.Text.Json.JsonValueKind.False);
+                    session.CloseBarrierCompletion?.TrySetResult(false);
+                }
+                else if (session.CloseBarrierId == acknowledgement.BarrierId)
+                {
+                    CloseBarrierReady?.Invoke(session, acknowledgement.IsDirty);
+                    session.HasUnsavedLibrary = acknowledgement.HasUnsavedLibrary;
+                    session.CloseBarrierCompletion?.TrySetResult(true);
                 }
                 return;
             }
             if (message.Kind == "request" && CommandsBlocked?.Invoke() == true &&
-                message.Method is "document.new" or "document.open" or "document.save" or "document.saveAs")
+                message.Method is "document.new" or "document.save" or "document.saveAs")
             {
                 var isCloseSave = message.Payload is { ValueKind: System.Text.Json.JsonValueKind.Object } payload &&
                     payload.TryGetProperty("closeRequestId", out var id) &&
                     id.ValueKind == System.Text.Json.JsonValueKind.String &&
-                    Guid.TryParse(id.GetString(), out var requestId) && session.CloseRequestId == requestId;
+                    Guid.TryParseExact(id.GetString(), "D", out var requestId) && session.CloseRequestId == requestId;
                 if (!isCloseSave)
                 {
                     session.TryPostEditorMessage(BridgeResponseJson.Error(message,
@@ -1018,8 +1018,8 @@ internal sealed class EditorSessionController
         catch (Exception exception)
         {
             DiagnosticLogService.Error("editor.bridge_dispatch_failed", exception);
-            session.LastLifecycleFailure = exception.Message;
-            StateChanged?.Invoke(session);
+            // An operational handler failure does not mean the renderer failed.
+            session.CloseBarrierCompletion?.TrySetResult(false);
         }
         finally
         {

@@ -72,6 +72,7 @@ try {
     }
 
     $package = Get-DesktopTestApplication
+    $package.DataRoot = Join-Path ([IO.Path]::GetTempPath()) ("ExcalidrawSmoke-document-" + [Guid]::NewGuid().ToString("N"))
     $installRoot = [System.IO.Path]::GetFullPath(
         $package.InstallLocation).TrimEnd('\') + '\'
     $requestPath = Join-Path $package.InstallLocation "document-safety-smoke.request"

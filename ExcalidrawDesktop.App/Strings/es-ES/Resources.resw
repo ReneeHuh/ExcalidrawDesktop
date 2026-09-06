@@ -186,4 +186,21 @@
   <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>No se pudieron guardar los ajustes</value></data>
   <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>La preferencia seleccionada está activa durante esta sesión, pero no se pudo guardar. Comprueba la ubicación de ajustes e inténtalo de nuevo.</value></data>
   <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>Reintentar</value></data>
+  <data name="UnsavedLibraryTitle" xml:space="preserve"><value>Cambios de biblioteca sin guardar</value></data>
+  <data name="UnsavedLibraryCloseContent" xml:space="preserve"><value>No se pudieron guardar los cambios de la biblioteca. Descártalos para continuar cerrando o cancela para volver a intentar guardarlos. Los cambios del dibujo se tratarán por separado.</value></data>
+  <data name="DiscardLibraryButton" xml:space="preserve"><value>Descartar cambios de biblioteca</value></data>
+  <data name="CloseNotReadyTitle" xml:space="preserve"><value>No se pudo cerrar el dibujo</value></data>
+  <data name="CloseNotReadyContent" xml:space="preserve"><value>El editor no terminó de prepararse para cerrar. Inténtalo de nuevo o reinicia el editor si se ha detenido.</value></data>
+  <data name="LibraryRepairTitle" xml:space="preserve"><value>La biblioteca guardada está dañada</value></data>
+  <data name="LibraryRepairContent" xml:space="preserve"><value>¿Restablecer la biblioteca compartida para seguir guardando cambios? El archivo dañado se conservará como archivo .bak junto a library.json. Tus dibujos no se modificarán.</value></data>
+  <data name="LibraryResetButton" xml:space="preserve"><value>Crear copia y restablecer</value></data>
+  <data name="FileVerificationTitle" xml:space="preserve"><value>No se pudo verificar la versión del archivo</value></data>
+  <data name="FileUnavailableContent" xml:space="preserve"><value>No se pudo leer el archivo. Puede estar ocupado o no tener permiso de acceso. Reintenta, guarda en otro archivo o sigue editando.</value></data>
+  <data name="FileBaselineUnknownContent" xml:space="preserve"><value>Este dibujo recuperado no tiene una versión de archivo de referencia. Guárdalo en otro archivo para conservar los cambios o vuelve a cargar la versión del disco para reemplazar esta pestaña. La aplicación no puede verificar si el original cambió.</value></data>
+  <data name="StatusFileUnavailable" xml:space="preserve"><value>Archivo no disponible — Reintentar</value></data>
+  <data name="StatusFileBaselineUnknown" xml:space="preserve"><value>Versión de archivo desconocida — Resolver</value></data>
+  <data name="TabStateFileUnavailable" xml:space="preserve"><value>archivo no disponible</value></data>
+  <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>versión del archivo desconocida</value></data>
+  <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — Archivo no disponible</value></data>
+  <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — Versión del archivo desconocida</value></data>
 </root>

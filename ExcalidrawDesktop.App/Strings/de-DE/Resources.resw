@@ -186,4 +186,21 @@
   <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>Einstellungen konnten nicht gespeichert werden</value></data>
   <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>Die ausgewählte Einstellung ist für diese Sitzung aktiv, konnte aber nicht gespeichert werden. Überprüfen Sie den Speicherort und versuchen Sie es erneut.</value></data>
   <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>Erneut versuchen</value></data>
+  <data name="UnsavedLibraryTitle" xml:space="preserve"><value>Ungespeicherte Bibliotheksänderungen</value></data>
+  <data name="UnsavedLibraryCloseContent" xml:space="preserve"><value>Die Bibliotheksänderungen konnten nicht gespeichert werden. Verwirf sie, um das Schließen fortzusetzen, oder brich ab, um das Speichern erneut zu versuchen. Zeichnungsänderungen werden gesondert behandelt.</value></data>
+  <data name="DiscardLibraryButton" xml:space="preserve"><value>Bibliotheksänderungen verwerfen</value></data>
+  <data name="CloseNotReadyTitle" xml:space="preserve"><value>Zeichnung konnte nicht geschlossen werden</value></data>
+  <data name="CloseNotReadyContent" xml:space="preserve"><value>Der Editor hat die Vorbereitung zum Schließen nicht abgeschlossen. Versuche es erneut oder starte den Editor neu, falls er angehalten wurde.</value></data>
+  <data name="LibraryRepairTitle" xml:space="preserve"><value>Die gespeicherte Bibliothek ist beschädigt</value></data>
+  <data name="LibraryRepairContent" xml:space="preserve"><value>Die gemeinsame Bibliothek zurücksetzen, um Änderungen wieder speichern zu können? Die beschädigte Datei bleibt als .bak-Datei neben library.json erhalten. Deine Zeichnungen werden nicht geändert.</value></data>
+  <data name="LibraryResetButton" xml:space="preserve"><value>Sichern und zurücksetzen</value></data>
+  <data name="FileVerificationTitle" xml:space="preserve"><value>Dateiversion konnte nicht überprüft werden</value></data>
+  <data name="FileUnavailableContent" xml:space="preserve"><value>Die Datei konnte nicht gelesen werden. Sie ist möglicherweise belegt oder der Zugriff wurde verweigert. Versuche es erneut, speichere in einer anderen Datei oder bearbeite weiter.</value></data>
+  <data name="FileBaselineUnknownContent" xml:space="preserve"><value>Für diese wiederhergestellte Zeichnung fehlt eine Referenzversion der Datei. Speichere sie in einer anderen Datei, um Änderungen zu behalten, oder lade die Version vom Datenträger neu, um diesen Tab zu ersetzen. Die App kann nicht prüfen, ob die Originaldatei geändert wurde.</value></data>
+  <data name="StatusFileUnavailable" xml:space="preserve"><value>Datei nicht verfügbar — Erneut versuchen</value></data>
+  <data name="StatusFileBaselineUnknown" xml:space="preserve"><value>Dateiversion unbekannt — Klären</value></data>
+  <data name="TabStateFileUnavailable" xml:space="preserve"><value>Datei nicht verfügbar</value></data>
+  <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>Dateiversion unbekannt</value></data>
+  <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — Datei nicht verfügbar</value></data>
+  <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — Dateiversion unbekannt</value></data>
 </root>

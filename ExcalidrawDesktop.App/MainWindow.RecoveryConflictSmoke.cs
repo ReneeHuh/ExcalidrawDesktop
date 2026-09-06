@@ -52,13 +52,13 @@ public sealed partial class MainWindow
             // also require a choice even when the current file is readable.
             var legacy = new DocumentService(this, DocumentTabs);
             await legacy.RestoreActiveFileAsync(path, RecoveryFileBaseline.ReadStamp(recovered, path));
-            await AssertRecoverySaveBlockedAsync(legacy, recovered);
+            await AssertRecoverySaveBlockedAsync(legacy, recovered, ExternalFileState.UnknownBaseline);
 
             // A legacy timestamp alone cannot prove byte identity either.
             var stampOnly = new DocumentService(this, DocumentTabs);
             var current = await stampOnly.OpenPathAsync(path);
             await stampOnly.RestoreActiveFileAsync(path, current.Stamp);
-            await AssertRecoverySaveBlockedAsync(stampOnly, recovered);
+            await AssertRecoverySaveBlockedAsync(stampOnly, recovered, ExternalFileState.UnknownBaseline);
 
             await File.WriteAllTextAsync(copyPath, original);
             afterRestart.SaveFileOverrideForSmoke = await StorageFile.GetFileFromPathAsync(copyPath);
@@ -91,9 +91,10 @@ public sealed partial class MainWindow
         }
     }
 
-    private static async Task AssertRecoverySaveBlockedAsync(DocumentService document, string content)
+    private static async Task AssertRecoverySaveBlockedAsync(DocumentService document, string content,
+        ExternalFileState expectedState = ExternalFileState.Modified)
     {
-        if (await document.CheckExternalFileStateAsync() != ExternalFileState.Modified)
+        if (await document.CheckExternalFileStateAsync() != expectedState)
         {
             throw new InvalidOperationException("A recovered file lost its external-change conflict.");
         }
@@ -101,7 +102,8 @@ public sealed partial class MainWindow
         {
             await document.SaveAsync(content, saveAs: false);
         }
-        catch (BridgeProtocolException exception) when (exception.Code == "DocumentChangedExternally")
+        catch (BridgeProtocolException exception) when (exception.Code ==
+            (expectedState == ExternalFileState.UnknownBaseline ? "DocumentBaselineUnknown" : "DocumentChangedExternally"))
         {
             return;
         }

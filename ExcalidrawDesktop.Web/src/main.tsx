@@ -58,6 +58,8 @@ type DesktopSmokeApi = {
   readState(): DesktopSmokeState;
   deleteAllElements(): void;
   isSaving(): boolean;
+  addLibraryItem(id: string): void;
+  retryLibrary(): void;
   updateAppState(appState: Parameters<ExcalidrawImperativeAPI["updateScene"]>[0]["appState"]): void;
   focusCanvas(): boolean;
 };
@@ -86,7 +88,6 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
   const lastReportedRevision = React.useRef<string | undefined>(undefined);
   const isDocumentOperationInProgress = React.useRef(false);
   const [closeBarrier, setCloseBarrier] = React.useState<{ barrierId: string; locked: boolean } | null>(null);
-  const isImageExportInProgress = React.useRef(false);
   const activeExport = React.useRef<{ exportId: string; controller: AbortController } | null>(null);
   const isDocumentLoading = React.useRef(false);
   const recovery = React.useMemo(() => new RecoverySnapshotController(ownerWindow, () => {
@@ -171,10 +172,8 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
       },
       load: (payload, isCancelled) => loadDocumentContentIntoEditor({
         api: excalidrawAPI,
-        bridge: desktopBridge,
         fileName: payload.fileName,
         content: payload.content,
-        notifyOpened: false,
         isCancelled,
       }),
       applied: (payload, result) => {
@@ -430,6 +429,10 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
 
     smokeWindow.__EXCALIDRAW_DESKTOP_SMOKE__ = {
       isSaving: () => isDocumentOperationInProgress.current,
+      addLibraryItem: id => { void excalidrawAPI.updateLibrary({ libraryItems: [{
+        id, status: "unpublished", created: Date.now(), elements: excalidrawAPI.getSceneElements(),
+      }], merge: true }); },
+      retryLibrary: () => library.current?.retry(),
       deleteAllElements() {
         excalidrawAPI.updateScene({
           elements: excalidrawAPI.getSceneElementsIncludingDeleted().map((element) => ({
@@ -529,7 +532,7 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
     }
 
     return desktopBridge.onImageExportRequested((request) => {
-      if (isImageExportInProgress.current) {
+      if (activeExport.current) {
         desktopBridge.notifyImageExportFailed(
           request.exportId,
           getDesktopString(language.langCode, "exportRunning"),
@@ -537,7 +540,6 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
         return;
       }
 
-      isImageExportInProgress.current = true;
       const controller = new ownerWindow.AbortController();
       activeExport.current = { exportId: request.exportId, controller };
       void exportWholeDrawingAsPng(excalidrawAPI, request, ownerWindow, undefined, controller.signal)
@@ -548,6 +550,7 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
             error instanceof DesktopBridgeError ? error.code :
               (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" ? error.code : undefined),
             "exportFailed",
+            { maxBytes: request.maxBytes },
           );
           desktopBridge.notifyImageExportFailed(request.exportId, message);
           excalidrawAPI.setToast({
@@ -558,7 +561,6 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
         })
         .finally(() => {
           if (activeExport.current?.exportId === request.exportId) {
-            isImageExportInProgress.current = false;
             activeExport.current = null;
           }
         });
