@@ -133,6 +133,7 @@ public sealed partial class MainWindow : Window
             SettingsButton,
             DesktopResources.Get("SettingsButtonToolTip", "Show Settings tab"));
         InitializeTitleBar();
+        InitializeTearOutLifetime();
         // Windows share the coordinator's store so snapshot writes and the
         // coordinator's pruning always target the same directory.
         recoverySnapshotStore = workspaceCoordinator.RecoverySnapshotStore;
@@ -622,6 +623,11 @@ public sealed partial class MainWindow : Window
         suspensionTimer.Tick -= OnSuspensionTimerTick;
         Activated -= OnWindowActivated;
         Closed -= OnWindowClosed;
+        if (tearOutPointerSource is not null)
+        {
+            tearOutPointerSource.ExitedMoveSize -= OnTearOutMoveSizeExited;
+            tearOutPointerSource = null;
+        }
         workspaceCoordinator.LibraryChanged -= OnSharedLibraryChanged;
         AppWindow.Closing -= OnAppWindowClosing;
         AppWindow.Changed -= OnAppWindowChanged;
@@ -1600,14 +1606,7 @@ public sealed partial class MainWindow : Window
         TabViewTabTearOutWindowRequestedEventArgs args)
     {
         var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
-        var session = tab is null ? null : FindSession(tab);
-        LogAction("tab.tear_out_started", "drag", session);
-        if (session is null || !CanMoveSession(session))
-        {
-            return;
-        }
-
-        args.NewWindowId = PreparePendingTearOutWindow().AppWindow.Id;
+        args.NewWindowId = RequestTearOutWindow(tab).AppWindow.Id;
     }
 
     private void OnPendingTearOutWindowClosed(object sender, WindowEventArgs args)
@@ -1642,28 +1641,15 @@ public sealed partial class MainWindow : Window
         // TabTearOutRequested consumes and clears a successful destination.
         // If the drag ended without that event, discard the hidden placeholder
         // so it cannot linger in the workspace or receive future activation.
-        pendingTearOutWindow?.CloseIfEmptyAfterMove();
-        pendingTearOutWindow = null;
+        QueueDiscardPendingTearOutWindow();
     }
 
     private void OnTabTearOutRequested(
         TabView sender,
         TabViewTabTearOutRequestedEventArgs args)
     {
-        var destination = pendingTearOutWindow;
-        if (destination is not null)
-        {
-            destination.Closed -= OnPendingTearOutWindowClosed;
-        }
-        pendingTearOutWindow = null;
         var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
-        var session = tab is null ? null : FindSession(tab);
-        LogAction("tab.tear_out_completed", "drag", session);
-        if (destination is null || session is null ||
-            !workspaceCoordinator.MoveSession(this, session, destination))
-        {
-            destination?.CloseIfEmptyAfterMove();
-        }
+        TryCompletePendingTearOut(tab);
     }
 
     private void OnExternalTornOutTabsDropping(

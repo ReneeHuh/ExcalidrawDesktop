@@ -190,11 +190,9 @@ internal sealed class ApplicationWorkspaceCoordinator
     /// </summary>
     public MainWindow CreateTearOutPlaceholder()
     {
-        if (isExiting)
-        {
-            throw new InvalidOperationException(
-                "A new window cannot be created while the application is exiting.");
-        }
+        // WinUI requires a valid destination even if a click arrives while an
+        // exit prompt is open. This unregistered placeholder can be discarded;
+        // MoveSession still rejects all transfers while isExiting is true.
         var window = new MainWindow(this, restoreWorkspace: false, createInitialTab: false);
         try
         {
@@ -584,7 +582,8 @@ internal sealed class ApplicationWorkspaceCoordinator
         MainWindow source,
         DocumentSession session,
         MainWindow destination,
-        int? index = null)
+        int? index = null,
+        bool closeDestinationOnFailure = true)
     {
         if (isExiting || ReferenceEquals(source, destination) ||
             !windows.Contains(source) || destination.IsClosed)
@@ -615,7 +614,7 @@ internal sealed class ApplicationWorkspaceCoordinator
             session.IsMoving = false;
             var rollback = destination.DetachSessionForMove(session) ?? transfer;
             source.AttachMovedSession(rollback, transfer.SourceIndex);
-            destination.CloseIfEmptyAfterMove();
+            if (closeDestinationOnFailure) destination.CloseIfEmptyAfterMove();
             source.Activate();
             throw;
         }

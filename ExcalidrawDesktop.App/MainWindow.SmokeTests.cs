@@ -395,6 +395,7 @@ public sealed partial class MainWindow
                     "A process-failed drawing entered a transfer.");
             }
 
+            await RunUnavailableTabTearOutSmokeAsync(session);
             multiWindowInitializationRelease = new TaskCompletionSource(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             var retryTask = editorSessions.RetryAsync(session);
@@ -407,6 +408,8 @@ public sealed partial class MainWindow
                 throw new InvalidOperationException(
                     "An initializing drawing was allowed to enter a transfer.");
             }
+            await RunUnavailableTabTearOutSmokeAsync(session);
+            await PauseTearOutInteractionForSmokeAsync(session);
             multiWindowInitializationRelease.TrySetResult();
             multiWindowInitializationRelease = null;
             await retryTask;

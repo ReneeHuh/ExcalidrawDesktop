@@ -6,11 +6,64 @@ namespace ExcalidrawDesktop.App;
 public sealed partial class MainWindow
 {
 #if DEBUG
+    private async Task RunUnavailableTabTearOutSmokeAsync(DocumentSession? session)
+    {
+        var windowCount = workspaceCoordinator.Windows.Count;
+        var tabCount = sessions.Count;
+        var editor = session?.CoreWebView;
+        var destination = RequestTearOutWindow(session?.TabItem);
+        if (destination.AppWindow.Id.Value == 0 || destination.IsClosed ||
+            workspaceCoordinator.Windows.Count != windowCount)
+        {
+            throw new InvalidOperationException("An unavailable tab did not receive a valid isolated tear-out window.");
+        }
+
+        destination.AppWindow.Show(activateWindow: false);
+        await Task.Delay(100);
+        destination.AppWindow.Hide();
+        if (TryCompletePendingTearOut(session?.TabItem) || destination.IsClosed ||
+            !ReferenceEquals(pendingTearOutWindow, destination) ||
+            sessions.Count != tabCount || workspaceCoordinator.Windows.Count != windowCount ||
+            (session is not null && (!sessions.Contains(session) || !ReferenceEquals(session.CoreWebView, editor))))
+        {
+            throw new InvalidOperationException("A rejected tear-out moved its tab or destroyed the window still in use by WinUI.");
+        }
+
+        // WinUI continues using the destination after a rejected callback.
+        destination.AppWindow.Show(activateWindow: false);
+        destination.AppWindow.Hide();
+        QueueDiscardPendingTearOutWindow();
+        if (!await AsyncWait.UntilAsync(
+                () => destination.IsClosed && pendingTearOutWindow is null,
+                TimeSpan.FromSeconds(5)))
+        {
+            throw new InvalidOperationException("A rejected tear-out did not clean up after the move loop.");
+        }
+    }
+
+    private async Task PauseTearOutInteractionForSmokeAsync(DocumentSession initializingSession)
+    {
+        // Optional manual/native-input checkpoint: keep one editor initializing
+        // while clicking and dragging its tab through WinUI's actual move loop.
+        var requestPath = Path.Combine(AppContext.BaseDirectory, "tear-out-interaction-smoke.request");
+        if (!File.Exists(requestPath)) return;
+
+        DocumentTabs.SelectedItem = sessions.First(session => session != initializingSession).TabItem;
+        Title = "Excalidraw Desktop — Tear-out interaction smoke ready";
+        if (!await AsyncWait.UntilAsync(() => !File.Exists(requestPath), TimeSpan.FromMinutes(10)))
+        {
+            throw new TimeoutException("The tear-out interaction checkpoint was not released.");
+        }
+    }
+
     private async Task RunTearOutPresentationSmokeAsync(DocumentSession session)
     {
         var windowCount = workspaceCoordinator.Windows.Count;
         var sourcePosition = AppWindow.Position;
         var sourceSize = AppWindow.Size;
+
+        // Settings has no document session but still enters the native callback.
+        await RunUnavailableTabTearOutSmokeAsync(null);
 
         // Reproduce WinUI's preparatory show/hide and close the unused window
         // as after a click without tearing out. The destination must remain

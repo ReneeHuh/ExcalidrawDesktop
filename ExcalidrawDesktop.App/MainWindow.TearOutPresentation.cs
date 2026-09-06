@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using ExcalidrawDesktop.App.Services;
+using Microsoft.UI.Input;
+using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
 
 namespace ExcalidrawDesktop.App;
@@ -8,6 +10,78 @@ public sealed partial class MainWindow
 {
     private const int DwmTransitionsForceDisabled = 3;
     private bool isPreparedTearOutWindow;
+    private InputNonClientPointerSource? tearOutPointerSource;
+
+    private void InitializeTearOutLifetime()
+    {
+        tearOutPointerSource = InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
+        tearOutPointerSource.ExitedMoveSize += OnTearOutMoveSizeExited;
+    }
+
+    private MainWindow RequestTearOutWindow(TabViewItem? tab)
+    {
+        // This event also fires on ordinary clicks. It has no cancellation
+        // property: WinUI unconditionally uses NewWindowId after it returns.
+        // A loading/failed editor (or Settings tab) must still get a valid HWND.
+        // Apply transfer eligibility only when an actual tear-out is requested.
+        LogAction("tab.tear_out_window_requested", "native", tab is null ? null : FindSession(tab));
+        return PreparePendingTearOutWindow();
+    }
+
+    private bool TryCompletePendingTearOut(TabViewItem? tab)
+    {
+        var destination = pendingTearOutWindow;
+        var session = tab is null ? null : FindSession(tab);
+        LogAction("tab.tear_out_started", "drag", session);
+        try
+        {
+            if (destination is not null && session is not null &&
+                workspaceCoordinator.MoveSession(
+                    this, session, destination, closeDestinationOnFailure: false))
+            {
+                destination.Closed -= OnPendingTearOutWindowClosed;
+                pendingTearOutWindow = null;
+                LogAction("tab.tear_out_completed", "drag", session);
+                return true;
+            }
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLogService.Error("tab.tear_out_failed", exception, new
+            {
+                sessionId = session?.RecoveryId,
+            });
+        }
+
+        LogAction("tab.tear_out_rejected", "drag", session);
+        if (destination is { IsClosed: false })
+        {
+            // WinUI still calls Show and queries this AppWindow after our
+            // callback. Do not destroy it here. End the native move loop and
+            // close the empty destination only after ExitedMoveSize returns.
+            PostMessage(WindowNative.GetWindowHandle(destination), 0x001F /* WM_CANCELMODE */, 0, 0);
+            PostMessage(WindowNative.GetWindowHandle(this), 0x001F /* WM_CANCELMODE */, 0, 0);
+        }
+        return false;
+    }
+
+    private void OnTearOutMoveSizeExited(
+        InputNonClientPointerSource sender, ExitedMoveSizeEventArgs args) =>
+        QueueDiscardPendingTearOutWindow();
+
+    private void QueueDiscardPendingTearOutWindow()
+    {
+        var destination = pendingTearOutWindow;
+        if (destination is null) return;
+
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!ReferenceEquals(pendingTearOutWindow, destination)) return;
+            destination.Closed -= OnPendingTearOutWindowClosed;
+            pendingTearOutWindow = null;
+            destination.CloseIfEmptyAfterMove();
+        });
+    }
 
     private MainWindow PreparePendingTearOutWindow()
     {
@@ -68,4 +142,8 @@ public sealed partial class MainWindow
     [DllImport("dwmapi.dll", ExactSpelling = true)]
     private static extern int DwmSetWindowAttribute(
         nint window, int attribute, ref int value, int size);
+
+    [DllImport("user32.dll", EntryPoint = "PostMessageW", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(nint window, uint message, nuint wParam, nint lParam);
 }

@@ -109,6 +109,8 @@ try {
                 TearOutPreparationHiddenFromSwitchers = $true
                 CancelledTearOutCleanedUp = $true
                 TornOutWindowRevealed = $true
+                UnavailableTabTearOutWindowValid = $true
+                RejectedTearOutWindowLifetimePreserved = $true
                 SaveIsolation = $true
                 SaveAsIsolation = $true
                 ExternalChangeIsolation = $true

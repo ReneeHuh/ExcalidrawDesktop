@@ -51,6 +51,8 @@ internal static class DiagnosticLogService
             Enqueue("info", "application.started", new
             {
                 version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(),
+                build = Assembly.GetExecutingAssembly()
+                    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
                 osVersion = Environment.OSVersion.VersionString,
                 processArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
                 logDirectory = Redact(DirectoryPath),
