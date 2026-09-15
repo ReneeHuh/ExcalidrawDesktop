@@ -88,19 +88,16 @@
                 x:Uid="ReopenTabsSettingsCard"
                 Grid.Row="6"
                 Header="Reopen saved drawing tabs"
-                Description="Restore clean file-backed tabs from the previous session. Unsaved recovery is always preserved.">
+                Description="Restore saved tabs after an interrupted session. Exit and closing the last window always preserve the complete workspace.">
                 <ToggleSwitch
                     x:Name="ReopenSavedTabsToggle"
                     IsOn="{Binding ReopenSavedTabs, Mode=TwoWay}" />
             </controls:SettingsCard>
             <controls:SettingsCard
-                x:Uid="SaveDirtyDrawingsOnCloseSettingsCard"
+                x:Uid="DraftRecoverySettingsCard"
                 Grid.Row="7"
-                Header="Automatically save dirty drawings on close"
-                Description="Save changed drawings when closing a tab or window, or when exiting. Untitled drawings still ask where to save, and cancelling keeps the window open.">
-                <ToggleSwitch
-                    x:Name="SaveDirtyDrawingsOnCloseToggle"
-                    IsOn="{Binding SaveDirtyDrawingsOnClose, Mode=TwoWay}" />
+                Header="Keep unsaved drawings for reopening"
+                Description="Closing tabs, windows, or Exit keeps local recovery drafts. Ctrl+Shift+T reopens closed drawings. Save or Save As writes to your drawing file.">
             </controls:SettingsCard>
 
             <TextBlock

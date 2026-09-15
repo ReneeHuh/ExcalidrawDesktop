@@ -72,9 +72,10 @@ public sealed partial class MainWindow
         TitleBarRightInset.Width = new GridLength(AppWindow.TitleBar.RightInset / scale);
     }
 
-    private void RestoreWindowPlacement()
+    private void RestoreWindowPlacement() => RestoreWindowPlacement(workspaceCoordinator.GetRestoreState(this));
+
+    internal void RestoreWindowPlacement(WorkspaceWindowState? state)
     {
-        var state = workspaceCoordinator.GetRestoreState(this);
         if (state?.Bounds is { Width: >= 320, Height: >= 240 } bounds)
         {
             var display = DisplayArea.GetFromRect(

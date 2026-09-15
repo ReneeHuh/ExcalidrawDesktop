@@ -13,7 +13,14 @@ public sealed record WorkspaceWindowState(
     WorkspaceWindowBounds? Bounds,
     bool IsMaximized,
     string? ActiveRecoveryId,
-    IReadOnlyList<WorkspaceTabState> Tabs);
+    IReadOnlyList<WorkspaceTabState> Tabs)
+{
+    public bool RestoreAllTabs { get; init; }
+}
+
+public sealed record ClosedWorkspaceItem(
+    string Id, bool IsWindow, WorkspaceWindowState Window, int TabIndex,
+    DateTimeOffset ClosedAt);
 
 public sealed record MultiWindowWorkspaceState(
     int Version,
@@ -21,7 +28,8 @@ public sealed record MultiWindowWorkspaceState(
     string? LastActiveWindowId,
     IReadOnlyList<WorkspaceWindowState> Windows)
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
+    public IReadOnlyList<ClosedWorkspaceItem> ClosedItems { get; init; } = [];
 
     public static MultiWindowWorkspaceState Empty { get; } = new(
         CurrentVersion,
@@ -34,7 +42,7 @@ public sealed class MultiWindowWorkspaceStateStore
 {
     public enum LoadStatus { Loaded, Missing, Corrupt, Unsupported, Inaccessible }
     public LoadStatus LastLoadStatus { get; private set; }
-    private const int MaxRecentFiles = 100, MaxWindows = 50, MaxTabsPerWindow = 100;
+    private const int MaxRecentFiles = 100;
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = true,
@@ -68,10 +76,11 @@ public sealed class MultiWindowWorkspaceStateStore
                 return MultiWindowWorkspaceState.Empty;
             }
 
-            if (version == MultiWindowWorkspaceState.CurrentVersion)
+            if (version is 3 or MultiWindowWorkspaceState.CurrentVersion)
             {
                 var state = document.RootElement.Deserialize<MultiWindowWorkspaceState>(
                     SerializerOptions);
+                if (state is not null) state = state with { Version = MultiWindowWorkspaceState.CurrentVersion };
                 if (IsValid(state))
                 {
                     LastLoadStatus = LoadStatus.Loaded;
@@ -159,19 +168,22 @@ public sealed class MultiWindowWorkspaceStateStore
         } &&
         state.RecentFiles.Count <= MaxRecentFiles &&
         state.RecentFiles.All(path => DesktopDocumentPath.Normalize(path) is not null) &&
-        state.Windows.Count <= MaxWindows &&
         state.Windows.All(window =>
             window is not null && !string.IsNullOrWhiteSpace(window.Id) &&
-            window.Tabs is not null && window.Tabs.Count <= MaxTabsPerWindow && window.Tabs.All(tab => tab is not null)) &&
+            window.Tabs is not null && window.Tabs.All(tab => tab is not null)) &&
         state.Windows.Select(window => window.Id).Distinct(
-            StringComparer.OrdinalIgnoreCase).Count() == state.Windows.Count;
+            StringComparer.OrdinalIgnoreCase).Count() == state.Windows.Count &&
+        state.ClosedItems is not null && state.ClosedItems.All(item =>
+            item is not null && !string.IsNullOrWhiteSpace(item.Id) &&
+            item.Window is not null && item.Window.Tabs is not null &&
+            item.Window.Tabs.All(tab => tab is not null));
 
     private static bool IsStructurallyReadable(MultiWindowWorkspaceState state) =>
         state.RecentFiles is not null && state.RecentFiles.Count <= MaxRecentFiles &&
         state.RecentFiles.All(path => path is not null) &&
-        state.Windows is not null && state.Windows.Count <= MaxWindows &&
+        state.Windows is not null &&
         state.Windows.All(window => window is not null && window.Tabs is not null &&
-            window.Tabs.Count <= MaxTabsPerWindow && window.Tabs.All(tab => tab is not null)) &&
+            window.Tabs.All(tab => tab is not null)) &&
         state.Windows.Select(window => window.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == state.Windows.Count;
 
     private static MultiWindowWorkspaceState Normalize(
@@ -193,6 +205,15 @@ public sealed class MultiWindowWorkspaceStateStore
             RecentFiles = (state.RecentFiles ?? Array.Empty<string>()).Select(DesktopDocumentPath.Normalize).OfType<string>()
                 .Distinct(StringComparer.OrdinalIgnoreCase).Take(MaxRecentFiles).ToArray(),
             Windows = windows,
+            ClosedItems = (state.ClosedItems ?? []).Where(item => item is not null &&
+                !string.IsNullOrWhiteSpace(item.Id) && item.Window is not null)
+                .DistinctBy(item => item.Id).Select(item => item with
+                {
+                    // A history entry owns its recovery IDs. Never deduplicate a
+                    // dirty draft against a different entry or silently evict it.
+                    Window = item.Window with { Tabs = SanitizeTabs(item.Window.Tabs,
+                        new HashSet<string>(StringComparer.OrdinalIgnoreCase)) },
+                }).ToArray(),
             LastActiveWindowId = windows.Any(window => string.Equals(
                 window.Id,
                 state.LastActiveWindowId,
@@ -220,7 +241,6 @@ public sealed class MultiWindowWorkspaceStateStore
             if (recovery is not null && !used.Add(recovery)) recovery = null;
             if (tab.WasDirty && recovery is null) continue;
             result.Add(tab with { Path = path, RecoveryId = recovery });
-            if (result.Count == MaxTabsPerWindow) break;
         }
         return result.ToArray();
     }

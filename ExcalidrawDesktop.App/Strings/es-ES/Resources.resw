@@ -15,7 +15,7 @@
   <data name="RecentFilesMenu.Text" xml:space="preserve"><value>Recientes</value></data>
   <data name="SaveMenuItem.Text" xml:space="preserve"><value>Guardar</value></data>
   <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>Guardar como…</value></data>
-  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Guardar todo</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Guardar todo en esta ventana</value></data>
   <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>Exportar dibujo completo como PNG…</value></data>
   <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>Cerrar pestaña</value></data>
   <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>Cerrar ventana</value></data>
@@ -39,7 +39,7 @@
   <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>Reinicia Excalidraw Desktop para aplicar el idioma. Los dibujos sin guardar no se cerrarán automáticamente.</value></data>
   <data name="StartupSection.Text" xml:space="preserve"><value>Inicio</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Volver a abrir pestañas guardadas</value></data>
-  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaura las pestañas guardadas de la sesión anterior. La recuperación sin guardar siempre se conserva.</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaura pestañas guardadas tras una sesión interrumpida. Salir y cerrar la última ventana siempre conservan todo el espacio de trabajo.</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Guardar automáticamente los dibujos modificados al cerrar</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Guarda los dibujos modificados al cerrar una pestaña o ventana, o al salir. Los dibujos sin título siguen preguntando dónde guardarse y cancelar mantiene la ventana abierta.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Rendimiento</value></data>
@@ -203,4 +203,14 @@
   <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>versión del archivo desconocida</value></data>
   <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — Archivo no disponible</value></data>
   <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — Versión del archivo desconocida</value></data>
+  <data name="ReopenClosedMenuItem.Text" xml:space="preserve"><value>Reabrir pestaña o ventana cerrada</value></data>
+  <data name="DraftRecoverySettingsCard.Header" xml:space="preserve"><value>Conservar dibujos sin guardar para reabrirlos</value></data>
+  <data name="DraftRecoverySettingsCard.Description" xml:space="preserve"><value>Cerrar pestañas, ventanas o salir conserva borradores locales. Ctrl+Shift+T reabre dibujos cerrados. Guardar o Guardar como escribe en el archivo.</value></data>
+  <data name="DraftCheckpointFailed" xml:space="preserve"><value>No se pudo guardar el borrador o el espacio de trabajo. Los dibujos siguen abiertos. Libera espacio o comprueba el acceso a la carpeta de datos y vuelve a intentarlo.</value></data>
+  <data name="ReopenFailedTitle" xml:space="preserve"><value>No se pudo reabrir el dibujo</value></data>
+  <data name="ReopenFailedContent" xml:space="preserve"><value>No se pudo abrir un dibujo o borrador. El elemento sigue en el historial. Comprueba que el archivo esté disponible e inténtalo de nuevo.</value></data>
+  <data name="ReopenAlreadyOpenTitle" xml:space="preserve"><value>El dibujo ya está abierto</value></data>
+  <data name="ReopenAlreadyOpenContent" xml:space="preserve"><value>Se seleccionaron los dibujos ya abiertos en sus ventanas. Los borradores independientes siguen en el historial; cierra el dibujo abierto antes de recuperar su borrador.</value></data>
+  <data name="RecentlyClosedMenu.Text" xml:space="preserve"><value>Cerrados recientemente</value></data>
+  <data name="ClosedWindowLabelFormat" xml:space="preserve"><value>Ventana: {0}</value></data>
 </root>

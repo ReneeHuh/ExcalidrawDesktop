@@ -15,7 +15,7 @@
   <data name="RecentFilesMenu.Text" xml:space="preserve"><value>الأخيرة</value></data>
   <data name="SaveMenuItem.Text" xml:space="preserve"><value>حفظ</value></data>
   <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>حفظ باسم…</value></data>
-  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>حفظ الكل</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>حفظ كل الرسومات في هذه النافذة</value></data>
   <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>تصدير الرسم بالكامل بصيغة PNG…</value></data>
   <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>إغلاق علامة التبويب</value></data>
   <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>إغلاق النافذة</value></data>
@@ -39,7 +39,7 @@
   <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>أعد تشغيل Excalidraw Desktop لتطبيق اللغة. لن تُغلق الرسومات غير المحفوظة تلقائيًا.</value></data>
   <data name="StartupSection.Text" xml:space="preserve"><value>بدء التشغيل</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>إعادة فتح علامات تبويب الرسومات المحفوظة</value></data>
-  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>استعادة علامات التبويب المحفوظة من الجلسة السابقة. يتم دائمًا الاحتفاظ ببيانات الاسترداد غير المحفوظة.</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>استعادة علامات التبويب المحفوظة بعد انقطاع الجلسة. يحافظ الخروج وإغلاق آخر نافذة دائمًا على مساحة العمل كاملة.</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>حفظ الرسومات المعدّلة تلقائيًا عند الإغلاق</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>يحفظ الرسومات المعدّلة عند إغلاق علامة تبويب أو نافذة أو إنهاء التطبيق. تظل الرسومات بلا عنوان تطلب مكان الحفظ، ويؤدي الإلغاء إلى إبقاء النافذة مفتوحة.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>الأداء</value></data>
@@ -203,4 +203,14 @@
   <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>إصدار الملف غير معروف</value></data>
   <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — الملف غير متاح</value></data>
   <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — إصدار الملف غير معروف</value></data>
+  <data name="ReopenClosedMenuItem.Text" xml:space="preserve"><value>إعادة فتح علامة التبويب أو النافذة المغلقة</value></data>
+  <data name="DraftRecoverySettingsCard.Header" xml:space="preserve"><value>الاحتفاظ بالرسومات غير المحفوظة لإعادة فتحها</value></data>
+  <data name="DraftRecoverySettingsCard.Description" xml:space="preserve"><value>يحتفظ إغلاق علامات التبويب والنوافذ والخروج بمسودات محلية. يعيد Ctrl+Shift+T فتح الرسومات المغلقة. تؤدي عملية الحفظ إلى الكتابة في ملف الرسم.</value></data>
+  <data name="DraftCheckpointFailed" xml:space="preserve"><value>تعذر حفظ المسودة أو مساحة العمل. ما زالت الرسومات مفتوحة. تحقق من مساحة القرص وإمكانية الوصول إلى مجلد البيانات ثم أعد المحاولة.</value></data>
+  <data name="ReopenFailedTitle" xml:space="preserve"><value>تعذرت إعادة فتح الرسم</value></data>
+  <data name="ReopenFailedContent" xml:space="preserve"><value>تعذر فتح رسم أو مسودة استرداد. ما زال العنصر في السجل. تحقق من توفر الملف ثم أعد المحاولة.</value></data>
+  <data name="ReopenAlreadyOpenTitle" xml:space="preserve"><value>الرسم مفتوح بالفعل</value></data>
+  <data name="ReopenAlreadyOpenContent" xml:space="preserve"><value>تم تحديد الرسومات المفتوحة في نوافذها الحالية. تبقى المسودات المنفصلة غير المحفوظة في السجل؛ أغلق الرسم الحالي قبل إعادة فتح مسودته.</value></data>
+  <data name="RecentlyClosedMenu.Text" xml:space="preserve"><value>المغلقة مؤخرًا</value></data>
+  <data name="ClosedWindowLabelFormat" xml:space="preserve"><value>نافذة: {0}</value></data>
 </root>

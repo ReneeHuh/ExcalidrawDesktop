@@ -15,7 +15,7 @@
   <data name="RecentFilesMenu.Text" xml:space="preserve"><value>Recentes</value></data>
   <data name="SaveMenuItem.Text" xml:space="preserve"><value>Salvar</value></data>
   <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>Salvar como…</value></data>
-  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Salvar tudo</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Salvar tudo nesta janela</value></data>
   <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>Exportar desenho inteiro como PNG…</value></data>
   <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>Fechar guia</value></data>
   <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>Fechar janela</value></data>
@@ -39,7 +39,7 @@
   <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>Reinicie o Excalidraw Desktop para aplicar o idioma. Desenhos não salvos não serão fechados automaticamente.</value></data>
   <data name="StartupSection.Text" xml:space="preserve"><value>Inicialização</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Reabrir guias de desenhos salvos</value></data>
-  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaura as guias salvas da sessão anterior. A recuperação não salva sempre é preservada.</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaura abas salvas após uma interrupção. Sair e fechar a última janela sempre preservam toda a área de trabalho.</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Salvar automaticamente desenhos alterados ao fechar</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Salva desenhos alterados ao fechar uma guia ou janela, ou ao sair. Desenhos sem título ainda perguntam onde salvar, e cancelar mantém a janela aberta.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Desempenho</value></data>
@@ -203,4 +203,14 @@
   <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>versão do arquivo desconhecida</value></data>
   <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — Arquivo indisponível</value></data>
   <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — Versão do arquivo desconhecida</value></data>
+  <data name="ReopenClosedMenuItem.Text" xml:space="preserve"><value>Reabrir aba ou janela fechada</value></data>
+  <data name="DraftRecoverySettingsCard.Header" xml:space="preserve"><value>Manter desenhos não salvos para reabrir</value></data>
+  <data name="DraftRecoverySettingsCard.Description" xml:space="preserve"><value>Fechar abas, janelas ou sair mantém rascunhos locais. Ctrl+Shift+T reabre desenhos fechados. Salvar grava no arquivo do desenho.</value></data>
+  <data name="DraftCheckpointFailed" xml:space="preserve"><value>Não foi possível salvar o rascunho ou a área de trabalho. Os desenhos continuam abertos. Verifique o espaço em disco e o acesso à pasta de dados e tente novamente.</value></data>
+  <data name="ReopenFailedTitle" xml:space="preserve"><value>Não foi possível reabrir o desenho</value></data>
+  <data name="ReopenFailedContent" xml:space="preserve"><value>Não foi possível abrir um desenho ou rascunho. O item continua no histórico. Verifique se o arquivo está disponível e tente novamente.</value></data>
+  <data name="ReopenAlreadyOpenTitle" xml:space="preserve"><value>Desenho já aberto</value></data>
+  <data name="ReopenAlreadyOpenContent" xml:space="preserve"><value>Desenhos já abertos foram selecionados nas suas janelas. Rascunhos separados continuam no histórico; feche o desenho antes de reabrir seu rascunho.</value></data>
+  <data name="RecentlyClosedMenu.Text" xml:space="preserve"><value>Fechados recentemente</value></data>
+  <data name="ClosedWindowLabelFormat" xml:space="preserve"><value>Janela: {0}</value></data>
 </root>

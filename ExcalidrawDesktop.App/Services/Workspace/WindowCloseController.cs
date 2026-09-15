@@ -1,33 +1,26 @@
 using ExcalidrawDesktop.App.Services.Logging;
-using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Editor;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
 using ExcalidrawDesktop.App.Models;
 using ExcalidrawDesktop.Core;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 
 namespace ExcalidrawDesktop.App.Services.Workspace;
 
 internal interface IWindowCloseHost
 {
-    bool SaveDirtyDrawingsOnClose { get; }
     Task<bool> YieldToDispatcherAsync();
     void CloseSession(DocumentSession session);
     void UpdateTabHeader(DocumentSession session);
     Task ShowImageExportErrorAsync(string message);
-    Task PersistWorkspaceAsync();
-    Task PruneRecoverySnapshotsAsync();
-    void RecordWindowDiscarded();
-    void ReleasePreservedRecovery(string recoveryId);
+    Task<bool> CommitTabCloseAsync(DocumentSession session);
     WindowModalCoordinator Modals { get; }
     Task<bool> EnterCloseBarrierAsync(IReadOnlyList<DocumentSession> targets, bool closingWindow);
     void ExitCloseBarrier(IEnumerable<DocumentSession> targets);
 }
 
-/// <summary>Coordinates save, discard, and cancellation for tab and window closing.</summary>
+/// <summary>Coordinates frozen draft checkpoints for closing and explicit Save All.</summary>
 internal sealed class WindowCloseController
 {
     private readonly IWindowCloseHost host;
@@ -176,44 +169,7 @@ internal sealed class WindowCloseController
             return false;
         }
 
-        if (!session.IsDirty)
-        {
-            host.CloseSession(session);
-            return true;
-        }
-
-        session.ClosePromptOpen = true;
-        documentTabs.SelectedItem = session.TabItem;
-        try
-        {
-            var canAutoSave = host.SaveDirtyDrawingsOnClose &&
-                EditorSessionController.CanRequestSave(session);
-            var decision = canAutoSave
-                ? CloseDecision.Save
-                : await session.DocumentService.PromptToSaveBeforeCloseAsync();
-            if (decision == CloseDecision.Discard)
-            {
-                host.CloseSession(session);
-                return true;
-            }
-
-            if (decision == CloseDecision.Save && EditorSessionController.CanRequestSave(session))
-            {
-                return await RequestCloseSaveAsync(session, closeTab: true);
-            }
-
-            return false;
-        }
-        catch (Exception exception)
-        {
-            AppLogger.Error($"[WindowCloseController] RequestCloseSessionCoreAsync failed (SessionId={session.RecoveryId})", exception);
-            OnCloseCancelled(session);
-            return false;
-        }
-        finally
-        {
-            session.ClosePromptOpen = false;
-        }
+        return await host.CommitTabCloseAsync(session);
     }
 
     public async Task<bool> ResolveWindowCloseAsync()
@@ -224,7 +180,7 @@ internal sealed class WindowCloseController
         try
         {
             approved = await host.EnterCloseBarrierAsync(targets, closingWindow: true) &&
-                await ResolveWindowCloseCoreAsync();
+                CanCommitClose(targets);
             return approved;
         }
         finally
@@ -236,148 +192,13 @@ internal sealed class WindowCloseController
         }
     }
 
-    private Task<bool> PersistCloseDecisionAsync()
-    {
-        var versions = sessions.Select(session => (Session: session, Version: session.DocumentStateVersion,
-            LoadId: session.PendingDocumentLoad?.LoadId)).ToArray();
-        return CloseCommitBarrier.CompleteAsync(
-            () => sessions.Count == versions.Length && versions.All(item =>
-                sessions.Contains(item.Session) && item.Session.CloseBarrierId is not null &&
-                item.Session.PendingDocumentLoad?.LoadId == item.LoadId &&
-                item.Session.DocumentStateVersion == item.Version && !item.Session.IsDirty &&
-                (!item.Session.HasUnsavedLibrary || item.Session.DiscardLibraryOnClose) &&
-                !item.Session.DocumentService.IsSaving && !item.Session.IsExporting),
-            host.PersistWorkspaceAsync,
-            host.PruneRecoverySnapshotsAsync);
-    }
-
-    private async Task<bool> ResolveWindowCloseCoreAsync()
-    {
-        if (sessions.Any(session => session.IsExporting))
-        {
-            await host.ShowImageExportErrorAsync(
-                DesktopResources.Get(
-                    "WaitForWindowExports",
-                    "Wait for PNG exports to finish before closing this window."));
-            return false;
-        }
-
-        var dirtySessions = sessions.Where(session => session.IsDirty).ToList();
-        if (dirtySessions.Count == 0)
-        {
-            return await PersistCloseDecisionAsync();
-        }
-
-        if (host.SaveDirtyDrawingsOnClose &&
-            dirtySessions.All(EditorSessionController.CanRequestSave))
-        {
-            if (!await SaveAllForWindowCloseAsync(dirtySessions))
-            {
-                return false;
-            }
-            return await PersistCloseDecisionAsync();
-        }
-
-        var names = string.Join(
-            Environment.NewLine,
-            dirtySessions.Select(session => $"• {session.DisplayName}"));
-        var reviewRequested = false;
-        var reviewButton = new Button
-        {
-            Content = DesktopResources.Get(
-                "ReviewTabsButton",
-                "Review tabs individually"),
-            HorizontalAlignment = HorizontalAlignment.Left,
-        };
-        AutomationProperties.SetAutomationId(reviewButton, "ReviewTabsButton");
-        AutomationProperties.SetName(
-            reviewButton,
-            DesktopResources.Get(
-                "ReviewTabsAutomationName",
-                "Review unsaved tabs individually"));
-        var content = new StackPanel { Spacing = 16 };
-        content.Children.Add(new TextBlock
-        {
-            Text = DesktopResources.Format(
-                "UnsavedDrawingsCountFormat",
-                "{0} drawing(s) have unsaved changes:\n\n{1}",
-                dirtySessions.Count,
-                names),
-            TextWrapping = TextWrapping.Wrap,
-        });
-        content.Children.Add(reviewButton);
-        var dialog = new ContentDialog
-        {
-            XamlRoot = documentTabs.XamlRoot,
-            Title = DesktopResources.Get("UnsavedDrawingsTitle", "Unsaved drawings"),
-            Content = content,
-            PrimaryButtonText = DesktopResources.Get("SaveAllButton", "Save all"),
-            SecondaryButtonText = DesktopResources.Get(
-                "DiscardAllButton",
-                "Discard all"),
-            CloseButtonText = DesktopResources.Get("CancelButton", "Cancel"),
-            DefaultButton = ContentDialogButton.Close,
-        };
-        reviewButton.Click += (_, _) =>
-        {
-            reviewRequested = true;
-            dialog.Hide();
-        };
-
-        var result = await host.Modals.RunAsync(async () => await dialog.ShowAsync());
-        if (reviewRequested)
-        {
-            documentTabs.SelectedItem = dirtySessions[0].TabItem;
-            return false;
-        }
-        if (result == ContentDialogResult.Primary)
-        {
-            if (!await SaveAllForWindowCloseAsync(dirtySessions))
-            {
-                return false;
-            }
-            return await PersistCloseDecisionAsync();
-        }
-        if (result != ContentDialogResult.Secondary)
-        {
-            return false;
-        }
-
-        var discardedSessions = dirtySessions
-            .Where(session => sessions.Contains(session) && session.IsDirty)
-            .ToArray();
-        foreach (var discardedSession in discardedSessions)
-        {
-#if DEBUG
-            discardedSession.ForceDirtyForSmoke = false;
-#endif
-            discardedSession.IsDirty = false;
-            host.ReleasePreservedRecovery(discardedSession.RecoveryId);
-        }
-        host.RecordWindowDiscarded();
-        try
-        {
-            if (await PersistCloseDecisionAsync())
-            {
-                return true;
-            }
-            foreach (var discardedSession in discardedSessions)
-            {
-                discardedSession.IsDirty = true;
-                host.UpdateTabHeader(discardedSession);
-            }
-            return false;
-        }
-        catch
-        {
-            foreach (var discardedSession in discardedSessions)
-            {
-                discardedSession.IsDirty = true;
-                host.UpdateTabHeader(discardedSession);
-            }
-            throw;
-        }
-    }
+    public static bool CanCommitClose(IEnumerable<DocumentSession> targets) =>
+        targets.All(session => session.CloseBarrierId is not null &&
+            session.CloseCheckpointVersion == session.DocumentStateVersion &&
+            session.PendingDocumentLoad is null && session.LastLifecycleFailure is null &&
+            (!session.HasUnsavedLibrary || session.DiscardLibraryOnClose) &&
+            !session.DocumentService.IsSaving && !session.IsExporting &&
+            (!session.IsDirty || (!session.RecoveryFailed && session.RecoveryUpdatedAt is not null)));
 
     public async Task<bool> SaveAllForWindowCloseAsync(
         IEnumerable<DocumentSession> dirtySessions)

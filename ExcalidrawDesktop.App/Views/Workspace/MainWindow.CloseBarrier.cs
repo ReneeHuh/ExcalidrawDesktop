@@ -13,7 +13,7 @@ namespace ExcalidrawDesktop.App;
 public sealed partial class MainWindow
 {
     private bool CommandsBlocked => resourcesDisposed || windowClosePromptOpen ||
-        workspaceCoordinator.IsExiting || sessions.Any(session => session.CloseBarrierId is not null);
+        workspaceCoordinator.IsBusy || sessions.Any(session => session.CloseBarrierId is not null);
 
     private async Task<bool> EnterCloseBarrierAsync(IReadOnlyList<DocumentSession> targets, bool closingWindow)
     {
@@ -34,6 +34,7 @@ public sealed partial class MainWindow
         foreach (var session in targets)
         {
             session.CloseBarrierId = Guid.NewGuid();
+            session.CloseCheckpointVersion = null;
             session.DiscardLibraryOnClose = false;
             session.CloseBarrierCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             if (session.Content.HasEditor)
@@ -48,8 +49,10 @@ public sealed partial class MainWindow
             {
                 // A never-mounted clean tab has no editable scene to freeze. Dirty
                 // recovery tabs are initialized so close-save can capture their scene.
-                if (!session.IsReady && !session.IsInitializing && !session.IsDirty)
+                if (!session.IsReady && !session.IsInitializing && !session.IsDirty &&
+                    session.LastLifecycleFailure is null && session.PendingDocumentLoad is null)
                 {
+                    session.CloseCheckpointVersion = session.DocumentStateVersion;
                     continue;
                 }
                 if (session.IsSuspended)
@@ -75,10 +78,8 @@ public sealed partial class MainWindow
                 }
                 if (session.LastLifecycleFailure is not null)
                 {
-                    // A failed page cannot acknowledge. Stop its callbacks before
-                    // presenting the existing save/discard/cancel recovery decision.
-                    EditorSessionController.DetachWebView(session);
-                    continue;
+                    await ShowCloseWaitMessageAsync();
+                    return false;
                 }
 
                 session.Content.IsEnabled = false;
@@ -88,11 +89,6 @@ public sealed partial class MainWindow
                     !await CloseSaveWait.UntilAsync(session.CloseBarrierCompletion!.Task,
                         TimeSpan.FromSeconds(30), () => session.DocumentService.IsSavePickerOpen))
                 {
-                    if (session.LastLifecycleFailure is not null)
-                    {
-                        EditorSessionController.DetachWebView(session);
-                        continue;
-                    }
                     await ShowCloseWaitMessageAsync();
                     return false;
                 }
@@ -109,7 +105,7 @@ public sealed partial class MainWindow
                     CloseButtonText = DesktopResources.Get("CancelButton", "Cancel"),
                     DefaultButton = ContentDialogButton.Close,
                 };
-                if (await WindowModalCoordinator.For(this).RunAsync(async () => await dialog.ShowAsync()) != ContentDialogResult.Primary)
+                if (await WindowModalCoordinator.For(this).RunDialogAsync(dialog) != ContentDialogResult.Primary)
                     return false;
                 foreach (var session in unsavedLibraries) session.DiscardLibraryOnClose = true;
             }
@@ -137,6 +133,7 @@ public sealed partial class MainWindow
             session.TryPostEditorMessage(BridgeEventJson.Create(
                 "document.closeBarrierRequested", new { barrierId, locked = false }));
             session.CloseBarrierId = null;
+            session.CloseCheckpointVersion = null;
             session.DiscardLibraryOnClose = false;
             session.CloseBarrierCompletion?.TrySetResult(false);
             session.CloseBarrierCompletion = null;

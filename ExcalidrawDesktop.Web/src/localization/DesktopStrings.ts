@@ -14,6 +14,8 @@ export type SupportedLanguageCode = (typeof supportedLanguageCodes)[number];
 export type DesktopStringKey =
   | "editorLabel"
   | "newTab"
+  | "newWindow"
+  | "reopenClosed"
   | "open"
   | "save"
   | "saveAs"
@@ -44,6 +46,8 @@ const en: Record<DesktopStringKey, string> = {
   documentBusy: "Wait for the current drawing operation to finish, or cancel closing.",
   editorLabel: "Excalidraw Desktop editor",
   newTab: "New Tab",
+  newWindow: "New window",
+  reopenClosed: "Reopen closed tab or window",
   open: "Open…",
   save: "Save",
   saveAs: "Save As…",
@@ -79,6 +83,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
   documentBusy: "Espera a que termine la operación actual del dibujo o cancela el cierre.",
     editorLabel: "Editor de Excalidraw Desktop",
     newTab: "Nueva pestaña",
+  newWindow: "Nueva ventana",
+  reopenClosed: "Reabrir pestaña o ventana cerrada",
     open: "Abrir…",
     save: "Guardar",
     saveAs: "Guardar como…",
@@ -103,6 +109,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
   documentBusy: "Attendez la fin de l’opération en cours ou annulez la fermeture.",
     editorLabel: "Éditeur Excalidraw Desktop",
     newTab: "Nouvel onglet",
+  newWindow: "Nouvelle fenêtre",
+  reopenClosed: "Rouvrir l’onglet ou la fenêtre fermée",
     open: "Ouvrir…",
     save: "Enregistrer",
     saveAs: "Enregistrer sous…",
@@ -127,6 +135,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
   documentBusy: "Warte auf den Abschluss des aktuellen Vorgangs oder brich das Schließen ab.",
     editorLabel: "Excalidraw-Desktop-Editor",
     newTab: "Neuer Tab",
+  newWindow: "Neues Fenster",
+  reopenClosed: "Geschlossenen Tab oder Fenster wieder öffnen",
     open: "Öffnen…",
     save: "Speichern",
     saveAs: "Speichern unter…",
@@ -151,6 +161,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
   documentBusy: "Aguarde a operação atual terminar ou cancele o fechamento.",
     editorLabel: "Editor do Excalidraw Desktop",
     newTab: "Nova guia",
+  newWindow: "Nova janela",
+  reopenClosed: "Reabrir aba ou janela fechada",
     open: "Abrir…",
     save: "Salvar",
     saveAs: "Salvar como…",
@@ -175,6 +187,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
   documentBusy: "現在の処理が完了するまで待つか、閉じる操作をキャンセルしてください。",
     editorLabel: "Excalidraw Desktop エディター",
     newTab: "新しいタブ",
+  newWindow: "新しいウィンドウ",
+  reopenClosed: "閉じたタブまたはウィンドウを開く",
     open: "開く…",
     save: "保存",
     saveAs: "名前を付けて保存…",
@@ -199,6 +213,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
   documentBusy: "请等待当前绘图操作完成，或取消关闭。",
     editorLabel: "Excalidraw Desktop 编辑器",
     newTab: "新建标签页",
+  newWindow: "新窗口",
+  reopenClosed: "重新打开已关闭的标签页或窗口",
     open: "打开…",
     save: "保存",
     saveAs: "另存为…",
@@ -223,6 +239,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
   documentBusy: "انتظر انتهاء العملية الحالية على الرسم أو ألغِ الإغلاق.",
     editorLabel: "محرر Excalidraw Desktop",
     newTab: "علامة تبويب جديدة",
+  newWindow: "نافذة جديدة",
+  reopenClosed: "إعادة فتح علامة التبويب أو النافذة المغلقة",
     open: "فتح…",
     save: "حفظ",
     saveAs: "حفظ باسم…",

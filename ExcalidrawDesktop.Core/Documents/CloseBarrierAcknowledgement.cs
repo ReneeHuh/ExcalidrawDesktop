@@ -4,6 +4,7 @@ namespace ExcalidrawDesktop.Core;
 
 public sealed record CloseBarrierAcknowledgement(Guid BarrierId, bool IsDirty, bool HasUnsavedLibrary)
 {
+    public string? Content { get; init; }
     public static CloseBarrierAcknowledgement? Read(JsonElement? payload)
     {
         if (payload is not { ValueKind: JsonValueKind.Object } value ||
@@ -13,6 +14,10 @@ public sealed record CloseBarrierAcknowledgement(Guid BarrierId, bool IsDirty, b
             dirty.ValueKind is not (JsonValueKind.True or JsonValueKind.False) ||
             !value.TryGetProperty("canClose", out var canClose) ||
             canClose.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return null;
-        return new(barrierId, dirty.GetBoolean(), !canClose.GetBoolean());
+        return new(barrierId, dirty.GetBoolean(), !canClose.GetBoolean())
+        {
+            Content = value.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String
+                ? content.GetString() : null,
+        };
     }
 }

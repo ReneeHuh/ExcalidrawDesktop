@@ -15,7 +15,7 @@
   <data name="RecentFilesMenu.Text" xml:space="preserve"><value>最近使った項目</value></data>
   <data name="SaveMenuItem.Text" xml:space="preserve"><value>保存</value></data>
   <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>名前を付けて保存…</value></data>
-  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>すべて保存</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>このウィンドウのすべてを保存</value></data>
   <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>図面全体を PNG としてエクスポート…</value></data>
   <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>タブを閉じる</value></data>
   <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>ウィンドウを閉じる</value></data>
@@ -39,7 +39,7 @@
   <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>言語を適用するには Excalidraw Desktop を再起動してください。未保存の図面が自動的に閉じられることはありません。</value></data>
   <data name="StartupSection.Text" xml:space="preserve"><value>起動</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>保存済み図面のタブを再度開く</value></data>
-  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>前回のセッションから保存済みタブを復元します。未保存の復旧データは常に保持されます。</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>中断したセッションの保存済みタブを復元します。終了時と最後のウィンドウを閉じるときは、常にワークスペース全体を保持します。</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>終了時に変更済みの図面を自動保存</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>タブやウィンドウを閉じるか終了するときに変更済みの図面を保存します。無題の図面では保存先を確認し、キャンセルするとウィンドウを開いたままにします。</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>パフォーマンス</value></data>
@@ -203,4 +203,14 @@
   <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>ファイルのバージョンが不明</value></data>
   <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — ファイルを利用できません</value></data>
   <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — ファイルのバージョンが不明</value></data>
+  <data name="ReopenClosedMenuItem.Text" xml:space="preserve"><value>閉じたタブまたはウィンドウを開く</value></data>
+  <data name="DraftRecoverySettingsCard.Header" xml:space="preserve"><value>未保存の図を再度開けるように保持</value></data>
+  <data name="DraftRecoverySettingsCard.Description" xml:space="preserve"><value>タブやウィンドウを閉じるときや終了時に、ローカルの下書きを保持します。Ctrl+Shift+Tで再度開けます。保存操作で図のファイルに書き込みます。</value></data>
+  <data name="DraftCheckpointFailed" xml:space="preserve"><value>下書きまたはワークスペースを保存できませんでした。図は開いたままです。空き容量とデータフォルダーへのアクセスを確認して、再試行してください。</value></data>
+  <data name="ReopenFailedTitle" xml:space="preserve"><value>図を再度開けませんでした</value></data>
+  <data name="ReopenFailedContent" xml:space="preserve"><value>図または下書きを開けませんでした。履歴には残っています。ファイルが利用可能か確認して、再試行してください。</value></data>
+  <data name="ReopenAlreadyOpenTitle" xml:space="preserve"><value>図は既に開いています</value></data>
+  <data name="ReopenAlreadyOpenContent" xml:space="preserve"><value>既に開いている図を元のウィンドウで選択しました。別の未保存の下書きは履歴に残っています。下書きを開くには、既存の図を閉じてください。</value></data>
+  <data name="RecentlyClosedMenu.Text" xml:space="preserve"><value>最近閉じた項目</value></data>
+  <data name="ClosedWindowLabelFormat" xml:space="preserve"><value>ウィンドウ: {0}</value></data>
 </root>

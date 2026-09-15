@@ -61,6 +61,7 @@ export type BridgeRequestMap = {
 export type BridgeRequestMethod = keyof BridgeRequestMap;
 
 export type BridgeEventMap = {
+  "workspace.commandRequested": { command: import("../workspace/DesktopShortcuts").DesktopCommand };
   "document.cancelSave": { requestId: string };
   "app.ready": undefined;
   "app.languageApplied": {

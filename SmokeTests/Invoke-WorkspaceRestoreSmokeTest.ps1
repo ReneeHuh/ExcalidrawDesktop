@@ -76,7 +76,7 @@ try {
         if (-not $workspaceRestored -and
             $startedProcess.MainWindowTitle -eq $expectedTitle) {
             $restoredState = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
-            if ($restoredState.Version -eq 3 -and
+            if ($restoredState.Version -eq 4 -and
                 $restoredState.Windows.Count -eq 1 -and
                 $restoredState.Windows[0].Tabs.Count -eq 2 -and
                 $restoredState.RecentFiles.Count -eq 2 -and

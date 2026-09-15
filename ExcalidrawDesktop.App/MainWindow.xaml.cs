@@ -90,7 +90,13 @@ public sealed partial class MainWindow : Window
             smoke.RequiresEditorSmokeApi,
             workspaceCoordinator.RecoverySnapshotStore);
         editorSessions.StateChanged += OnEditorStateChanged;
+        FileMenu.PointerEntered += (_, _) => RefreshClosedItemsMenu();
+        FileMenu.GotFocus += (_, args) =>
+        {
+            if (ReferenceEquals(args.OriginalSource, FileMenu)) RefreshClosedItemsMenu();
+        };
         editorSessions.CommandsBlocked = () => CommandsBlocked;
+        editorSessions.WorkspaceCommandRequested = DispatchWorkspaceCommand;
         editorSessions.LibraryRequest = HandleLibraryRequestAsync;
         workspaceCoordinator.LibraryChanged += OnSharedLibraryChanged;
         editorSessions.Ready += OnAppReady;
@@ -101,6 +107,8 @@ public sealed partial class MainWindow : Window
             if (ReferenceEquals(session, ActiveSession)) Title = ViewModel.WindowTitle = title;
         };
         editorSessions.CloseBarrierReady += OnDirtyChanged;
+        editorSessions.WriteCloseCheckpointAsync = (session, content) =>
+            documents.OnRecoverySnapshotReceivedAsync(session, content, closing: true);
         editorSessions.DocumentLoadApplied += OnDocumentLoadApplied;
         documents.DocumentLoadTimedOut += session => editorSessions.HandleLoadFailure(session);
         editorSessions.EditorRecreated += ConfigureEditorDropTarget;
@@ -196,6 +204,7 @@ public sealed partial class MainWindow : Window
         await workspaceCoordinator.NotifyWindowReadyAsync(this);
 #if DEBUG
         TryRunMultiWindowExitSmoke();
+        if (smoke.VerifyCloseReopenSmoke) _ = RunCloseReopenRestoreSmokeAsync();
 #endif
         if (ActiveSession is { } session)
         {
@@ -436,55 +445,40 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    internal async Task<bool> RequestCloseAsync()
-    {
-        if (resourcesDisposed)
-        {
-            return true;
-        }
-        if (windowClosePromptOpen)
-        {
-            return false;
-        }
+    internal Task<bool> RequestCloseAsync() => workspaceCoordinator.RequestWindowCloseAsync(this);
 
+    internal async Task<bool> PrepareCloseAsync()
+    {
+        if (resourcesDisposed || windowClosePromptOpen) return false;
         windowClosePromptOpen = true;
         try
         {
-            if (!await windowClose.ResolveWindowCloseAsync())
-            {
-                return false;
-            }
-
-            allowClose = true;
-            var completion = new TaskCompletionSource(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-            void ClosedHandler(object sender, WindowEventArgs args) =>
-                completion.TrySetResult();
-            Closed += ClosedHandler;
-            try
-            {
-                Close();
-                await completion.Task;
-            }
-            finally
-            {
-                Closed -= ClosedHandler;
-            }
-            return true;
+            if (await windowClose.ResolveWindowCloseAsync()) return true;
         }
         catch (Exception exception)
         {
-            AppLogger.Error($"[MainWindow] Window close failed (WindowCount={workspaceCoordinator.Windows.Count}, " +
-                $"TabCount={sessions.Count}, " +
-                $"DirtyTabCount={sessions.Count(session => session.IsDirty)})", exception);
-            return false;
+            AppLogger.Error("[MainWindow] Close preparation failed", exception);
         }
-        finally
-        {
-            windowClosePromptOpen = false;
-            if (!resourcesDisposed) ExitCloseBarrier(sessions);
-        }
+        CancelPreparedClose();
+        return false;
     }
+
+    internal bool CanCommitPreparedClose => !resourcesDisposed &&
+        WindowCloseController.CanCommitClose(sessions);
+
+    internal void CancelPreparedClose()
+    {
+        windowClosePromptOpen = false;
+        if (!resourcesDisposed) ExitCloseBarrier(sessions);
+    }
+
+    internal void CommitPreparedClose()
+    {
+        allowClose = true;
+        Close();
+    }
+
+    internal void CommitPreparedTabClose(DocumentSession session) => CloseSession(session, discardRecovery: false);
 
     private Task<bool> YieldToDispatcherAsync()
     {
@@ -511,24 +505,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        windowClosePromptOpen = true;
-        try
-        {
-            if (await windowClose.ResolveWindowCloseAsync())
-            {
-                allowClose = true;
-                Close();
-            }
-        }
-        catch (Exception exception)
-        {
-            AppLogger.Error("[MainWindow] OnAppWindowClosing failed", exception);
-        }
-        finally
-        {
-            windowClosePromptOpen = false;
-            if (!resourcesDisposed) ExitCloseBarrier(sessions);
-        }
+        await RequestCloseAsync();
     }
 
     private DocumentSession? ActiveSession =>

@@ -96,6 +96,20 @@ describe("mounted editor and native bridge orchestration", () => {
     vi.clearAllTimers(); vi.useRealTimers();
   });
 
+  it("forwards one workspace command from canvas or text input, ignoring repeat", async () => {
+    const ownerWindow = host.ownerDocument.defaultView!;
+    const input = host.ownerDocument.createElement("textarea");
+    host.append(input); input.focus();
+    for (const target of [host, input]) {
+      await act(async () => target.dispatchEvent(new ownerWindow.KeyboardEvent("keydown",
+        { key: "T", ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })));
+      await act(async () => target.dispatchEvent(new ownerWindow.KeyboardEvent("keydown",
+        { key: "T", ctrlKey: true, shiftKey: true, repeat: true, bubbles: true })));
+    }
+    expect(events("workspace.commandRequested").map(message => message.payload))
+      .toEqual([{ command: "reopenClosed" }, { command: "reopenClosed" }]);
+  });
+
   it("keeps newer edits dirty when an older save finishes", async () => {
     await edit("revision-a");
     await emit("document.saveRequested", { reason: "save" });
@@ -143,7 +157,7 @@ describe("mounted editor and native bridge orchestration", () => {
     await emit("document.closeBarrierRequested", { barrierId, locked: true });
     await advance(0);
     expect(host.querySelector(".excalidraw")?.getAttribute("data-readonly")).toBe("true");
-    expect(events("document.closeBarrierReady").at(-1)!.payload).toEqual({ barrierId, isDirty: true, canClose: true });
+    expect(events("document.closeBarrierReady").at(-1)!.payload).toEqual({ barrierId, isDirty: true, canClose: true, content: expect.stringContaining('"id":"dirty"') });
     await emit("document.closeBarrierRequested", { barrierId: id(), locked: false });
     expect(host.querySelector(".excalidraw")?.getAttribute("data-readonly")).toBe("true");
     await emit("document.saveRequested", { reason: "save" });

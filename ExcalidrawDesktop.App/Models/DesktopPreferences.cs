@@ -10,6 +10,7 @@ internal enum DesktopThemePreference
 internal sealed record DesktopPreferences(
     DesktopThemePreference Theme,
     bool ReopenSavedTabs,
+    // Retained for settings-file compatibility; closing now checkpoints drafts.
     bool SaveDirtyDrawingsOnClose,
     bool SuspendInactiveTabs,
     bool UnloadInactiveTabs,

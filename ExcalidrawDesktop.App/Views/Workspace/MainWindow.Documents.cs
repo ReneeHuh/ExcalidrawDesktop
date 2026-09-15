@@ -77,7 +77,7 @@ public sealed partial class MainWindow
             var restoredSessions = new List<DocumentSession>();
             foreach (var savedTab in state.Tabs)
             {
-                if (!desktopPreferences.ReopenSavedTabs && !savedTab.WasDirty)
+                if (!state.RestoreAllTabs && !desktopPreferences.ReopenSavedTabs && !savedTab.WasDirty)
                 {
                     continue;
                 }
@@ -128,7 +128,15 @@ public sealed partial class MainWindow
                     }
                     else
                     {
-                        if (path is null || !File.Exists(path))
+                        if (path is null)
+                        {
+                            target.RecoveryId = savedTab.RecoveryId ?? target.RecoveryId;
+                            target.DisplayName = savedTab.DisplayName ?? target.DisplayName;
+                            UpdateTabHeader(target);
+                            restoredSessions.Add(target);
+                            continue;
+                        }
+                        if (!File.Exists(path))
                         {
                             if (!ReferenceEquals(target, initialSession))
                             {
@@ -519,9 +527,6 @@ public sealed partial class MainWindow
             isMaximized,
             activeSession?.RecoveryId,
             GetOrderedSessions()
-                .Where(session =>
-                    session.DocumentService.DocumentPath is not null ||
-                    (!treatDirtyAsClean && session.IsDirty))
                 .Select(session => new WorkspaceTabState(
                     session.DocumentService.DocumentPath,
                     !treatDirtyAsClean && session.IsDirty,

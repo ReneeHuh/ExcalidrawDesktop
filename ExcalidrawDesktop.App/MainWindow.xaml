@@ -70,18 +70,28 @@
                             <MenuFlyoutItem
                                 x:Uid="NewTabMenuItem"
                                 Text="New tab"
-                                KeyboardAcceleratorTextOverride="Ctrl+N"
+                                KeyboardAcceleratorTextOverride="Ctrl+T"
                                 Click="OnFileNewTabClick" />
                             <MenuFlyoutItem
                                 x:Uid="NewWindowMenuItem"
                                 Text="New window"
-                                KeyboardAcceleratorTextOverride="Ctrl+Shift+N"
+                                KeyboardAcceleratorTextOverride="Ctrl+N"
                                 Click="OnFileNewWindowClick" />
                             <MenuFlyoutItem
                                 x:Uid="OpenMenuItem"
                                 Text="Open…"
                                 KeyboardAcceleratorTextOverride="Ctrl+O"
                                 Click="OnFileOpenClick" />
+                            <MenuFlyoutItem
+                                x:Name="ReopenClosedMenuItem"
+                                x:Uid="ReopenClosedMenuItem"
+                                Text="Reopen closed tab or window"
+                                KeyboardAcceleratorTextOverride="Ctrl+Shift+T"
+                                Click="OnReopenClosedClick" />
+                            <MenuFlyoutSubItem
+                                x:Name="RecentlyClosedMenu"
+                                x:Uid="RecentlyClosedMenu"
+                                Text="Recently closed" />
                             <MenuFlyoutSubItem
                                 x:Name="RecentFilesMenu"
                                 x:Uid="RecentFilesMenu"
@@ -105,7 +115,7 @@
                                 x:Name="SaveAllMenuItem"
                                 IsEnabled="{Binding CanSaveAll, Mode=OneWay}"
                                 x:Uid="SaveAllMenuItem"
-                                Text="Save all"
+                                Text="Save all in this window"
                                 KeyboardAcceleratorTextOverride="Ctrl+Alt+S"
                                 Click="OnFileSaveAllClick" />
                             <MenuFlyoutItem
@@ -158,11 +168,11 @@
                     <KeyboardAccelerator
                         Key="N"
                         Modifiers="Control"
-                        Invoked="OnNewTabAcceleratorInvoked" />
-                    <KeyboardAccelerator
-                        Key="N"
-                        Modifiers="Control,Shift"
                         Invoked="OnNewWindowAcceleratorInvoked" />
+                    <KeyboardAccelerator
+                        Key="T"
+                        Modifiers="Control,Shift"
+                        Invoked="OnReopenClosedAcceleratorInvoked" />
                     <KeyboardAccelerator
                         Key="W"
                         Modifiers="Control"
@@ -195,6 +205,15 @@
                         Key="Tab"
                         Modifiers="Control,Shift"
                         Invoked="OnPreviousTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number1" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number2" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number3" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number4" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number5" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number6" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number7" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number8" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
+                    <KeyboardAccelerator Key="Number9" Modifiers="Control" Invoked="OnSelectNumberedTabAcceleratorInvoked" />
                 </TabView.KeyboardAccelerators>
             </TabView>
 

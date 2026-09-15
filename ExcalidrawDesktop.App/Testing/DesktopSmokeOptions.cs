@@ -21,7 +21,8 @@ internal sealed record DesktopSmokeOptions(
     bool RunDocumentSafetySmoke = false,
     bool RunCloseDecisionsSmoke = false,
     bool RunLocalizationSmoke = false,
-    string? LocalizationSmokeLanguage = null)
+    string? LocalizationSmokeLanguage = null,
+    bool VerifyCloseReopenSmoke = false)
 {
     public static DesktopSmokeOptions None { get; } = new();
 

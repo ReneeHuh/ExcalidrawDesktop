@@ -7,7 +7,7 @@ using ExcalidrawDesktop.Core;
 
 namespace ExcalidrawDesktop.App.Services.Workspace;
 
-internal sealed class ApplicationWorkspaceCoordinator
+internal sealed partial class ApplicationWorkspaceCoordinator
 {
     internal enum SettingsPersistenceOutcome { AppliedAndPersisted, AppliedInMemoryOnly }
     internal sealed record SettingsPersistenceResult(SettingsPersistenceOutcome Outcome, Exception? Error = null);
@@ -20,13 +20,18 @@ internal sealed class ApplicationWorkspaceCoordinator
     private readonly MultiWindowWorkspaceStateStore workspaceStateStore;
     private readonly DesktopSettingsStore desktopSettingsStore = new();
     private readonly SemaphoreSlim persistenceGate = new(1, 1);
+    private readonly DesktopShortcutInput? shortcutInput = DesktopShortcutInput.TryStart();
+    public bool IsRepeatedShortcut(uint key) => shortcutInput?.IsRepeated(key) == true;
     private CancellationTokenSource? queuedPersistence;
     private MainWindow? mostRecentlyActiveWindow;
     private string? restoredLastActiveWindowId;
     private bool isExiting;
     private bool startupRecoveryPruned;
     public SettingsPersistenceResult? LastSettingsPersistenceResult { get; private set; }
-    private Dictionary<string, WorkspaceWindowState>? exitWorkspace;
+    private MultiWindowWorkspaceState? terminalWorkspace;
+    private bool transitionInProgress;
+    public bool IsBusy => isExiting || transitionInProgress;
+    public IReadOnlyList<ClosedWorkspaceItem> ClosedItems { get; private set; } = [];
 
     public ApplicationWorkspaceCoordinator(
         string? workspaceStatePath = null,
@@ -148,7 +153,8 @@ internal sealed class ApplicationWorkspaceCoordinator
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(10));
         RestoredWindows = state.Windows;
-        var referenced = state.Windows.SelectMany(w => w.Tabs)
+        ClosedItems = state.ClosedItems;
+        var referenced = state.Windows.Concat(state.ClosedItems.Select(item => item.Window)).SelectMany(w => w.Tabs)
             .Select(t => t.RecoveryId).OfType<string>()
             .Select(id => Guid.TryParseExact(id, "N", out var g) ? g.ToString("N") : null)
             .OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -286,6 +292,7 @@ internal sealed class ApplicationWorkspaceCoordinator
         windows.Remove(window);
         logicalWindowIds.Remove(window);
         restoreStates.Remove(window);
+        if (windows.Count == 0) shortcutInput?.Dispose();
         AppLogger.Info($"[ApplicationWorkspaceCoordinator] Window unregistered (WindowId={removedWindowId}, " +
             $"WindowCount={windows.Count}, " +
             $"Exiting={isExiting})");
@@ -314,15 +321,6 @@ internal sealed class ApplicationWorkspaceCoordinator
         QueuePersistWorkspace();
     }
 
-    public void RecordWindowDiscarded(MainWindow window)
-    {
-        if (exitWorkspace is not null && logicalWindowIds.TryGetValue(window, out var id))
-        {
-            var state = window.CaptureWorkspaceState(treatDirtyAsClean: true);
-            exitWorkspace[id] = state;
-        }
-    }
-
     public void QueuePersistWorkspace()
     {
         queuedPersistence?.Cancel();
@@ -347,51 +345,26 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
     }
 
-    public async Task PersistWorkspaceAsync(
-        MainWindow? treatDirtyAsCleanInWindow = null)
+    private MultiWindowWorkspaceState CaptureWorkspace(MainWindow? treatDirtyAsCleanInWindow = null)
     {
-        var liveSnapshots = windows.Select(window =>
-            CaptureWindowForPersistence(
-                window,
-                ReferenceEquals(window, treatDirtyAsCleanInWindow)))
-            .OfType<WorkspaceWindowState>()
-            .ToArray();
-        if (isExiting && exitWorkspace is not null)
-        {
-            foreach (var liveSnapshot in liveSnapshots)
-            {
-                exitWorkspace[liveSnapshot.Id] = liveSnapshot;
-            }
-        }
-        var snapshotWindows = isExiting && exitWorkspace is not null
-            ? exitWorkspace.Values.ToArray()
-            : liveSnapshots;
-        var lastActiveId = mostRecentlyActiveWindow is not null &&
-            logicalWindowIds.TryGetValue(mostRecentlyActiveWindow, out var id) &&
-            snapshotWindows.Any(window => string.Equals(
-                window.Id,
-                id,
-                StringComparison.OrdinalIgnoreCase))
-                ? id
-                : snapshotWindows.FirstOrDefault()?.Id;
-        var state = new MultiWindowWorkspaceState(
-            MultiWindowWorkspaceState.CurrentVersion,
-            RecentFiles.ToArray(),
-            lastActiveId,
-            snapshotWindows);
+        var snapshots = windows.Select(window => CaptureWindowForPersistence(window,
+            ReferenceEquals(window, treatDirtyAsCleanInWindow))).OfType<WorkspaceWindowState>().ToArray();
+        var active = mostRecentlyActiveWindow is not null
+            ? logicalWindowIds.GetValueOrDefault(mostRecentlyActiveWindow) : null;
+        return new(MultiWindowWorkspaceState.CurrentVersion, RecentFiles.ToArray(),
+            active ?? snapshots.FirstOrDefault()?.Id, snapshots) { ClosedItems = ClosedItems };
+    }
 
+    public async Task PersistWorkspaceAsync(MainWindow? treatDirtyAsCleanInWindow = null)
+    {
         await persistenceGate.WaitAsync();
         try
         {
-            await workspaceStateStore.SaveAsync(state);
-            AppLogger.Info($"[ApplicationWorkspaceCoordinator] Workspace persisted (WindowCount={snapshotWindows.Length}, " +
-                $"RecentFileCount={RecentFiles.Count}, " +
-                $"Exiting={isExiting})");
+            // Capture after acquiring the gate: a queued autosave must not put a
+            // just-closed window back into the active workspace.
+            await workspaceStateStore.SaveAsync(terminalWorkspace ?? CaptureWorkspace(treatDirtyAsCleanInWindow));
         }
-        finally
-        {
-            persistenceGate.Release();
-        }
+        finally { persistenceGate.Release(); }
     }
 
     private WorkspaceWindowState? CaptureWindowForPersistence(
@@ -416,12 +389,15 @@ internal sealed class ApplicationWorkspaceCoordinator
     }
 
     public Task PruneRecoverySnapshotsAsync(MainWindow? excludedWindow = null) =>
-        recoveryRetention.ShouldSkipPrune ? Task.CompletedTask :
+        (recoveryRetention.ShouldSkipPrune || IsBusy) ? Task.CompletedTask :
         RecoverySnapshotStore.PruneExceptAsync(() =>
             recoveryRetention.GetRetained(windows.Where(window => !ReferenceEquals(window, excludedWindow))
                 .SelectMany(window => window.OpenSessions)
                 .Where(session => session.IsDirty)
-                .Select(session => session.RecoveryId)));
+                .Select(session => session.RecoveryId)
+                .Concat(ClosedItems.SelectMany(item => item.Window.Tabs)
+                    .Where(tab => tab.WasDirty).Select(tab => tab.RecoveryId).OfType<string>())
+                .Concat(terminalWorkspace is null ? [] : WorkspaceCloseHistory.RecoveryIds(terminalWorkspace))));
 
     /// <summary>Releases an orphan only after a confirmed restore or explicit discard.</summary>
     public void ReleasePreservedRecovery(string recoveryId)
@@ -606,63 +582,4 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
     }
 
-    public async Task RequestExitAsync()
-    {
-        if (isExiting)
-        {
-            return;
-        }
-
-        isExiting = true;
-        AppLogger.Info($"[ApplicationWorkspaceCoordinator] Application exit requested (WindowCount={windows.Count}, " +
-            $"DirtyTabCount={windows.Sum(window => window.OpenSessions.Count(session => session.IsDirty))})");
-        queuedPersistence?.Cancel();
-        queuedPersistence?.Dispose();
-        queuedPersistence = null;
-        exitWorkspace = windows
-            .Select(window => CaptureWindowForPersistence(window))
-            .OfType<WorkspaceWindowState>()
-            .ToDictionary(window => window.Id, StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            await PersistWorkspaceAsync();
-            foreach (var window in windows.ToArray())
-            {
-                if (!windows.Contains(window))
-                {
-                    continue;
-                }
-
-                if (window.IsClosed)
-                {
-                    continue;
-                }
-
-                if (!await window.ActivateForExitAsync())
-                {
-                    // Windows may refuse to bring a window to the foreground
-                    // (foreground lock). Any dialog the close flow shows still
-                    // renders inside the window, so continue rather than abort.
-                    AppLogger.Warning($"[ApplicationWorkspaceCoordinator] Application exit activation skipped (WindowId={LogicalWindowIdOrNull(window)})");
-                }
-                if (!await window.RequestCloseAsync())
-                {
-                    AppLogger.Info($"[ApplicationWorkspaceCoordinator] Application exit cancelled by window (WindowId={LogicalWindowIdOrNull(window)})");
-                    return;
-                }
-            }
-            await PersistWorkspaceAsync();
-            AppLogger.Info("[ApplicationWorkspaceCoordinator] Application exit completed");
-            DesktopLogging.Flush();
-        }
-        finally
-        {
-            isExiting = false;
-            exitWorkspace = null;
-            if (windows.Count > 0)
-            {
-                QueuePersistWorkspace();
-            }
-        }
-    }
 }

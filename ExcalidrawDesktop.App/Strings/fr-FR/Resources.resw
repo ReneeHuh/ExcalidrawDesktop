@@ -15,7 +15,7 @@
   <data name="RecentFilesMenu.Text" xml:space="preserve"><value>Récents</value></data>
   <data name="SaveMenuItem.Text" xml:space="preserve"><value>Enregistrer</value></data>
   <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>Enregistrer sous…</value></data>
-  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Tout enregistrer</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Tout enregistrer dans cette fenêtre</value></data>
   <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>Exporter le dessin entier au format PNG…</value></data>
   <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>Fermer l’onglet</value></data>
   <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>Fermer la fenêtre</value></data>
@@ -39,7 +39,7 @@
   <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>Redémarrez Excalidraw Desktop pour appliquer la langue. Les dessins non enregistrés ne seront pas fermés automatiquement.</value></data>
   <data name="StartupSection.Text" xml:space="preserve"><value>Démarrage</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Rouvrir les onglets enregistrés</value></data>
-  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaure les onglets enregistrés de la session précédente. La récupération non enregistrée est toujours conservée.</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restaure les onglets enregistrés après une interruption. Quitter ou fermer la dernière fenêtre conserve toujours tout l’espace de travail.</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Enregistrer automatiquement les dessins modifiés à la fermeture</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Enregistre les dessins modifiés lors de la fermeture d’un onglet, d’une fenêtre ou de l’application. Les dessins sans titre demandent toujours où être enregistrés et l’annulation garde la fenêtre ouverte.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Performances</value></data>
@@ -203,4 +203,14 @@
   <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>version du fichier inconnue</value></data>
   <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — Fichier indisponible</value></data>
   <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — Version du fichier inconnue</value></data>
+  <data name="ReopenClosedMenuItem.Text" xml:space="preserve"><value>Rouvrir l’onglet ou la fenêtre fermée</value></data>
+  <data name="DraftRecoverySettingsCard.Header" xml:space="preserve"><value>Conserver les dessins non enregistrés</value></data>
+  <data name="DraftRecoverySettingsCard.Description" xml:space="preserve"><value>Fermer les onglets, les fenêtres ou quitter conserve des brouillons locaux. Ctrl+Shift+T rouvre les dessins fermés. Enregistrer écrit dans votre fichier.</value></data>
+  <data name="DraftCheckpointFailed" xml:space="preserve"><value>Impossible d’enregistrer le brouillon ou l’espace de travail. Les dessins restent ouverts. Vérifiez l’espace disque et l’accès au dossier de données, puis réessayez.</value></data>
+  <data name="ReopenFailedTitle" xml:space="preserve"><value>Impossible de rouvrir le dessin</value></data>
+  <data name="ReopenFailedContent" xml:space="preserve"><value>Un dessin ou brouillon n’a pas pu être ouvert. L’élément reste dans l’historique. Vérifiez que son fichier est disponible, puis réessayez.</value></data>
+  <data name="ReopenAlreadyOpenTitle" xml:space="preserve"><value>Dessin déjà ouvert</value></data>
+  <data name="ReopenAlreadyOpenContent" xml:space="preserve"><value>Les dessins déjà ouverts ont été sélectionnés dans leurs fenêtres. Les brouillons distincts restent dans l’historique ; fermez le dessin avant de rouvrir son brouillon.</value></data>
+  <data name="RecentlyClosedMenu.Text" xml:space="preserve"><value>Fermés récemment</value></data>
+  <data name="ClosedWindowLabelFormat" xml:space="preserve"><value>Fenêtre : {0}</value></data>
 </root>

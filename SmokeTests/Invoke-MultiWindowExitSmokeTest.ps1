@@ -74,8 +74,8 @@ try {
             }
 
             $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
-            if ($state.Version -ne 3 -or $state.Windows.Count -ne 2) {
-                throw "Exit did not retain the two-window version-3 workspace."
+            if ($state.Version -ne 4 -or $state.Windows.Count -ne 2) {
+                throw "Exit did not retain the two-window version-4 workspace."
             }
             $dirtyTabs = @($state.Windows | ForEach-Object { $_.Tabs } |
                 Where-Object { $_.WasDirty })

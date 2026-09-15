@@ -336,6 +336,7 @@ public partial class App : Application
         var runImageExportSmoke = Requested("image-export-smoke");
         var runDocumentSafetySmoke = Requested("document-safety-smoke");
         var runCloseDecisionsSmoke = Requested("close-decisions-smoke");
+        var verifyCloseReopenSmoke = Requested("close-reopen-restore");
         Consume("performance-smoke", out var performanceRequest);
         var performanceTabCount = ParsePerformanceTabCount(performanceRequest);
         var performanceSuspendInactive = PerformanceModeIs(performanceRequest, ":suspend");
@@ -369,14 +370,17 @@ public partial class App : Application
             (runSuspensionSmoke, "suspension-smoke"),
             (runImageExportSmoke, "image-export-smoke"),
             (runDocumentSafetySmoke, "document-safety-smoke"),
-            (runCloseDecisionsSmoke, "close-decisions-smoke"),
+            (runCloseDecisionsSmoke || verifyCloseReopenSmoke, "close-decisions-smoke"),
             (runLocalizationSmoke, "localization-smoke"),
             (runRecoverySmoke || verifyRecoverySmoke, "recovery-smoke"),
         ];
         var selectedState = stateSelection.FirstOrDefault(scenario => scenario.Active);
         return new DesktopSmokeOptions(
             RunTabSmoke: runTabSmoke,
-            WorkspaceStatePath: selectedState.Active ? StatePath(selectedState.Name) : null,
+            WorkspaceStatePath: selectedState.Active
+                ? (runCloseDecisionsSmoke || verifyCloseReopenSmoke
+                    ? Path.Combine(DesktopPaths.DataRoot, "close-decisions-smoke-state.json")
+                    : StatePath(selectedState.Name)) : null,
             RunRecoverySmoke: runRecoverySmoke,
             VerifyRecoverySmoke: verifyRecoverySmoke,
             RunTitleBarSmoke: runTitleBarSmoke,
@@ -391,7 +395,8 @@ public partial class App : Application
             RunDocumentSafetySmoke: runDocumentSafetySmoke,
             RunCloseDecisionsSmoke: runCloseDecisionsSmoke,
             RunLocalizationSmoke: runLocalizationSmoke,
-            LocalizationSmokeLanguage: localizationSmokeLanguage);
+            LocalizationSmokeLanguage: localizationSmokeLanguage,
+            VerifyCloseReopenSmoke: verifyCloseReopenSmoke);
 #else
         _ = launchArguments;
         return DesktopSmokeOptions.None;

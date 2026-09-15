@@ -19,15 +19,11 @@ public sealed partial class MainWindow : IDocumentLifecycleHost, IWindowCloseHos
     bool IDocumentLifecycleHost.CommandsBlocked => CommandsBlocked;
     WindowModalCoordinator IDocumentLifecycleHost.Modals => WindowModalCoordinator.For(this);
 
-    bool IWindowCloseHost.SaveDirtyDrawingsOnClose => desktopPreferences.SaveDirtyDrawingsOnClose;
+    Task<bool> IWindowCloseHost.CommitTabCloseAsync(DocumentSession session) => workspaceCoordinator.CommitTabCloseAsync(this, session);
     Task<bool> IWindowCloseHost.YieldToDispatcherAsync() => YieldToDispatcherAsync();
     void IWindowCloseHost.CloseSession(DocumentSession session) => CloseSession(session);
     void IWindowCloseHost.UpdateTabHeader(DocumentSession session) => UpdateTabHeader(session);
     Task IWindowCloseHost.ShowImageExportErrorAsync(string message) => imageExports.ShowImageExportErrorAsync(message);
-    Task IWindowCloseHost.PersistWorkspaceAsync() => workspaceCoordinator.PersistWorkspaceAsync();
-    Task IWindowCloseHost.PruneRecoverySnapshotsAsync() => workspaceCoordinator.PruneRecoverySnapshotsAsync();
-    void IWindowCloseHost.RecordWindowDiscarded() => workspaceCoordinator.RecordWindowDiscarded(this);
-    void IWindowCloseHost.ReleasePreservedRecovery(string recoveryId) => workspaceCoordinator.ReleasePreservedRecovery(recoveryId);
     WindowModalCoordinator IWindowCloseHost.Modals => WindowModalCoordinator.For(this);
     Task<bool> IWindowCloseHost.EnterCloseBarrierAsync(IReadOnlyList<DocumentSession> targets, bool closingWindow) => EnterCloseBarrierAsync(targets, closingWindow);
     void IWindowCloseHost.ExitCloseBarrier(IEnumerable<DocumentSession> targets) => ExitCloseBarrier(targets);

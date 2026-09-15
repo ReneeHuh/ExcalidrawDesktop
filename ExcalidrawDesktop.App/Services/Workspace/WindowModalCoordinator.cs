@@ -20,12 +20,31 @@ internal sealed class WindowModalCoordinator
         Coordinators.GetValue(owner, window => new WindowModalCoordinator(window));
 
     public bool IsBusy => queue.IsBusy;
+#if DEBUG
+    public Action<string, string>? MessageForSmoke { get; set; }
+    public Func<ContentDialog, ContentDialogResult>? DialogForSmoke { get; set; }
+#endif
     public Task<T> RunAsync<T>(Func<Task<T>> operation) => queue.RunAsync(operation);
     public Task RunAsync(Func<Task> operation) => queue.RunAsync(operation);
+
+    public Task<ContentDialogResult> RunDialogAsync(ContentDialog dialog) => RunAsync(async () =>
+    {
+#if DEBUG
+        if (DialogForSmoke is { } response) return response(dialog);
+#endif
+        return await dialog.ShowAsync();
+    });
 
     public Task ShowMessageAsync(string title, string message) =>
         RunAsync(async () =>
         {
+#if DEBUG
+            if (MessageForSmoke is { } messageForSmoke)
+            {
+                messageForSmoke(title, message);
+                return;
+            }
+#endif
             try
             {
                 // Resolve the root after waiting, since the window may have closed in the queue.

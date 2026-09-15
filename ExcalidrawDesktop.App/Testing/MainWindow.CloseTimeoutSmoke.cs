@@ -9,12 +9,10 @@ public sealed partial class MainWindow
     private async Task VerifyCloseTimeoutSmokeAsync(DocumentSession session)
     {
         var timeout = windowClose.SaveResponseTimeoutForSmoke;
-        var preferences = desktopPreferences;
         try
         {
             windowClose.SuppressSaveRequestForSmoke = true;
             windowClose.SaveResponseTimeoutForSmoke = TimeSpan.FromMilliseconds(200);
-            desktopPreferences = desktopPreferences with { SaveDirtyDrawingsOnClose = true };
             session.ForceDirtyForSmoke = true;
             session.IsDirty = true;
             var windowWait = windowClose.RequestSaveForWindowCloseAsync(session);
@@ -24,10 +22,10 @@ public sealed partial class MainWindow
             {
                 throw new InvalidOperationException("A silent editor did not cancel window closing safely.");
             }
-            if (await windowClose.RequestCloseSessionAsync(session) || session.ClosePromptOpen ||
+            if (await windowClose.RequestSaveForWindowCloseAsync(session) || session.ClosePromptOpen ||
                 session.CloseCompletion is not null || !sessions.Contains(session))
             {
-                throw new InvalidOperationException("A silent editor did not release tab closing controls.");
+                throw new InvalidOperationException("A silent editor did not release explicit save controls.");
             }
 
             windowClose.SaveResponseTimeoutForSmoke = TimeSpan.FromSeconds(5);
@@ -52,7 +50,6 @@ public sealed partial class MainWindow
             windowClose.OnCloseCancelled(session);
             windowClose.SuppressSaveRequestForSmoke = false;
             windowClose.SaveResponseTimeoutForSmoke = timeout;
-            desktopPreferences = preferences;
             session.ForceDirtyForSmoke = false;
             session.IsDirty = false;
             UpdateTabHeader(session);

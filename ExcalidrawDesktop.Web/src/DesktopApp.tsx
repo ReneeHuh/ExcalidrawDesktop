@@ -1,4 +1,5 @@
 import React from "react";
+import { getDesktopShortcut } from "./workspace/DesktopShortcuts";
 
 import {
   Excalidraw,
@@ -175,6 +176,8 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
 
   React.useEffect(() => {
     if (!closeBarrier?.locked || !excalidrawAPI) {
+      if (excalidrawAPI && isDirty.current) scheduleRecoverySnapshot(
+        getDocumentRevision(excalidrawAPI.getSceneElements(), excalidrawAPI.getAppState()));
       return;
     }
     let cancelled = false;
@@ -187,8 +190,14 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
       const revision = getDocumentRevision(
         excalidrawAPI.getSceneElements(), excalidrawAPI.getAppState(),
       );
-      desktopBridge.notifyCloseBarrierReady(closeBarrier.barrierId,
-        revision !== savedRevision.current, !library.current?.hasUnsavedChanges);
+      const dirty = revision !== savedRevision.current;
+      // The acknowledgement carries the frozen scene. The host only approves
+      // close after writing this exact checkpoint to durable draft storage.
+      recovery.reset();
+      desktopBridge.notifyCloseBarrierReady(closeBarrier.barrierId, dirty,
+        !library.current?.hasUnsavedChanges, dirty ? serializeAsJSON(
+          excalidrawAPI.getSceneElements(), excalidrawAPI.getAppState(),
+          excalidrawAPI.getFiles(), "local") : undefined);
     };
     // Let Excalidraw commit the read-only render before acknowledging the barrier.
     const timer = ownerWindow.setTimeout(waitForOperation, 0);
@@ -279,65 +288,12 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
         event.stopImmediatePropagation();
         return;
       }
-      if (
-        (event.key.toLowerCase() === "n" ||
-          event.key.toLowerCase() === "t") &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey &&
-        !event.shiftKey
-      ) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        desktopBridge.requestNewTab();
-        return;
-      }
-
-      if (
-        event.key.toLowerCase() === "w" &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey &&
-        !event.shiftKey
-      ) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        desktopBridge.requestCloseTab();
-        return;
-      }
-
-      if (
-        event.key === "Tab" &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey
-      ) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        desktopBridge.requestSelectAdjacentTab(
-          event.shiftKey ? "previous" : "next",
-        );
-        return;
-      }
-
-      if (
-        event.key.toLowerCase() === "o" &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey &&
-        !event.shiftKey
-      ) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        void openDocument();
-        return;
-      }
-
-      if (
-        event.key.toLowerCase() === "s" &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey
-      ) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        void saveDocument(event.shiftKey);
-      }
+      const command = getDesktopShortcut(event);
+      if (!command) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.repeat) return;
+      desktopBridge.requestWorkspaceCommand(command);
     };
 
     ownerWindow.addEventListener("keydown", handleKeyDown, true);
@@ -384,6 +340,12 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
             shortcut="Ctrl+T"
           >
             {getDesktopString(language.langCode, "newTab")}
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => desktopBridge.requestWorkspaceCommand("newWindow")} shortcut="Ctrl+N">
+            {getDesktopString(language.langCode, "newWindow")}
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => desktopBridge.requestWorkspaceCommand("reopenClosed")} shortcut="Ctrl+Shift+T">
+            {getDesktopString(language.langCode, "reopenClosed")}
           </MainMenu.Item>
           <MainMenu.Item onSelect={openDocument} shortcut="Ctrl+O">
             {getDesktopString(language.langCode, "open")}

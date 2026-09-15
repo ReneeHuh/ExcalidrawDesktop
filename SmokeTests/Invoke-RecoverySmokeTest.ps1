@@ -81,7 +81,7 @@ try {
 
     $savedState = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
     $savedTabs = @($savedState.Windows | ForEach-Object { $_.Tabs })
-    if ($savedState.Version -ne 3 -or
+    if ($savedState.Version -ne 4 -or
         $savedState.Windows.Count -ne 1 -or
         $savedTabs.Count -ne 2 -or
         @($savedTabs | Where-Object { -not $_.WasDirty }).Count -ne 0) {

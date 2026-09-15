@@ -15,7 +15,7 @@
   <data name="RecentFilesMenu.Text" xml:space="preserve"><value>Zuletzt verwendet</value></data>
   <data name="SaveMenuItem.Text" xml:space="preserve"><value>Speichern</value></data>
   <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>Speichern unter…</value></data>
-  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Alle speichern</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Alle in diesem Fenster speichern</value></data>
   <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>Gesamte Zeichnung als PNG exportieren…</value></data>
   <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>Tab schließen</value></data>
   <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>Fenster schließen</value></data>
@@ -39,7 +39,7 @@
   <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>Starten Sie Excalidraw Desktop neu, um die Sprache anzuwenden. Nicht gespeicherte Zeichnungen werden nicht automatisch geschlossen.</value></data>
   <data name="StartupSection.Text" xml:space="preserve"><value>Start</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Gespeicherte Zeichnungstabs erneut öffnen</value></data>
-  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Saubere dateibasierte Tabs der vorherigen Sitzung wiederherstellen. Ungesicherte Wiederherstellungen bleiben erhalten.</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Stellt gespeicherte Tabs nach einer Unterbrechung wieder her. Beenden und Schließen des letzten Fensters bewahren immer den gesamten Arbeitsbereich.</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Geänderte Zeichnungen beim Schließen automatisch speichern</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Geänderte Zeichnungen beim Schließen eines Tabs oder Fensters sowie beim Beenden speichern. Bei unbenannten Zeichnungen wird weiterhin nach einem Speicherort gefragt; Abbrechen lässt das Fenster geöffnet.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Leistung</value></data>
@@ -203,4 +203,14 @@
   <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>Dateiversion unbekannt</value></data>
   <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — Datei nicht verfügbar</value></data>
   <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — Dateiversion unbekannt</value></data>
+  <data name="ReopenClosedMenuItem.Text" xml:space="preserve"><value>Geschlossenen Tab oder geschlossenes Fenster wieder öffnen</value></data>
+  <data name="DraftRecoverySettingsCard.Header" xml:space="preserve"><value>Ungespeicherte Zeichnungen aufbewahren</value></data>
+  <data name="DraftRecoverySettingsCard.Description" xml:space="preserve"><value>Beim Schließen und Beenden bleiben lokale Entwürfe erhalten. Ctrl+Shift+T öffnet geschlossene Zeichnungen. Speichern schreibt in Ihre Zeichnungsdatei.</value></data>
+  <data name="DraftCheckpointFailed" xml:space="preserve"><value>Entwurf oder Arbeitsbereich konnte nicht gespeichert werden. Die Zeichnungen bleiben geöffnet. Prüfen Sie Speicherplatz und Zugriff auf den Datenordner und versuchen Sie es erneut.</value></data>
+  <data name="ReopenFailedTitle" xml:space="preserve"><value>Zeichnung konnte nicht geöffnet werden</value></data>
+  <data name="ReopenFailedContent" xml:space="preserve"><value>Eine Zeichnung oder ein Entwurf konnte nicht geöffnet werden. Der Eintrag bleibt im Verlauf. Prüfen Sie die Verfügbarkeit der Datei und versuchen Sie es erneut.</value></data>
+  <data name="ReopenAlreadyOpenTitle" xml:space="preserve"><value>Zeichnung bereits geöffnet</value></data>
+  <data name="ReopenAlreadyOpenContent" xml:space="preserve"><value>Bereits geöffnete Zeichnungen wurden in ihren Fenstern ausgewählt. Separate ungespeicherte Entwürfe bleiben im Verlauf. Schließen Sie die Zeichnung, bevor Sie ihren Entwurf öffnen.</value></data>
+  <data name="RecentlyClosedMenu.Text" xml:space="preserve"><value>Kürzlich geschlossen</value></data>
+  <data name="ClosedWindowLabelFormat" xml:space="preserve"><value>Fenster: {0}</value></data>
 </root>

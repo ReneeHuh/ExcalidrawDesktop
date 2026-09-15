@@ -49,8 +49,10 @@ internal sealed class EditorSessionController
     public event Action<DocumentSession>? Failed;
     public event Action<DocumentSession, string>? TitleChanged;
     public event Action<DocumentSession, bool>? CloseBarrierReady;
+    public Func<DocumentSession, string, Task<bool>>? WriteCloseCheckpointAsync { get; set; }
     public event Action<DocumentSession, Guid, string, bool>? DocumentLoadApplied;
     public Func<bool>? CommandsBlocked { get; set; }
+    public Action<string>? WorkspaceCommandRequested { get; set; }
     public Func<DocumentSession, BridgeMessage, Task<object?>>? LibraryRequest { get; set; }
     public event Action<DocumentSession, WebView2>? EditorRecreated;
     public event Action<DocumentSession, CoreWebView2,
@@ -417,8 +419,12 @@ internal sealed class EditorSessionController
     {
         if (!sessions.Contains(session) ||
             session.IsReady ||
-            session.IsInitializing)
+            session.IsInitializing ||
+            (session.CoreWebView is not null && session.NavigationPolicy is not null))
         {
+            // EnsureCoreWebView2/Navigate can finish before the page's ready
+            // event. Repeated selection in that gap must reuse the navigation;
+            // only explicit Retry detaches it and starts another one.
             return;
         }
 
@@ -784,6 +790,7 @@ internal sealed class EditorSessionController
 
         if (!args.IsSuccess)
         {
+            AppLogger.Warning($"[EditorSessionController] Editor navigation failed (SessionId={session.RecoveryId}, Status={args.WebErrorStatus}, NavigationId={args.NavigationId})");
             session.IsReady = false;
             session.IsRetrying = false;
             session.LastLifecycleFailure = args.WebErrorStatus.ToString();
@@ -926,6 +933,16 @@ internal sealed class EditorSessionController
         {
             session.BridgeDispatchDepth++;
             var message = BridgeMessageParser.Parse(args.WebMessageAsJson);
+            if (message.Kind == "event" && message.Method == "workspace.commandRequested")
+            {
+                if (CommandsBlocked?.Invoke() != true &&
+                    ReferenceEquals(session, getActiveSession()) &&
+                    message.Payload is { ValueKind: System.Text.Json.JsonValueKind.Object } commandPayload &&
+                    commandPayload.TryGetProperty("command", out var command) &&
+                    command.ValueKind == System.Text.Json.JsonValueKind.String)
+                    WorkspaceCommandRequested?.Invoke(command.GetString()!);
+                return;
+            }
             if (message.Kind == "event" && message.Method == "library.stateChanged")
             {
                 if (message.Payload is { ValueKind: System.Text.Json.JsonValueKind.Object } libraryPayload &&
@@ -985,7 +1002,20 @@ internal sealed class EditorSessionController
                 {
                     CloseBarrierReady?.Invoke(session, acknowledgement.IsDirty);
                     session.HasUnsavedLibrary = acknowledgement.HasUnsavedLibrary;
-                    session.CloseBarrierCompletion?.TrySetResult(true);
+                    var version = session.DocumentStateVersion;
+                    var stored = !session.IsDirty;
+                    if (session.IsDirty && acknowledgement.Content is { } content &&
+                        WriteCloseCheckpointAsync is { } writeCheckpoint)
+                    {
+                        ExcalidrawDocumentValidator.Validate(content);
+                        stored = await writeCheckpoint(session, content);
+                    }
+                    if (session.CloseBarrierId == acknowledgement.BarrierId)
+                    {
+                        stored &= version == session.DocumentStateVersion;
+                        session.CloseCheckpointVersion = stored ? version : null;
+                        session.CloseBarrierCompletion?.TrySetResult(stored);
+                    }
                 }
                 return;
             }

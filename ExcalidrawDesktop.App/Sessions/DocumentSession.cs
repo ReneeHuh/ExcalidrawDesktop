@@ -70,6 +70,7 @@ internal sealed class DocumentSession : IDisposable
     public TaskCompletionSource<bool>? CloseBarrierCompletion { get; set; }
 
     public long DocumentStateVersion { get; set; }
+    public long? CloseCheckpointVersion { get; set; }
 
     public bool RecoveryFailed { get; set; }
 

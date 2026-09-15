@@ -138,6 +138,7 @@ public sealed partial class MainWindow
 
     private void CloseWindowFromInput(string inputSource)
     {
+        if (CommandsBlocked) return;
         LogAction("Close window requested", inputSource);
         Close();
     }
@@ -200,6 +201,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        if (workspaceCoordinator.IsRepeatedShortcut((uint)sender.Key)) return;
         NewTabFromInput("keyboard");
     }
 
@@ -208,6 +210,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        if (workspaceCoordinator.IsRepeatedShortcut((uint)sender.Key)) return;
         NewWindowFromInput("keyboard");
     }
 
@@ -216,6 +219,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        if (workspaceCoordinator.IsRepeatedShortcut((uint)sender.Key)) return;
         CloseActiveTabFromInput("keyboard");
     }
 
@@ -224,6 +228,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        if (workspaceCoordinator.IsRepeatedShortcut((uint)sender.Key)) return;
         OpenFromInput("keyboard");
     }
 
@@ -232,6 +237,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        if (workspaceCoordinator.IsRepeatedShortcut((uint)sender.Key)) return;
         SaveFromInput(saveAs: false, "keyboard");
     }
 
@@ -240,6 +246,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        if (workspaceCoordinator.IsRepeatedShortcut((uint)sender.Key)) return;
         SaveFromInput(saveAs: true, "keyboard");
     }
 
@@ -248,6 +255,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        if (workspaceCoordinator.IsRepeatedShortcut((uint)sender.Key)) return;
         CloseWindowFromInput("keyboard");
     }
 
@@ -256,6 +264,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        if (workspaceCoordinator.IsRepeatedShortcut((uint)sender.Key)) return;
         SaveAllFromInput("keyboard");
     }
 
@@ -286,6 +295,12 @@ public sealed partial class MainWindow
     private MenuFlyout CreateTabContextFlyout(DocumentSession session)
     {
         var flyout = new MenuFlyout();
+        var reopen = new MenuFlyoutItem
+        {
+            Text = DesktopResources.Get("ReopenClosedMenuItem.Text", "Reopen closed tab or window"),
+            KeyboardAcceleratorTextOverride = "Ctrl+Shift+T",
+        };
+        reopen.Click += (_, _) => ReopenClosedFromInput();
         var newTab = new MenuFlyoutItem
         {
             Text = DesktopResources.Get("ContextNewTab", "New Tab"),
@@ -346,6 +361,7 @@ public sealed partial class MainWindow
 
         flyout.Opening += (_, _) =>
         {
+            reopen.IsEnabled = !CommandsBlocked && workspaceCoordinator.ClosedItems.Count > 0;
             var path = session.DocumentService.DocumentPath;
             copyPath.IsEnabled = path is not null;
             reveal.IsEnabled = path is not null && File.Exists(path);
@@ -353,6 +369,7 @@ public sealed partial class MainWindow
         };
 
         flyout.Items.Add(newTab);
+        flyout.Items.Add(reopen);
         flyout.Items.Add(new MenuFlyoutSeparator());
         flyout.Items.Add(copyPath);
         flyout.Items.Add(reveal);

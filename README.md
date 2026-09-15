@@ -62,15 +62,35 @@ The main document shortcuts are:
 
 | Action | Shortcut |
 | --- | --- |
-| New drawing tab | `Ctrl+N` |
+| New drawing tab | `Ctrl+T` |
+| New window | `Ctrl+N` |
+| Reopen last closed tab or window | `Ctrl+Shift+T` |
 | Open a drawing | `Ctrl+O` |
 | Save | `Ctrl+S` |
 | Save as | `Ctrl+Shift+S` |
 | Close the active tab | `Ctrl+W` |
+| Close the active window | `Ctrl+Shift+W` or `Alt+F4` |
+| Save all drawings in this window | `Ctrl+Alt+S` |
+| Next / previous tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| Select a tab / last tab | `Ctrl+1`–`Ctrl+8` / `Ctrl+9` |
 
 Right-click a drawing tab to copy its path, reveal it in Explorer, or close a
-group of tabs. If a tab has unsaved work, Excalidraw Desktop asks what to do
-before closing it.
+group of tabs. Closing preserves unsaved edits as local recovery drafts without
+changing the original drawing file. Ctrl+Shift+T reopens closed tabs and entire
+closed windows, newest first. File > Recently closed lets you choose an older
+entry, including a draft whose file is already open. Closing the last tab leaves
+a blank replacement.
+
+**File > Exit** checkpoints all windows before closing any of them. The next
+launch restores that complete workspace, including unsaved and blank tabs.
+Closing the last window also preserves it for startup. A window closed earlier
+stays in reopen history instead of opening automatically.
+
+Drafts are stored under `%LOCALAPPDATA%\\ExcalidrawDesktop\\workspace-state.recovery`,
+with active windows and closed history recorded in `workspace-state.json`.
+Installer upgrades preserve this folder. History keeps the latest 20 clean
+entries and every entry containing unsaved drawings. Save/Save As writes to your
+chosen file. If a checkpoint fails, the drawing stays open.
 
 ### Settings
 

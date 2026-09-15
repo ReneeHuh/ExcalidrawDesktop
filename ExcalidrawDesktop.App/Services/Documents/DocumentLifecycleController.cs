@@ -503,7 +503,8 @@ internal sealed class DocumentLifecycleController
 
     public async Task<bool> OnRecoverySnapshotReceivedAsync(
         DocumentSession session,
-        string content)
+        string content,
+        bool closing = false)
     {
         if (!sessions.Contains(session) || !session.IsDirty)
         {
@@ -513,7 +514,8 @@ internal sealed class DocumentLifecycleController
         await session.RecoveryGate.WaitAsync();
         try
         {
-            if (sessions.Contains(session) && session.IsDirty)
+            if (sessions.Contains(session) && session.IsDirty &&
+                (closing ? session.CloseBarrierId is not null : session.CloseBarrierId is null))
             {
 #if DEBUG
                 if (BeforeRecoveryWriteForSmoke is { } beforeWrite)

@@ -106,13 +106,13 @@ export class DesktopBridge {
     this.notify("app.closeCancelled", { closeRequestId });
   }
 
-  public notifyCloseBarrierReady(barrierId: string, isDirty: boolean, canClose = true) {
+  public notifyCloseBarrierReady(barrierId: string, isDirty: boolean, canClose = true, content?: string) {
     this.transport?.postMessage({
       version: 1,
       kind: "event",
       requestId: this.ownerWindow.crypto.randomUUID(),
       method: "document.closeBarrierReady",
-      payload: { barrierId, isDirty, canClose },
+      payload: { barrierId, isDirty, canClose, content },
     } as BridgeMessage);
   }
 
@@ -135,6 +135,10 @@ export class DesktopBridge {
 
   public requestNewTab() {
     this.notify("workspace.newTabRequested", undefined);
+  }
+
+  public requestWorkspaceCommand(command: import("../workspace/DesktopShortcuts").DesktopCommand) {
+    this.notify("workspace.commandRequested", { command });
   }
 
   public requestOpenDocument() {

@@ -23,7 +23,7 @@
   <data name="RecentFilesMenu.Text" xml:space="preserve"><value>Recent</value></data>
   <data name="SaveMenuItem.Text" xml:space="preserve"><value>Save</value></data>
   <data name="SaveAsMenuItem.Text" xml:space="preserve"><value>Save as…</value></data>
-  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Save all</value></data>
+  <data name="SaveAllMenuItem.Text" xml:space="preserve"><value>Save all in this window</value></data>
   <data name="ExportPngMenuItem.Text" xml:space="preserve"><value>Export whole drawing as PNG…</value></data>
   <data name="CloseTabMenuItem.Text" xml:space="preserve"><value>Close tab</value></data>
   <data name="CloseWindowMenuItem.Text" xml:space="preserve"><value>Close window</value></data>
@@ -47,7 +47,7 @@
   <data name="LanguageRestartInfoBar.Message" xml:space="preserve"><value>Restart Excalidraw Desktop to apply the selected language. Unsaved drawings will not be closed automatically.</value></data>
   <data name="StartupSection.Text" xml:space="preserve"><value>Startup</value></data>
   <data name="ReopenTabsSettingsCard.Header" xml:space="preserve"><value>Reopen saved drawing tabs</value></data>
-  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restore clean file-backed tabs from the previous session. Unsaved recovery is always preserved.</value></data>
+  <data name="ReopenTabsSettingsCard.Description" xml:space="preserve"><value>Restore saved tabs after an interrupted session. Exit and closing the last window always preserve the complete workspace.</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Header" xml:space="preserve"><value>Automatically save dirty drawings on close</value></data>
   <data name="SaveDirtyDrawingsOnCloseSettingsCard.Description" xml:space="preserve"><value>Save changed drawings when closing a tab or window, or when exiting. Untitled drawings still ask where to save, and cancelling keeps the window open.</value></data>
   <data name="PerformanceSection.Text" xml:space="preserve"><value>Performance</value></data>
@@ -211,4 +211,14 @@
   <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>file version unknown</value></data>
   <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — File unavailable</value></data>
   <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — File version unknown</value></data>
+  <data name="ReopenClosedMenuItem.Text" xml:space="preserve"><value>Reopen closed tab or window</value></data>
+  <data name="DraftRecoverySettingsCard.Header" xml:space="preserve"><value>Keep unsaved drawings for reopening</value></data>
+  <data name="DraftRecoverySettingsCard.Description" xml:space="preserve"><value>Closing tabs, windows, or Exit keeps local recovery drafts. Ctrl+Shift+T reopens closed drawings. Save or Save As writes to your drawing file.</value></data>
+  <data name="DraftCheckpointFailed" xml:space="preserve"><value>The recovery draft or workspace could not be saved. Your drawings are still open. Free disk space or check access to the app's data folder, then try again.</value></data>
+  <data name="ReopenFailedTitle" xml:space="preserve"><value>Could not reopen drawing</value></data>
+  <data name="ReopenFailedContent" xml:space="preserve"><value>A drawing or recovery draft could not be opened. The closed item is still in history. Check that its file is available, then try again.</value></data>
+  <data name="ReopenAlreadyOpenTitle" xml:space="preserve"><value>Drawing already open</value></data>
+  <data name="ReopenAlreadyOpenContent" xml:space="preserve"><value>Drawings that are already open were selected in their existing windows. Any separate unsaved drafts remain in history; close the existing drawing before reopening its draft.</value></data>
+  <data name="RecentlyClosedMenu.Text" xml:space="preserve"><value>Recently closed</value></data>
+  <data name="ClosedWindowLabelFormat" xml:space="preserve"><value>Window: {0}</value></data>
 </root>
