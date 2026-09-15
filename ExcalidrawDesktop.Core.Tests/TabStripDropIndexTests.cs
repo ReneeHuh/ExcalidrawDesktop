@@ -78,4 +78,36 @@ public sealed class TabStripDropIndexTests
         Assert.Equal(2, TabStripDropIndex.FromPointer(10, scrolled));
         Assert.Equal(0, TabStripDropIndex.FromPointer(-140, scrolled));
     }
+
+    [Fact]
+    public void UnrealizedTailDoesNotReverseTheStrip()
+    {
+        TabStripSlot[] slots = [new(49.6, 100), new(149.6, 100), new(2.4, 0)];
+        Assert.Equal(1, TabStripDropIndex.FromPointer(109.6, slots));
+        Assert.Equal(2, TabStripDropIndex.FromPointer(260, slots));
+    }
+
+    [Theory]
+    [InlineData(-10, 3)]
+    [InlineData(10, 4)]
+    [InlineData(110, 5)]
+    public void UnrealizedHeadKeepsOriginalCollectionIndices(double pointerX, int expected)
+    {
+        TabStripSlot[] slots = [default, default, new(-150, 100), new(-50, 100), new(50, 100)];
+        Assert.Equal(expected, TabStripDropIndex.FromPointer(pointerX, slots));
+    }
+
+    [Fact]
+    public void MirroredStripIgnoresUnrealizedEntries()
+    {
+        TabStripSlot[] slots = [default, new(200, 100), new(100, 100), new(0, 100), default];
+        Assert.Equal(2, TabStripDropIndex.FromPointer(220, slots));
+        Assert.Equal(4, TabStripDropIndex.FromPointer(0, slots));
+    }
+
+    [Fact]
+    public void AllUnrealizedSlotsFallBackToTheBeginning()
+    {
+        Assert.Equal(0, TabStripDropIndex.FromPointer(42, [default, default]));
+    }
 }

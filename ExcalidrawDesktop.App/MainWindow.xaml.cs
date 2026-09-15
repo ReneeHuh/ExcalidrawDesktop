@@ -256,6 +256,8 @@ public sealed partial class MainWindow : Window
         }
 
         resourcesDisposed = true;
+        tabDragInput?.Dispose();
+        tabDragInput = null;
         workspaceCoordinator.UnregisterWindow(this);
         suspensionTimer.Stop();
         suspensionTimer.Tick -= OnSuspensionTimerTick;

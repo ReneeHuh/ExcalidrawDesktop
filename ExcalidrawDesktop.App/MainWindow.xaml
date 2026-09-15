@@ -51,7 +51,7 @@
                 SizeChanged="OnTabStripSizeChanged"
                 SelectionChanged="OnTabSelectionChanged"
                 TabDragStarting="OnTabDragStarting"
-                TabDroppedOutside="OnTabDroppedOutside"
+                TabDragCompleted="OnTabDragCompleted"
                 TabStripDragOver="OnTabStripDragOver"
                 TabStripDrop="OnTabStripDrop"
                 TabCloseRequested="OnTabCloseRequested">

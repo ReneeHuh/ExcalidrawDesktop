@@ -20,6 +20,7 @@
     <Compile Include="..\ExcalidrawDesktop.App\Services\Platform\DesktopPaths.cs" Link="DesktopPaths.cs" />
     <Compile Include="..\ExcalidrawDesktop.App\Services\Platform\DesktopInstallation.cs" Link="DesktopInstallation.cs" />
     <Compile Include="..\ExcalidrawDesktop.App\Services\Platform\DesktopCommandLine.cs" Link="DesktopCommandLine.cs" />
+    <Compile Include="..\ExcalidrawDesktop.App\Services\Platform\DesktopDragInput.cs" Link="DesktopDragInput.cs" />
     <EmbeddedResource Include="..\installer\identity.json" LogicalName="ExcalidrawDesktop.InstallerIdentity.json" />
   </ItemGroup>
 </Project>

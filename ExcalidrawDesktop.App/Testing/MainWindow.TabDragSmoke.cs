@@ -1,6 +1,12 @@
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
+using ExcalidrawDesktop.App.Views.Workspace;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
 using Windows.Graphics;
 
 namespace ExcalidrawDesktop.App;
@@ -40,10 +46,19 @@ public sealed partial class MainWindow
 
     private async Task RunTabDragSmokeAsync(DocumentSession session)
     {
+        await RunTabDropGeometrySmokeAsync();
         var windowCount = workspaceCoordinator.Windows.Count;
         var sourcePosition = AppWindow.Position;
         var sourceSize = AppWindow.Size;
         await RunUnavailableTabDropSmokeAsync(null);
+
+        var stripPoint = new PointInt32(sourcePosition.X + sourceSize.Width / 2,
+            sourcePosition.Y + (int)(TitleBarContainer.Height / 2 * (MainLayout.XamlRoot?.RasterizationScale ?? 1)));
+        if (!IsPointOverTabStrip(stripPoint) ||
+            TryQueueOutsideTabDrop(session.TabItem, DataPackageOperation.None, null) ||
+            TryQueueOutsideTabDrop(session.TabItem, DataPackageOperation.None, stripPoint) ||
+            TryQueueOutsideTabDrop(session.TabItem, DataPackageOperation.Move, new PointInt32(-10000, -10000)))
+            throw new InvalidOperationException("Cancellation, rejected strip drops, and accepted transfers must not queue a new window.");
 
         if (DocumentTabs.CanTearOutTabs || !DocumentTabs.CanDragTabs || !DocumentTabs.CanReorderTabs)
             throw new InvalidOperationException("Tabs must use drag-and-drop without native placeholder windows.");
@@ -104,9 +119,12 @@ public sealed partial class MainWindow
             throw new InvalidOperationException("Tabs did not expand after closing the extra tabs.");
 
         var editor = session.CoreWebView;
+        // Leave enough room below the pointer for the source-sized window.
+        // A point near the screen bottom must be clamped away from the strip.
+        var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
         var pointer = new PointInt32(
             sourcePosition.X + sourceSize.Width / 2,
-            sourcePosition.Y + sourceSize.Height / 2);
+            workArea.Y + (int)Math.Round(TitleBarContainer.Height / 2 * (MainLayout.XamlRoot?.RasterizationScale ?? 1)));
         var expected = GetDroppedTabWindowBounds(pointer);
         if (!TryMoveDroppedTabToNewWindow(session.TabItem, pointer))
             throw new InvalidOperationException("Dropping a live tab outside did not create its window.");
@@ -126,6 +144,63 @@ public sealed partial class MainWindow
             !ReferenceEquals(session.CoreWebView, editor) || workspaceCoordinator.Windows.Count != windowCount)
             throw new InvalidOperationException("Moving a tab back lost the editor or leaked a window.");
         await Task.Delay(200);
+    }
+
+    private static async Task RunTabDropGeometrySmokeAsync()
+    {
+        // Exercise the production geometry adapter against WinUI virtualization
+        // without creating a WebView for each placeholder tab.
+        var tabs = new TabView { Height = 48 };
+        for (var index = 0; index < 100; index++)
+            tabs.TabItems.Add(new TabViewItem { Header = $"Tab {index}", MinWidth = 100, MaxWidth = 100 });
+        var probe = new Window { Content = tabs };
+        try
+        {
+            probe.AppWindow.Resize(new SizeInt32(800, 200));
+            probe.Activate();
+            if (!await AsyncWait.UntilAsync(() => tabs.ContainerFromIndex(0) is TabViewItem { ActualWidth: > 0 },
+                    TimeSpan.FromSeconds(5)))
+                throw new InvalidOperationException("The tab geometry probe did not load.");
+
+            var scroller = FindTabScroller(tabs) ?? throw new InvalidOperationException("No tab scroll viewer.");
+            foreach (var direction in new[] { FlowDirection.LeftToRight, FlowDirection.RightToLeft })
+            {
+                tabs.FlowDirection = direction;
+                foreach (var offset in new[] { 0d, 4000d })
+                {
+                    scroller.ChangeView(offset, null, null, disableAnimation: true);
+                    await Task.Delay(200);
+                    if (Enumerable.Range(0, tabs.TabItems.Count).All(index => tabs.ContainerFromIndex(index) is not null))
+                        throw new InvalidOperationException("The tab geometry probe did not virtualize any tabs.");
+
+                    var checkedVisibleTab = false;
+                    for (var index = 0; index < tabs.TabItems.Count; index++)
+                    {
+                        if (tabs.ContainerFromIndex(index) is not TabViewItem { ActualWidth: > 0 } item) continue;
+                        var start = item.TransformToVisual(tabs).TransformPoint(new Point()).X;
+                        if (start < 0 || start + item.ActualWidth > tabs.ActualWidth - 100) continue;
+                        var before = TabStripGeometry.GetDropIndex(tabs, start + item.ActualWidth / 4);
+                        var after = TabStripGeometry.GetDropIndex(tabs, start + item.ActualWidth * 3 / 4);
+                        if (before != index || after != index + 1)
+                            throw new InvalidOperationException($"Tab drop indices {before}/{after} did not match {index}/{index + 1} ({direction}, scroll={offset}).");
+                        checkedVisibleTab = true;
+                    }
+                    if (!checkedVisibleTab) throw new InvalidOperationException("No visible tab was checked.");
+                }
+            }
+        }
+        finally { probe.Close(); }
+    }
+
+    private static ScrollViewer? FindTabScroller(DependencyObject parent)
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is ScrollViewer scroller) return scroller;
+            if (FindTabScroller(child) is { } nested) return nested;
+        }
+        return null;
     }
 #endif
 }

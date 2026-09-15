@@ -85,8 +85,11 @@ off, enable `CanDragTabs` and `AllowDropTabs`, and implement:
   when the source session can move and the destination window has no dialog,
   picker, or close in progress. The insertion index comes from
   `TabStripDropIndex` in Core.
-- `TabDroppedOutside` to open a new window sized like the source and placed so
-  the pointer rests on its tab strip, using `WindowPlacement` in Core.
+- `TabDragCompleted` to open a new window only after an uncanceled pointer
+  release outside every window's tab strip. A thread-scoped input observer
+  distinguishes that release from Escape/right-click cancellation. The new
+  window is sized like the source and placed so the pointer rests on its tab
+  strip, using `WindowPlacement` in Core.
 
 Native tear-out (`CanTearOutTabs`) was implemented first and reverted. WinUI
 raises `TabTearOutWindowRequested` for ordinary tab clicks and uses the

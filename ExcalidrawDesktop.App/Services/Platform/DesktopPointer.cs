@@ -3,12 +3,14 @@ using Windows.Graphics;
 
 namespace ExcalidrawDesktop.App.Services.Platform;
 
-/// <summary>Screen-space pointer queries for input events that carry no position.</summary>
+/// <summary>Converts physical screen coordinates to a native window's client area.</summary>
 internal static class DesktopPointer
 {
-    /// <summary>The cursor position in physical screen pixels, or null when unavailable.</summary>
-    public static PointInt32? TryGetScreenPosition() =>
-        GetCursorPos(out var point) ? new PointInt32(point.X, point.Y) : null;
+    public static PointInt32? TryGetClientPosition(nint window, PointInt32 screenPoint)
+    {
+        var point = new NativePoint { X = screenPoint.X, Y = screenPoint.Y };
+        return ScreenToClient(window, ref point) ? new PointInt32(point.X, point.Y) : null;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -17,7 +19,7 @@ internal static class DesktopPointer
         public int Y;
     }
 
-    [DllImport("user32.dll", ExactSpelling = true, SetLastError = true)]
+    [DllImport("user32.dll", ExactSpelling = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetCursorPos(out NativePoint point);
+    private static extern bool ScreenToClient(nint window, ref NativePoint point);
 }

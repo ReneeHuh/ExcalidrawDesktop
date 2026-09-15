@@ -1,12 +1,14 @@
 using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
+using ExcalidrawDesktop.App.Views.Workspace;
 using ExcalidrawDesktop.Core;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
+using WinRT.Interop;
 
 namespace ExcalidrawDesktop.App;
 
@@ -16,6 +18,7 @@ namespace ExcalidrawDesktop.App;
 public sealed partial class MainWindow
 {
     private const string DraggedTabProperty = "ExcalidrawDesktop.DocumentTab";
+    private DesktopDragInput? tabDragInput;
 
     private void OnTabDragStarting(TabView sender, TabViewTabDragStartingEventArgs args)
     {
@@ -27,6 +30,8 @@ public sealed partial class MainWindow
 
         args.Data.Properties[DraggedTabProperty] = args.Tab;
         args.Data.RequestedOperation = DataPackageOperation.Move;
+        tabDragInput?.Dispose();
+        tabDragInput = DesktopDragInput.TryStart();
     }
 
     /// <summary>
@@ -38,14 +43,43 @@ public sealed partial class MainWindow
     private static bool CanStartTabDrag(DocumentSession? session, bool commandsBlocked) =>
         !commandsBlocked && session is { IsMoving: false };
 
-    private void OnTabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
+    private void OnTabDragCompleted(TabView sender, TabViewTabDragCompletedEventArgs args)
     {
-        // Read the pointer now; the drop position is gone once this returns.
-        // Finish the drag callback before reparenting the live WebView.
-        // Ordinary clicks and in-strip reordering never reach this handler.
-        var tab = args.Tab;
-        var pointer = DesktopPointer.TryGetScreenPosition();
-        DispatcherQueue.TryEnqueue(() => TryMoveDroppedTabToNewWindow(tab, pointer));
+        var pointer = tabDragInput?.State.ReleasePoint;
+        tabDragInput?.Dispose();
+        tabDragInput = null;
+
+        TryQueueOutsideTabDrop(args.Tab, args.DropResult, pointer);
+    }
+
+    private bool TryQueueOutsideTabDrop(TabViewItem? tab, DataPackageOperation result, PointInt32? pointer)
+    {
+        // WinUI reports None for both outside drops and cancellation. Require
+        // an actual release, and do not reinterpret a refused strip as outside.
+        if (tab is null || result != DataPackageOperation.None || pointer is not { } point ||
+            workspaceCoordinator.Windows.Any(window => window.IsPointOverTabStrip(point)))
+        {
+            return false;
+        }
+
+        // Finish WinUI's drag callback before reparenting the live WebView.
+        return DispatcherQueue.TryEnqueue(() => TryMoveDroppedTabToNewWindow(tab, point));
+    }
+
+    private bool IsPointOverTabStrip(PointInt32 point)
+    {
+        if (IsClosed || !AppWindow.IsVisible ||
+            AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized } ||
+            MainLayout.XamlRoot is not { } root ||
+            DesktopPointer.TryGetClientPosition(WindowNative.GetWindowHandle(this), point) is not { } client)
+        {
+            return false;
+        }
+
+        // Include the strip's header, footer, and caption buttons, even while a
+        // dialog prevents XAML hit testing. Coordinates are physical pixels.
+        return client.X >= 0 && client.X < AppWindow.ClientSize.Width &&
+            client.Y >= 0 && client.Y < TitleBarContainer.ActualHeight * root.RasterizationScale;
     }
 
     private bool TryMoveDroppedTabToNewWindow(TabViewItem? tab, PointInt32? pointer = null)
@@ -137,17 +171,10 @@ public sealed partial class MainWindow
             return;
         }
 
-        var pointerX = args.GetPosition(DocumentTabs).X;
-        var slots = DocumentTabs.TabItems
-            .OfType<TabViewItem>()
-            .Select(item => new TabStripSlot(
-                item.TransformToVisual(DocumentTabs).TransformPoint(new Windows.Foundation.Point()).X,
-                item.ActualWidth))
-            .ToArray();
-        var index = TabStripDropIndex.FromPointer(pointerX, slots);
         LogAction("Tab dropped into window", "drag", session);
         try
         {
+            var index = TabStripGeometry.GetDropIndex(DocumentTabs, args.GetPosition(DocumentTabs).X);
             workspaceCoordinator.MoveSession(source, session, this, index);
         }
         catch (Exception exception)
