@@ -2,6 +2,7 @@ import React from "react";
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { DesktopBridge } from "../bridge/DesktopBridge";
+import type { LibraryController } from "../document/LibraryController";
 
 type DesktopSmokeState = {
   elementIds: string[];
@@ -25,6 +26,8 @@ type DesktopSmokeApi = {
   readState(): DesktopSmokeState;
   deleteAllElements(): void;
   isSaving(): boolean;
+  addLibraryItem(id: string): void;
+  retryLibrary(): void;
   updateAppState(appState: Parameters<ExcalidrawImperativeAPI["updateScene"]>[0]["appState"]): void;
   focusCanvas(): boolean;
 };
@@ -35,6 +38,7 @@ export const useDesktopSmoke = (
   excalidrawAPI: ExcalidrawImperativeAPI | null,
   isCloseLocked: boolean,
   isDocumentOperationInProgress: React.MutableRefObject<boolean>,
+  library: React.MutableRefObject<LibraryController | null>,
 ) => {
   const ownerDocument = mountNode.ownerDocument;
   const ownerWindow = ownerDocument.defaultView;
@@ -150,6 +154,10 @@ export const useDesktopSmoke = (
 
     smokeWindow.__EXCALIDRAW_DESKTOP_SMOKE__ = {
       isSaving: () => isDocumentOperationInProgress.current,
+      addLibraryItem: id => { void excalidrawAPI.updateLibrary({ libraryItems: [{
+        id, status: "unpublished", created: Date.now(), elements: excalidrawAPI.getSceneElements(),
+      }], merge: true }); },
+      retryLibrary: () => library.current?.retry(),
       deleteAllElements() {
         excalidrawAPI.updateScene({
           elements: excalidrawAPI.getSceneElementsIncludingDeleted().map((element) => ({
@@ -241,6 +249,6 @@ export const useDesktopSmoke = (
     return () => {
       delete smokeWindow.__EXCALIDRAW_DESKTOP_SMOKE__;
     };
-  }, [excalidrawAPI, ownerDocument, ownerWindow, isDocumentOperationInProgress]);
+  }, [excalidrawAPI, ownerDocument, ownerWindow, isDocumentOperationInProgress, library]);
 
 };

@@ -4,6 +4,7 @@ using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
 using ExcalidrawDesktop.App.Views.Settings;
 using ExcalidrawDesktop.App.Views.Workspace;
+using ExcalidrawDesktop.Core;
 
 namespace ExcalidrawDesktop.App.ViewModels;
 
@@ -92,9 +93,12 @@ public sealed class MainViewModel : ObservableObject
                 dirtyMarker);
         if (active.ExternalFileState is not ExternalFileState.None)
         {
-            WindowTitle += DesktopResources.Get(
-                "ChangedOnDiskTitleSuffix",
-                " — Changed on disk");
+            WindowTitle += active.ExternalFileState switch
+            {
+                ExternalFileState.Unavailable => DesktopResources.Get("FileUnavailableTitleSuffix", " — File unavailable"),
+                ExternalFileState.UnknownBaseline => DesktopResources.Get("FileVersionUnknownTitleSuffix", " — File version unknown"),
+                _ => DesktopResources.Get("ChangedOnDiskTitleSuffix", " — Changed on disk"),
+            };
         }
     }
 

@@ -20,8 +20,8 @@ internal static class TransactedDocumentWriter
             if (transaction.Stream.Size > 50L * 1024 * 1024)
                 throw new BridgeProtocolException("DocumentTooLarge", "The drawing exceeds the 50 MB desktop document limit.");
             transaction.Stream.Seek(0);
-            var hash = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(
-                transaction.Stream.AsStreamForRead(), cancellationToken));
+            var hash = await RecoveryFileBaseline.ComputeContentHashAsync(
+                transaction.Stream.AsStreamForRead(), cancellationToken);
             if (!string.Equals(hash, expectedContentHash, StringComparison.OrdinalIgnoreCase))
                 throw new BridgeProtocolException("DocumentChangedExternally", "The drawing changed outside Excalidraw Desktop. Resolve the conflict before saving.");
             transaction.Stream.Seek(0);

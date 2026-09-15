@@ -10,11 +10,6 @@ using WinRT.Interop;
 
 namespace ExcalidrawDesktop.App.Services.Documents;
 
-public sealed record DocumentOpenResult(string Status, string? FileName = null, string? Content = null)
-{
-    public static DocumentOpenResult Cancelled { get; } = new("cancelled");
-}
-
 public sealed record PickedDocument(
     StorageFile File,
     string CanonicalPath,
@@ -22,14 +17,6 @@ public sealed record PickedDocument(
     string Content,
     DesktopFileStamp Stamp,
     string ContentHash);
-
-public enum ExternalFileState
-{
-    None,
-    Modified,
-    Moved,
-    Deleted,
-}
 
 public sealed record DocumentSaveResult(string Status, string? FileName = null)
 {
@@ -93,36 +80,6 @@ public sealed class DocumentService
     {
         this.window = window;
         this.dialogRoot = dialogRoot;
-    }
-
-    public async Task<DocumentOpenResult> OpenAsync(bool hasUnsavedChanges)
-    {
-        pendingOpenFile = null;
-        pendingOpenFileStamp = null;
-        pendingOpenContentHash = null;
-        pendingCanonicalPath = null;
-        pendingNewDocument = false;
-
-        if (hasUnsavedChanges && !await ConfirmDiscardChangesAsync(
-            DesktopResources.Get(
-                "OpenDiscardContent",
-                "Opening another drawing will replace the current unsaved drawing."),
-            DesktopResources.Get("DiscardAndOpen", "Discard and open")))
-        {
-            return DocumentOpenResult.Cancelled;
-        }
-
-        var pickedDocument = await PickOpenDocumentAsync();
-        if (pickedDocument is null)
-        {
-            return DocumentOpenResult.Cancelled;
-        }
-
-        StageOpen(pickedDocument);
-        return new DocumentOpenResult(
-            "opened",
-            pickedDocument.FileName,
-            pickedDocument.Content);
     }
 
     public async Task<PickedDocument?> PickOpenDocumentAsync()
@@ -224,6 +181,10 @@ public sealed class DocumentService
             throw new BridgeProtocolException(
                 "DocumentAccessDenied",
                 "Excalidraw Desktop does not have permission to read the selected file.");
+        }
+        catch (System.Text.DecoderFallbackException)
+        {
+            throw new BridgeProtocolException("DocumentInvalid", "The drawing must contain valid UTF-8 JSON.");
         }
         catch (IOException)
         {
@@ -402,14 +363,6 @@ public sealed class DocumentService
         cancellationToken.ThrowIfCancellationRequested();
         ValidateContentForSave(content);
 
-        if (!saveAs && activeFile is not null &&
-            await CheckExternalFileStateAsync() is not ExternalFileState.None)
-        {
-            throw new BridgeProtocolException(
-                "DocumentChangedExternally",
-                "The drawing changed outside Excalidraw Desktop. Resolve the conflict before saving.");
-        }
-
         var file = saveAs || activeFile is null
             ? await PickSaveFileAsync(cancellationToken)
             : activeFile;
@@ -444,13 +397,7 @@ public sealed class DocumentService
             {
             // The save picker and any caller hooks can yield to external
             // writers. Check again immediately before opening the transaction.
-            if (!saveAs && activeFile is not null &&
-                await CheckExternalFileStateAsync() is not ExternalFileState.None)
-            {
-                throw new BridgeProtocolException(
-                    "DocumentChangedExternally",
-                    "The drawing changed outside Excalidraw Desktop. Resolve the conflict before saving.");
-            }
+            if (!saveAs && activeFile is not null) await VerifyFileBeforeSaveAsync();
 #if DEBUG
             if (BeforeSaveWriteForSmoke is { } beforeWrite)
             {
@@ -492,54 +439,29 @@ public sealed class DocumentService
         }
     }
 
-    public async Task<ExternalFileState> CheckExternalFileStateAsync()
+    private async Task VerifyFileBeforeSaveAsync()
+    {
+        var state = await CheckExternalFileStateAsync(compareContent: false);
+        if (state == ExternalFileState.Unavailable)
+            throw new BridgeProtocolException("DocumentUnavailable", "The file is unavailable. Retry or use Save As.");
+        if (state == ExternalFileState.UnknownBaseline)
+            throw new BridgeProtocolException("DocumentBaselineUnknown", "The recovered file version is unknown. Resolve it before saving.");
+        if (state != ExternalFileState.None)
+            throw new BridgeProtocolException("DocumentChangedExternally", "The drawing changed outside Excalidraw Desktop. Resolve the conflict before saving.");
+    }
+
+    public Task<ExternalFileState> CheckExternalFileStateAsync() => CheckExternalFileStateAsync(compareContent: true);
+
+    private async Task<ExternalFileState> CheckExternalFileStateAsync(bool compareContent)
     {
         if (activeFile is null)
         {
             return ExternalFileState.None;
         }
 
-        try
-        {
-            if (string.IsNullOrWhiteSpace(activeFile.Path) ||
-                !File.Exists(activeFile.Path))
-            {
-                return ExternalFileState.Deleted;
-            }
-
-            if (!DesktopDocumentPath.Equals(activeCanonicalPath, activeFile.Path))
-            {
-                return ExternalFileState.Moved;
-            }
-
-            var fileInfo = new FileInfo(activeFile.Path);
-            var currentStamp = new DesktopFileStamp(
-                fileInfo.LastWriteTimeUtc,
-                (ulong)fileInfo.Length);
-            if (activeFileStamp is null || string.IsNullOrWhiteSpace(activeContentHash) ||
-                activeFileStamp.DiffersFrom(currentStamp))
-            {
-                return ExternalFileState.Modified;
-            }
-
-            // Timestamps and lengths are not an identity. Hash the current
-            // bytes when an older baseline contains one, catching same-size
-            // replacements that preserve the filesystem stamp.
-            if (!string.IsNullOrWhiteSpace(activeContentHash))
-            {
-                var current = await ExactFileBaseline.CaptureAsync(activeFile.Path);
-                if (!string.Equals(current.ContentHash, activeContentHash, StringComparison.OrdinalIgnoreCase))
-                {
-                    return ExternalFileState.Modified;
-                }
-            }
-            return ExternalFileState.None;
-        }
-        catch (Exception exception) when (
-            exception is FileNotFoundException or IOException or UnauthorizedAccessException)
-        {
-            return ExternalFileState.Deleted;
-        }
+        if (string.IsNullOrWhiteSpace(activeFile.Path)) return ExternalFileState.Unavailable;
+        if (!DesktopDocumentPath.Equals(activeCanonicalPath, activeFile.Path)) return ExternalFileState.Moved;
+        return await ExternalFileCheck.CheckAsync(activeFile.Path, activeFileStamp, activeContentHash, compareContent);
     }
 
     public async Task<PickedDocument> ReloadActiveAsync()

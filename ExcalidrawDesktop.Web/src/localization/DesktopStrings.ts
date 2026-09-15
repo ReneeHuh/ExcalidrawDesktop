@@ -32,6 +32,7 @@ export type DesktopStringKey =
   | "documentAlreadyOpen"
   | "documentWriteFailed"
   | "documentInvalid"
+  | "documentBaselineUnknown" | "documentBusy"
   | "exportEmpty" | "exportDimensions" | "exportBytes" | "exportInvalid" | "exportUpload"
   | "libraryUnavailable" | "recoveryUnavailable" | "settingsRetry";
 
@@ -39,6 +40,8 @@ type SpecificStringKey = "exportEmpty" | "exportDimensions" | "exportBytes" | "e
 type BaseCatalog = Record<Exclude<DesktopStringKey, SpecificStringKey>, string>;
 
 const en: Record<DesktopStringKey, string> = {
+  documentBaselineUnknown: "The recovered file version is unknown. Resolve the file status or use Save As before saving.",
+  documentBusy: "Wait for the current drawing operation to finish, or cancel closing.",
   editorLabel: "Excalidraw Desktop editor",
   newTab: "New Tab",
   open: "Open…",
@@ -61,7 +64,7 @@ const en: Record<DesktopStringKey, string> = {
   documentInvalid: "The selected file is not a valid Excalidraw drawing.",
   exportEmpty: "Add something to the drawing before exporting.",
   exportDimensions: "Image dimensions exceed the limit; reduce the drawing size.",
-  exportBytes: "The PNG exceeds 100 MB.",
+  exportBytes: "The PNG exceeds {maxMegabytes} MB.",
   exportInvalid: "The editor returned an invalid PNG. Try again.",
   exportUpload: "Could not write the PNG to the selected file. Check access and disk space, then retry.",
   libraryUnavailable: "Library changes could not be saved. Retry before closing or export your library.",
@@ -72,6 +75,8 @@ const en: Record<DesktopStringKey, string> = {
 const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
   en,
   "es-ES": {
+  documentBaselineUnknown: "Se desconoce la versión del archivo recuperado. Resuelve su estado o usa Guardar como antes de guardar.",
+  documentBusy: "Espera a que termine la operación actual del dibujo o cancela el cierre.",
     editorLabel: "Editor de Excalidraw Desktop",
     newTab: "Nueva pestaña",
     open: "Abrir…",
@@ -94,6 +99,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
     documentInvalid: "El archivo seleccionado no es un dibujo de Excalidraw válido.",
   },
   "fr-FR": {
+  documentBaselineUnknown: "La version du fichier récupéré est inconnue. Résolvez son état ou utilisez Enregistrer sous avant de sauvegarder.",
+  documentBusy: "Attendez la fin de l’opération en cours ou annulez la fermeture.",
     editorLabel: "Éditeur Excalidraw Desktop",
     newTab: "Nouvel onglet",
     open: "Ouvrir…",
@@ -116,6 +123,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
     documentInvalid: "Le fichier sélectionné n’est pas un dessin Excalidraw valide.",
   },
   "de-DE": {
+  documentBaselineUnknown: "Die Version der wiederhergestellten Datei ist unbekannt. Kläre den Dateistatus oder verwende Speichern unter.",
+  documentBusy: "Warte auf den Abschluss des aktuellen Vorgangs oder brich das Schließen ab.",
     editorLabel: "Excalidraw-Desktop-Editor",
     newTab: "Neuer Tab",
     open: "Öffnen…",
@@ -138,6 +147,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
     documentInvalid: "Die ausgewählte Datei ist keine gültige Excalidraw-Zeichnung.",
   },
   "pt-BR": {
+  documentBaselineUnknown: "A versão do arquivo recuperado é desconhecida. Resolva o estado do arquivo ou use Salvar como antes de salvar.",
+  documentBusy: "Aguarde a operação atual terminar ou cancele o fechamento.",
     editorLabel: "Editor do Excalidraw Desktop",
     newTab: "Nova guia",
     open: "Abrir…",
@@ -160,6 +171,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
     documentInvalid: "O arquivo selecionado não é um desenho válido do Excalidraw.",
   },
   "ja-JP": {
+  documentBaselineUnknown: "復元したファイルのバージョンが不明です。ファイルの状態を確認するか、名前を付けて保存してください。",
+  documentBusy: "現在の処理が完了するまで待つか、閉じる操作をキャンセルしてください。",
     editorLabel: "Excalidraw Desktop エディター",
     newTab: "新しいタブ",
     open: "開く…",
@@ -182,6 +195,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
     documentInvalid: "選択したファイルは有効な Excalidraw 図面ではありません。",
   },
   "zh-CN": {
+  documentBaselineUnknown: "恢复的文件版本未知。请先处理文件状态，或使用“另存为”。",
+  documentBusy: "请等待当前绘图操作完成，或取消关闭。",
     editorLabel: "Excalidraw Desktop 编辑器",
     newTab: "新建标签页",
     open: "打开…",
@@ -204,6 +219,8 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
     documentInvalid: "所选文件不是有效的 Excalidraw 绘图。",
   },
   "ar-SA": {
+  documentBaselineUnknown: "إصدار الملف المستعاد غير معروف. عالج حالة الملف أو استخدم «حفظ باسم» قبل الحفظ.",
+  documentBusy: "انتظر انتهاء العملية الحالية على الرسم أو ألغِ الإغلاق.",
     editorLabel: "محرر Excalidraw Desktop",
     newTab: "علامة تبويب جديدة",
     open: "فتح…",
@@ -228,13 +245,13 @@ const catalogs: Record<SupportedLanguageCode, BaseCatalog> = {
 };
 
 const specific: Record<Exclude<SupportedLanguageCode, "en">, Record<SpecificStringKey, string>> = {
-  "es-ES": { exportEmpty: "Añade algo al dibujo antes de exportar.", exportDimensions: "Las dimensiones superan el límite; reduce el tamaño del dibujo.", exportBytes: "El PNG supera los 100 MB.", exportInvalid: "El editor devolvió un PNG no válido. Inténtalo de nuevo.", exportUpload: "No se pudo escribir el PNG en el archivo elegido. Comprueba el acceso y el disco e inténtalo de nuevo.", libraryUnavailable: "No se pudieron guardar los cambios de la biblioteca. Reintenta antes de cerrar o exporta tu biblioteca.", recoveryUnavailable: "La recuperación no está disponible. Guarda el dibujo para proteger los cambios recientes.", settingsRetry: "Reintentar" },
-  "fr-FR": { exportEmpty: "Ajoutez quelque chose au dessin avant l’exportation.", exportDimensions: "Les dimensions dépassent la limite ; réduisez la taille du dessin.", exportBytes: "Le PNG dépasse 100 Mo.", exportInvalid: "L’éditeur a renvoyé un PNG invalide. Réessayez.", exportUpload: "Impossible d’écrire le PNG dans le fichier choisi. Vérifiez l’accès et l’espace disque, puis réessayez.", libraryUnavailable: "Les modifications de la bibliothèque n’ont pas pu être enregistrées. Réessayez avant de fermer ou exportez votre bibliothèque.", recoveryUnavailable: "La récupération est indisponible. Enregistrez le dessin pour protéger les modifications récentes.", settingsRetry: "Retry" },
-  "de-DE": { exportEmpty: "Fügen Sie vor dem Export etwas zur Zeichnung hinzu.", exportDimensions: "Die Bildabmessungen überschreiten das Limit; verkleinern Sie die Zeichnung.", exportBytes: "Die PNG-Datei überschreitet 100 MB.", exportInvalid: "Der Editor gab ein ungültiges PNG zurück. Versuchen Sie es erneut.", exportUpload: "Das PNG konnte nicht in die ausgewählte Datei geschrieben werden. Prüfen Sie Zugriff und Speicherplatz und versuchen Sie es erneut.", libraryUnavailable: "Bibliotheksänderungen konnten nicht gespeichert werden. Versuchen Sie es vor dem Schließen erneut oder exportieren Sie die Bibliothek.", recoveryUnavailable: "Wiederherstellung ist nicht verfügbar. Speichern Sie die Zeichnung, um aktuelle Änderungen zu schützen.", settingsRetry: "Retry" },
-  "pt-BR": { exportEmpty: "Adicione algo ao desenho antes de exportar.", exportDimensions: "As dimensões excedem o limite; reduza o tamanho do desenho.", exportBytes: "O PNG excede 100 MB.", exportInvalid: "O editor retornou um PNG inválido. Tente novamente.", exportUpload: "Não foi possível gravar o PNG no arquivo escolhido. Verifique o acesso e o disco e tente novamente.", libraryUnavailable: "Não foi possível salvar as alterações da biblioteca. Tente novamente antes de fechar ou exporte sua biblioteca.", recoveryUnavailable: "A recuperação está indisponível. Salve o desenho para proteger as alterações recentes.", settingsRetry: "Retry" },
-  "ja-JP": { exportEmpty: "エクスポートする前に図面に何か追加してください。", exportDimensions: "画像の寸法が上限を超えています。図面を小さくしてください。", exportBytes: "PNG が 100 MB を超えています。", exportInvalid: "エディターが無効な PNG を返しました。再試行してください。", exportUpload: "選択したファイルに PNG を書き込めませんでした。アクセス権とディスクを確認して再試行してください。", libraryUnavailable: "ライブラリの変更を保存できませんでした。閉じる前に再試行するか、ライブラリをエクスポートしてください。", recoveryUnavailable: "復元を利用できません。最近の変更を保護するため図面を保存してください。", settingsRetry: "Retry" },
-  "zh-CN": { exportEmpty: "导出前请先向绘图添加内容。", exportDimensions: "图像尺寸超出限制，请缩小绘图。", exportBytes: "PNG 超过 100 MB。", exportInvalid: "编辑器返回了无效 PNG，请重试。", exportUpload: "无法将 PNG 写入所选文件。请检查访问权限和磁盘空间后重试。", libraryUnavailable: "无法保存图库更改。请在关闭前重试，或导出图库。", recoveryUnavailable: "恢复不可用。请保存绘图以保护最近的更改。", settingsRetry: "Retry" },
-  "ar-SA": { exportEmpty: "أضف شيئًا إلى الرسم قبل التصدير.", exportDimensions: "تتجاوز أبعاد الصورة الحد المسموح؛ صغّر الرسم.", exportBytes: "يتجاوز PNG حجم 100 ميغابايت.", exportInvalid: "أعاد المحرر ملف PNG غير صالح. حاول مرة أخرى.", exportUpload: "تعذرت كتابة PNG في الملف المحدد. تحقق من الوصول ومساحة القرص ثم حاول مرة أخرى.", libraryUnavailable: "تعذر حفظ تغييرات المكتبة. حاول مرة أخرى قبل الإغلاق أو صدّر مكتبتك.", recoveryUnavailable: "الاسترداد غير متاح. احفظ الرسم لحماية التغييرات الأخيرة.", settingsRetry: "Retry" },
+  "es-ES": { exportEmpty: "Añade algo al dibujo antes de exportar.", exportDimensions: "Las dimensiones superan el límite; reduce el tamaño del dibujo.", exportBytes: "El PNG supera los {maxMegabytes} MB.", exportInvalid: "El editor devolvió un PNG no válido. Inténtalo de nuevo.", exportUpload: "No se pudo escribir el PNG en el archivo elegido. Comprueba el acceso y el disco e inténtalo de nuevo.", libraryUnavailable: "No se pudieron guardar los cambios de la biblioteca. Reintenta antes de cerrar o exporta tu biblioteca.", recoveryUnavailable: "La recuperación no está disponible. Guarda el dibujo para proteger los cambios recientes.", settingsRetry: "Reintentar" },
+  "fr-FR": { exportEmpty: "Ajoutez quelque chose au dessin avant l’exportation.", exportDimensions: "Les dimensions dépassent la limite ; réduisez la taille du dessin.", exportBytes: "Le PNG dépasse {maxMegabytes} Mo.", exportInvalid: "L’éditeur a renvoyé un PNG invalide. Réessayez.", exportUpload: "Impossible d’écrire le PNG dans le fichier choisi. Vérifiez l’accès et l’espace disque, puis réessayez.", libraryUnavailable: "Les modifications de la bibliothèque n’ont pas pu être enregistrées. Réessayez avant de fermer ou exportez votre bibliothèque.", recoveryUnavailable: "La récupération est indisponible. Enregistrez le dessin pour protéger les modifications récentes.", settingsRetry: "Réessayer" },
+  "de-DE": { exportEmpty: "Fügen Sie vor dem Export etwas zur Zeichnung hinzu.", exportDimensions: "Die Bildabmessungen überschreiten das Limit; verkleinern Sie die Zeichnung.", exportBytes: "Die PNG-Datei überschreitet {maxMegabytes} MB.", exportInvalid: "Der Editor gab ein ungültiges PNG zurück. Versuchen Sie es erneut.", exportUpload: "Das PNG konnte nicht in die ausgewählte Datei geschrieben werden. Prüfen Sie Zugriff und Speicherplatz und versuchen Sie es erneut.", libraryUnavailable: "Bibliotheksänderungen konnten nicht gespeichert werden. Versuchen Sie es vor dem Schließen erneut oder exportieren Sie die Bibliothek.", recoveryUnavailable: "Wiederherstellung ist nicht verfügbar. Speichern Sie die Zeichnung, um aktuelle Änderungen zu schützen.", settingsRetry: "Erneut versuchen" },
+  "pt-BR": { exportEmpty: "Adicione algo ao desenho antes de exportar.", exportDimensions: "As dimensões excedem o limite; reduza o tamanho do desenho.", exportBytes: "O PNG excede {maxMegabytes} MB.", exportInvalid: "O editor retornou um PNG inválido. Tente novamente.", exportUpload: "Não foi possível gravar o PNG no arquivo escolhido. Verifique o acesso e o disco e tente novamente.", libraryUnavailable: "Não foi possível salvar as alterações da biblioteca. Tente novamente antes de fechar ou exporte sua biblioteca.", recoveryUnavailable: "A recuperação está indisponível. Salve o desenho para proteger as alterações recentes.", settingsRetry: "Tentar novamente" },
+  "ja-JP": { exportEmpty: "エクスポートする前に図面に何か追加してください。", exportDimensions: "画像の寸法が上限を超えています。図面を小さくしてください。", exportBytes: "PNG が {maxMegabytes} MB を超えています。", exportInvalid: "エディターが無効な PNG を返しました。再試行してください。", exportUpload: "選択したファイルに PNG を書き込めませんでした。アクセス権とディスクを確認して再試行してください。", libraryUnavailable: "ライブラリの変更を保存できませんでした。閉じる前に再試行するか、ライブラリをエクスポートしてください。", recoveryUnavailable: "復元を利用できません。最近の変更を保護するため図面を保存してください。", settingsRetry: "再試行" },
+  "zh-CN": { exportEmpty: "导出前请先向绘图添加内容。", exportDimensions: "图像尺寸超出限制，请缩小绘图。", exportBytes: "PNG 超过 {maxMegabytes} MB。", exportInvalid: "编辑器返回了无效 PNG，请重试。", exportUpload: "无法将 PNG 写入所选文件。请检查访问权限和磁盘空间后重试。", libraryUnavailable: "无法保存图库更改。请在关闭前重试，或导出图库。", recoveryUnavailable: "恢复不可用。请保存绘图以保护最近的更改。", settingsRetry: "重试" },
+  "ar-SA": { exportEmpty: "أضف شيئًا إلى الرسم قبل التصدير.", exportDimensions: "تتجاوز أبعاد الصورة الحد المسموح؛ صغّر الرسم.", exportBytes: "يتجاوز PNG حجم {maxMegabytes} ميغابايت.", exportInvalid: "أعاد المحرر ملف PNG غير صالح. حاول مرة أخرى.", exportUpload: "تعذرت كتابة PNG في الملف المحدد. تحقق من الوصول ومساحة القرص ثم حاول مرة أخرى.", libraryUnavailable: "تعذر حفظ تغييرات المكتبة. حاول مرة أخرى قبل الإغلاق أو صدّر مكتبتك.", recoveryUnavailable: "الاسترداد غير متاح. احفظ الرسم لحماية التغييرات الأخيرة.", settingsRetry: "إعادة المحاولة" },
 };
 
 export const isSupportedLanguageCode = (
@@ -253,6 +270,15 @@ export const getDesktopString = (
 };
 
 const errorKeys: Record<string, DesktopStringKey> = {
+  DocumentUnavailable: "documentReadFailed",
+  DocumentBaselineUnknown: "documentBaselineUnknown",
+  DocumentSaveInProgress: "documentBusy",
+  DocumentLoadInProgress: "documentBusy",
+  DocumentClosing: "documentBusy",
+  EditorNotReady: "documentBusy",
+  LibraryConflict: "libraryUnavailable",
+  LibraryInvalid: "libraryUnavailable",
+  LibraryUnavailable: "libraryUnavailable",
   ExportEmpty: "exportEmpty",
   ExportDimensionLimit: "exportDimensions",
   ExportTooLarge: "exportDimensions",
@@ -276,4 +302,14 @@ export const getDesktopErrorString = (
   langCode: string,
   code: string | undefined,
   fallbackKey: "openFailed" | "saveFailed" | "exportFailed",
-) => getDesktopString(langCode, (code && errorKeys[code]) || fallbackKey);
+  limits?: { maxBytes: number },
+) => {
+  const key = (code && errorKeys[code]) || fallbackKey;
+  if (key === "exportBytes") {
+    if (!limits) return getDesktopString(langCode, "exportFailed");
+    const locale = isSupportedLanguageCode(langCode) ? langCode : "en";
+    const megabytes = (limits.maxBytes / 1024 / 1024).toLocaleString(locale, { maximumFractionDigits: 2 });
+    return getDesktopString(langCode, key).replace("{maxMegabytes}", megabytes);
+  }
+  return getDesktopString(langCode, key);
+};

@@ -25,7 +25,7 @@ public sealed partial class MainWindow
                 throw new InvalidOperationException("A silent editor did not cancel window closing safely.");
             }
             if (await windowClose.RequestCloseSessionAsync(session) || session.ClosePromptOpen ||
-                session.CloseAfterSave || session.CloseCompletion is not null || !sessions.Contains(session))
+                session.CloseCompletion is not null || !sessions.Contains(session))
             {
                 throw new InvalidOperationException("A silent editor did not release tab closing controls.");
             }

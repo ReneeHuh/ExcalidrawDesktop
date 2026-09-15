@@ -4,6 +4,19 @@ namespace ExcalidrawDesktop.Tests;
 
 public sealed class MultiWindowWorkspaceStateStoreTests : IDisposable
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task DamagedLegacyTabsAreReportedAsCorrupt(int version)
+    {
+        Directory.CreateDirectory(testDirectory);
+        var path = Path.Combine(testDirectory, "workspace.json");
+        await File.WriteAllTextAsync(path, $$"""{"Version":{{version}},"RecentFiles":[],"Tabs":[null]}""");
+        var store = new MultiWindowWorkspaceStateStore(path);
+        var state = await store.LoadAsync();
+        Assert.Equal(MultiWindowWorkspaceStateStore.LoadStatus.Corrupt, store.LastLoadStatus);
+        Assert.Empty(state.Windows);
+    }
     private readonly string testDirectory = Path.Combine(
         Path.GetTempPath(),
         $"ExcalidrawDesktopMultiWindowTests-{Guid.NewGuid():N}");

@@ -17,8 +17,15 @@ public sealed class RecoverySnapshotStore
         finally { fileGate.Release(); }
     }
 
-    public Task SaveAsync(string recoveryId, string content, RecoveryFileBaseline? baseline) =>
-        SaveAsync(recoveryId, RecoveryFileBaseline.Attach(content, baseline));
+    public async Task SaveAsync(string recoveryId, string content, RecoveryFileBaseline? baseline)
+    {
+        await fileGate.WaitAsync();
+        try
+        {
+            await AtomicFile.WriteAllBytesAsync(GetSnapshotPath(recoveryId), RecoveryFileBaseline.AttachUtf8(content, baseline));
+        }
+        finally { fileGate.Release(); }
+    }
 
     public async Task<string?> LoadAsync(string recoveryId)
     {

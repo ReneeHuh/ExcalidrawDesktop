@@ -104,7 +104,6 @@ public sealed class BridgeDispatcher
                 "app.ping" => new { host = "winui", ready = true },
                 "document.recoverySnapshot" => await SaveRecoverySnapshotAsync(message.Payload),
                 "document.new" => await NewDocumentAsync(message.Payload),
-                "document.open" => await OpenDocumentAsync(message.Payload),
                 "document.save" => await SaveDocumentAsync(webView, message, saveAs: false),
                 "document.saveAs" => await SaveDocumentAsync(webView, message, saveAs: true),
                 _ => throw new BridgeProtocolException(
@@ -270,16 +269,6 @@ public sealed class BridgeDispatcher
             return;
         }
 
-        if (message.Method == "document.opened" &&
-            message.Payload is { ValueKind: JsonValueKind.Object } payload &&
-            payload.TryGetProperty("fileName", out var fileNameElement) &&
-            fileNameElement.ValueKind == JsonValueKind.String &&
-            fileNameElement.GetString() is { Length: > 0 and <= 260 } fileName &&
-            ReadLoadId(payload) is { } loadId &&
-            documentService.ConfirmOpened(fileName, loadId))
-        {
-            documentOpened(fileName);
-        }
     }
 
     private async Task<object> SaveRecoverySnapshotAsync(JsonElement? payload)
@@ -333,8 +322,8 @@ public sealed class BridgeDispatcher
         pendingSaveCancellation = cancellation;
         pendingSaveRequestId = message.RequestId;
         pendingCloseRequestId = closeRequestId;
-        void PickerChanged(bool isPickerOpen) => TryPostResponse(webView, BridgeEventJson.Create(
-            "document.saveProgress", new { requestId = message.RequestId, isPickerOpen }));
+        void PickerChanged(bool isPickerOpen) => TryPostResponse(webView,
+            BridgeEventJson.SaveProgress(message.RequestId, isPickerOpen));
         documentService.SavePickerChanged += PickerChanged;
         try
         {
@@ -349,7 +338,8 @@ public sealed class BridgeDispatcher
         {
             return DocumentSaveResult.Cancelled;
         }
-        catch (BridgeProtocolException exception) when (exception.Code == "DocumentChangedExternally")
+        catch (BridgeProtocolException exception) when (exception.Code is
+            "DocumentChangedExternally" or "DocumentUnavailable" or "DocumentBaselineUnknown")
         {
             externalConflictDetected();
             throw;
@@ -363,24 +353,12 @@ public sealed class BridgeDispatcher
         }
     }
 
-    private async Task<DocumentOpenResult> OpenDocumentAsync(JsonElement? payload)
-    {
-        var hasUnsavedChanges = ReadDirtyFlag(payload, "document.open");
-        return await documentService.OpenAsync(hasUnsavedChanges);
-    }
-
     private static Guid? ReadCloseRequestId(JsonElement? payload) =>
         payload is { ValueKind: JsonValueKind.Object } value &&
         value.TryGetProperty("closeRequestId", out var id) &&
         id.ValueKind == JsonValueKind.String &&
         Guid.TryParseExact(id.GetString(), "D", out var requestId)
             ? requestId : null;
-
-    private static Guid? ReadLoadId(JsonElement payload) =>
-        payload.TryGetProperty("loadId", out var id) &&
-        id.ValueKind == JsonValueKind.String &&
-        Guid.TryParseExact(id.GetString(), "D", out var loadId)
-            ? loadId : null;
 
     private static bool ReadDirtyFlag(JsonElement? payload, string method)
     {

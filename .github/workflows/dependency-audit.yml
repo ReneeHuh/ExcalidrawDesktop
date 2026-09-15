@@ -5,6 +5,9 @@ on:
     paths:
       - "ExcalidrawDesktop.Web/package.json"
       - "ExcalidrawDesktop.Web/yarn.lock"
+      - "tools/Check-YarnAudit.mjs"
+      - "tools/Check-YarnAudit.test.mjs"
+      - ".github/workflows/dependency-audit.yml"
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
@@ -32,7 +35,11 @@ jobs:
       - name: Install locked dependencies
         run: yarn install --frozen-lockfile --non-interactive
       - name: Run Yarn audit
-        run: yarn audit --level moderate --json > dependency-audit.json
+        run: |
+          node --test ../tools/Check-YarnAudit.test.mjs
+          audit_status=0
+          yarn audit --json > dependency-audit.json || audit_status=$?
+          node ../tools/Check-YarnAudit.mjs dependency-audit.json "$audit_status"
       - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@v4

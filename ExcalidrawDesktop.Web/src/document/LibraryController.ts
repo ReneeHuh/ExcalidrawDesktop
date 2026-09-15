@@ -1,7 +1,7 @@
 type Item = { id: string; [key: string]: unknown };
 type Snapshot = { content: string; revision: string };
 type LibraryHost = {
-  loadLibrary: () => Promise<({ status: "loaded" } & Snapshot) | { status: "unavailable" }>;
+  loadLibrary: (retryRepair?: boolean) => Promise<({ status: "loaded" } & Snapshot) | { status: "unavailable" }>;
   saveLibrary: (content: string, expectedRevision: string) => Promise<{ status: "saved" } & Snapshot>;
 };
 
@@ -30,6 +30,8 @@ export class LibraryController {
   private applying?: string;
   private disposed = false;
   private writing = false;
+  private loading = false;
+  private needsRepair = false;
   private remote?: Snapshot;
   private failed = false;
   private conflicts = 0;
@@ -39,27 +41,39 @@ export class LibraryController {
     private readonly onFailure: () => void,
     private readonly onUnsavedChanged: (hasUnsavedChanges: boolean) => void = () => {}) {}
 
-  public get isSaving() { return this.writing; }
+  public get isSaving() { return this.writing || this.loading; }
   public get hasUnsavedChanges() { return this.desired !== undefined; }
 
-  public async start() {
+  public async start(retryRepair = false) {
+    if (this.disposed || this.loading) return;
+    this.loading = true;
+    const previous = this.base;
+    this.remote = undefined;
     try {
-      const result = await this.host.loadLibrary();
+      const result = await this.host.loadLibrary(retryRepair);
       if (this.disposed) return;
-      if (result.status !== "loaded") throw new Error("Library unavailable");
-      const latest = this.remote ?? result;
+      const latest = this.remote ?? (result.status === "loaded" ? result : undefined);
+      if (!latest) throw new Error("Library unavailable");
       this.remote = undefined;
       parse(latest.content);
-      this.base = latest;
       if (this.desired !== undefined) {
-        this.desired = JSON.stringify(mergeLibraryChanges([], parse(this.desired), parse(latest.content)));
+        // After corruption, restore the in-memory library as well as pending edits.
+        // Ordinary reloads retain the original delta, including local deletions.
+        const baseItems = previous && !this.needsRepair ? parse(previous.content) : [];
+        this.desired = JSON.stringify(mergeLibraryChanges(baseItems, parse(this.desired), parse(latest.content)));
+        this.base = latest;
         await this.applyContent(this.desired);
-        void this.flush();
       } else {
+        this.base = latest;
         await this.applyContent(latest.content);
       }
+      this.needsRepair = false;
+      this.failed = false;
     } catch {
-      if (!this.disposed) this.onFailure();
+      if (!this.disposed) { this.failed = true; this.onFailure(); }
+    } finally {
+      this.loading = false;
+      void this.flush();
     }
   }
 
@@ -79,7 +93,7 @@ export class LibraryController {
   public receive(snapshot: Snapshot) {
     if (this.disposed || snapshot.revision === this.base?.revision) return;
     try { parse(snapshot.content); } catch { this.onFailure(); return; }
-    if (this.writing || this.desired !== undefined || !this.base) {
+    if (this.writing || this.loading || this.desired !== undefined || !this.base) {
       this.remote = snapshot;
       return;
     }
@@ -90,7 +104,7 @@ export class LibraryController {
   public retry() {
     this.failed = false;
     this.conflicts = 0;
-    if (!this.base) void this.start();
+    if (!this.base || this.needsRepair) void this.start(true);
     else void this.flush();
   }
 
@@ -98,13 +112,14 @@ export class LibraryController {
 
   private async applyContent(content: string) {
     if (this.disposed) return;
-    this.applying = JSON.stringify(parse(content));
-    try { await this.apply(parse(content)); }
+    const items = parse(content);
+    this.applying = JSON.stringify(items);
+    try { await this.apply(items); }
     finally { this.applying = undefined; }
   }
 
   private async flush() {
-    if (this.disposed || this.writing || this.failed || !this.base || this.desired === undefined) return;
+    if (this.disposed || this.writing || this.loading || this.failed || !this.base || this.desired === undefined) return;
     this.writing = true;
     const base = this.base;
     const content = this.desired;
@@ -116,16 +131,10 @@ export class LibraryController {
       if (this.desired === content) this.desired = undefined;
     } catch (error) {
       if (this.disposed) return;
-      if (typeof error === "object" && error !== null && "code" in error &&
-        error.code === "LibraryConflict" && this.conflicts++ < 3) {
-        try {
-          const latest = await this.host.loadLibrary();
-          if (this.disposed) return;
-          if (latest.status !== "loaded") throw new Error("Library unavailable");
-          this.desired = JSON.stringify(mergeLibraryChanges(parse(base.content), parse(this.desired ?? content), parse(latest.content)));
-          this.base = latest;
-          await this.applyContent(this.desired);
-        } catch { this.failed = true; this.onFailure(); }
+      const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+      if (code === "LibraryCorrupt") this.needsRepair = true;
+      if ((code === "LibraryConflict" || code === "LibraryCorrupt") && this.conflicts++ < 3) {
+        await this.start();
       } else {
         this.failed = true;
         this.onFailure();

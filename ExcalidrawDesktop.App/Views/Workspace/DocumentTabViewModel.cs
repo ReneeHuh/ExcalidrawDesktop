@@ -2,6 +2,7 @@ using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
 using ExcalidrawDesktop.App.ViewModels;
+using ExcalidrawDesktop.Core;
 
 namespace ExcalidrawDesktop.App.Views.Workspace;
 
@@ -61,9 +62,12 @@ public sealed class DocumentTabViewModel : ObservableObject
             }
             if (session.ExternalFileState is not ExternalFileState.None)
             {
-                accessibilityStates.Add(DesktopResources.Get(
-                    "TabStateChangedOnDisk",
-                    "changed on disk"));
+                accessibilityStates.Add(session.ExternalFileState switch
+                {
+                    ExternalFileState.Unavailable => DesktopResources.Get("TabStateFileUnavailable", "file unavailable"),
+                    ExternalFileState.UnknownBaseline => DesktopResources.Get("TabStateFileVersionUnknown", "file version unknown"),
+                    _ => DesktopResources.Get("TabStateChangedOnDisk", "changed on disk"),
+                });
             }
 
 
@@ -95,6 +99,16 @@ public sealed class DocumentTabViewModel : ObservableObject
             session.IsSuspended || session.IsSuspensionChanging)
         {
             status = DesktopResources.Get("StatusSleeping", "Sleeping");
+        }
+        else if (session.ExternalFileState == ExternalFileState.Unavailable)
+        {
+            status = DesktopResources.Get("StatusFileUnavailable", "File unavailable — Retry");
+            actionable = true;
+        }
+        else if (session.ExternalFileState == ExternalFileState.UnknownBaseline)
+        {
+            status = DesktopResources.Get("StatusFileBaselineUnknown", "File version unknown — Resolve");
+            actionable = true;
         }
         else if (session.ExternalFileState == ExternalFileState.Modified)
         {

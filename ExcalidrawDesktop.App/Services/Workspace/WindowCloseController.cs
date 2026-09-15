@@ -19,12 +19,11 @@ internal interface IWindowCloseHost
     void UpdateTabHeader(DocumentSession session);
     Task ShowImageExportErrorAsync(string message);
     Task PersistWorkspaceAsync();
-    Task PersistApplicationWorkspaceAsync();
     Task PruneRecoverySnapshotsAsync();
     void RecordWindowDiscarded();
     void ReleasePreservedRecovery(string recoveryId);
     WindowModalCoordinator Modals { get; }
-    Task<bool> EnterCloseBarrierAsync(IReadOnlyList<DocumentSession> targets);
+    Task<bool> EnterCloseBarrierAsync(IReadOnlyList<DocumentSession> targets, bool closingWindow);
     void ExitCloseBarrier(IEnumerable<DocumentSession> targets);
 }
 
@@ -76,7 +75,6 @@ internal sealed class WindowCloseController
         var saveCompletion = session.WindowCloseSaveCompletion;
         var completion = session.CloseCompletion;
         session.WindowCloseSaveCompletion = null;
-        session.CloseAfterSave = false;
         session.CloseCompletion = null;
         saveCompletion?.TrySetResult(false);
         completion?.TrySetResult(false);
@@ -91,7 +89,6 @@ internal sealed class WindowCloseController
         var requestId = Guid.NewGuid();
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         session.CloseRequestId = requestId;
-        session.CloseAfterSave = closeTab;
         if (closeTab)
         {
             session.CloseCompletion = completion;
@@ -145,7 +142,7 @@ internal sealed class WindowCloseController
         if (session.CloseBarrierId is not null) return false;
         try
         {
-            return await host.EnterCloseBarrierAsync([session]) &&
+            return await host.EnterCloseBarrierAsync([session], closingWindow: false) &&
                 await RequestCloseSessionCoreAsync(session);
         }
         finally
@@ -226,7 +223,7 @@ internal sealed class WindowCloseController
         var approved = false;
         try
         {
-            approved = await host.EnterCloseBarrierAsync(targets) &&
+            approved = await host.EnterCloseBarrierAsync(targets, closingWindow: true) &&
                 await ResolveWindowCloseCoreAsync();
             return approved;
         }
@@ -239,7 +236,7 @@ internal sealed class WindowCloseController
         }
     }
 
-    private Task<bool> PersistCloseDecisionAsync(bool discard = false)
+    private Task<bool> PersistCloseDecisionAsync()
     {
         var versions = sessions.Select(session => (Session: session, Version: session.DocumentStateVersion,
             LoadId: session.PendingDocumentLoad?.LoadId)).ToArray();
@@ -248,9 +245,9 @@ internal sealed class WindowCloseController
                 sessions.Contains(item.Session) && item.Session.CloseBarrierId is not null &&
                 item.Session.PendingDocumentLoad?.LoadId == item.LoadId &&
                 item.Session.DocumentStateVersion == item.Version && !item.Session.IsDirty &&
-                !item.Session.HasUnsavedLibrary &&
+                (!item.Session.HasUnsavedLibrary || item.Session.DiscardLibraryOnClose) &&
                 !item.Session.DocumentService.IsSaving && !item.Session.IsExporting),
-            discard ? host.PersistApplicationWorkspaceAsync : host.PersistWorkspaceAsync,
+            host.PersistWorkspaceAsync,
             host.PruneRecoverySnapshotsAsync);
     }
 
@@ -360,7 +357,7 @@ internal sealed class WindowCloseController
         host.RecordWindowDiscarded();
         try
         {
-            if (await PersistCloseDecisionAsync(discard: true))
+            if (await PersistCloseDecisionAsync())
             {
                 return true;
             }

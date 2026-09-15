@@ -186,4 +186,21 @@
   <data name="SettingsPersistenceInfoBar.Title" xml:space="preserve"><value>تعذر حفظ الإعدادات</value></data>
   <data name="SettingsPersistenceInfoBar.Message" xml:space="preserve"><value>التفضيل المحدد فعال لهذه الجلسة، ولكن تعذر حفظه. تحقق من موقع الإعدادات وحاول مرة أخرى.</value></data>
   <data name="SettingsPersistenceRetryButton.Content" xml:space="preserve"><value>إعادة المحاولة</value></data>
+  <data name="UnsavedLibraryTitle" xml:space="preserve"><value>تغييرات غير محفوظة في المكتبة</value></data>
+  <data name="UnsavedLibraryCloseContent" xml:space="preserve"><value>تعذّر حفظ تغييرات المكتبة. تجاهلها لمتابعة الإغلاق، أو ألغِ الإغلاق لإعادة محاولة حفظها. ستتم معالجة تغييرات الرسم بشكل منفصل.</value></data>
+  <data name="DiscardLibraryButton" xml:space="preserve"><value>تجاهل تغييرات المكتبة</value></data>
+  <data name="CloseNotReadyTitle" xml:space="preserve"><value>تعذّر إغلاق الرسم</value></data>
+  <data name="CloseNotReadyContent" xml:space="preserve"><value>لم يُكمل المحرر الاستعداد للإغلاق. حاول مرة أخرى، أو أعد تشغيل المحرر إذا كان قد توقف.</value></data>
+  <data name="LibraryRepairTitle" xml:space="preserve"><value>المكتبة المحفوظة تالفة</value></data>
+  <data name="LibraryRepairContent" xml:space="preserve"><value>هل تريد إعادة ضبط المكتبة المشتركة لمتابعة حفظ التغييرات؟ سيُحتفظ بالملف التالف كملف .bak بجانب library.json. لن تتغير رسوماتك.</value></data>
+  <data name="LibraryResetButton" xml:space="preserve"><value>نسخ احتياطي وإعادة ضبط</value></data>
+  <data name="FileVerificationTitle" xml:space="preserve"><value>تعذّر التحقق من إصدار الملف</value></data>
+  <data name="FileUnavailableContent" xml:space="preserve"><value>تعذّرت قراءة الملف. قد يكون مشغولاً أو قد يكون الوصول مرفوضاً. أعد المحاولة، أو احفظ في ملف آخر، أو تابع التحرير.</value></data>
+  <data name="FileBaselineUnknownContent" xml:space="preserve"><value>لا يتوفر إصدار مرجعي محفوظ لملف هذا الرسم المستعاد. احفظه في ملف آخر للاحتفاظ بالتغييرات، أو أعد تحميل إصدار القرص لاستبدال علامة التبويب هذه. لا يمكن للتطبيق التحقق مما إذا كان الملف الأصلي قد تغير.</value></data>
+  <data name="StatusFileUnavailable" xml:space="preserve"><value>الملف غير متاح — إعادة المحاولة</value></data>
+  <data name="StatusFileBaselineUnknown" xml:space="preserve"><value>إصدار الملف غير معروف — معالجة</value></data>
+  <data name="TabStateFileUnavailable" xml:space="preserve"><value>الملف غير متاح</value></data>
+  <data name="TabStateFileVersionUnknown" xml:space="preserve"><value>إصدار الملف غير معروف</value></data>
+  <data name="FileUnavailableTitleSuffix" xml:space="preserve"><value> — الملف غير متاح</value></data>
+  <data name="FileVersionUnknownTitleSuffix" xml:space="preserve"><value> — إصدار الملف غير معروف</value></data>
 </root>

@@ -144,6 +144,9 @@ public static class BridgeEventJson
 {
     private static readonly JsonSerializerOptions Options = BridgeEnvelopeJson.Options;
 
+    public static string SaveProgress(string requestId, bool isPickerOpen) =>
+        Create("document.saveProgress", new { requestId, isPickerOpen });
+
     public static string Create(string method, object? payload = null) =>
         JsonSerializer.Serialize(new
         {

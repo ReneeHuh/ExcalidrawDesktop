@@ -20,6 +20,7 @@ public sealed partial class MainWindow
         PreferencesChangedEventArgs args)
     {
         if (!CommandsBlocked) workspaceCoordinator.UpdatePreferences(args.Preferences);
+        else ApplySharedPreferences(desktopPreferences);
     }
 
     private void OnSettingsPersistenceRetry(object? sender, EventArgs args) =>

@@ -87,8 +87,9 @@ public sealed class MultiWindowWorkspaceStateStore
             {
                 var legacy = document.RootElement.Deserialize<WorkspaceState>(
                     SerializerOptions);
-                LastLoadStatus = legacy is null ? LoadStatus.Corrupt : LoadStatus.Loaded;
-                return legacy is null ? MultiWindowWorkspaceState.Empty : MigrateLegacy(legacy);
+                var migrated = legacy is null ? null : MigrateLegacy(legacy);
+                LastLoadStatus = migrated is null ? LoadStatus.Corrupt : LoadStatus.Loaded;
+                return migrated is null ? MultiWindowWorkspaceState.Empty : Normalize(migrated);
             }
 
             LastLoadStatus = LoadStatus.Unsupported;
@@ -224,13 +225,13 @@ public sealed class MultiWindowWorkspaceStateStore
         return result.ToArray();
     }
 
-    private static MultiWindowWorkspaceState MigrateLegacy(WorkspaceState legacy)
+    private static MultiWindowWorkspaceState? MigrateLegacy(WorkspaceState legacy)
     {
         if (legacy.Tabs is null || legacy.RecentFiles is null ||
             legacy.Tabs.Any(tab => tab is null) ||
             legacy.RecentFiles.Any(string.IsNullOrWhiteSpace))
         {
-            return MultiWindowWorkspaceState.Empty;
+            return null;
         }
 
         var tabs = legacy.Tabs.Select(tab => tab with

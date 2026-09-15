@@ -1,0 +1,12 @@
+{
+  "Result": "Passed",
+  "ProcessId": 12164,
+  "SaveIsolation": true,
+  "BridgeIsolation": true,
+  "ExternalModification": true,
+  "ExternalMoveOrRename": true,
+  "ExternalDeletion": true,
+  "ConflictReload": true,
+  "ConflictSaveAs": true,
+  "ConflictKeepEditing": true
+}

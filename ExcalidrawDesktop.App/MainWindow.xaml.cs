@@ -58,6 +58,7 @@ public sealed partial class MainWindow : Window
     private bool jumpListUpdateRunning;
     private bool restoringWorkspace = true;
     private bool resourcesDisposed;
+    internal XamlRoot? DialogRoot => resourcesDisposed ? null : DocumentTabs.XamlRoot;
     private int untitledSequence;
     private XamlRoot? titleBarXamlRoot;
 

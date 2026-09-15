@@ -12,7 +12,6 @@ export const useImageExport = (
 ) => {
   const ownerWindow = mountNode.ownerDocument.defaultView;
   if (!ownerWindow) throw new Error("The editor window is unavailable.");
-  const isImageExportInProgress = React.useRef(false);
   const activeExport = React.useRef<{ exportId: string; controller: AbortController } | null>(null);
 
   React.useEffect(() => {
@@ -21,7 +20,7 @@ export const useImageExport = (
     }
 
     return desktopBridge.onImageExportRequested((request) => {
-      if (isImageExportInProgress.current) {
+      if (activeExport.current) {
         desktopBridge.notifyImageExportFailed(
           request.exportId,
           getDesktopString(langCode, "exportRunning"),
@@ -29,7 +28,6 @@ export const useImageExport = (
         return;
       }
 
-      isImageExportInProgress.current = true;
       const controller = new ownerWindow.AbortController();
       activeExport.current = { exportId: request.exportId, controller };
       void exportWholeDrawingAsPng(excalidrawAPI, request, ownerWindow, undefined, controller.signal)
@@ -40,6 +38,7 @@ export const useImageExport = (
             error instanceof DesktopBridgeError ? error.code :
               (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" ? error.code : undefined),
             "exportFailed",
+            { maxBytes: request.maxBytes },
           );
           desktopBridge.notifyImageExportFailed(request.exportId, message);
           excalidrawAPI.setToast({
@@ -50,7 +49,6 @@ export const useImageExport = (
         })
         .finally(() => {
           if (activeExport.current?.exportId === request.exportId) {
-            isImageExportInProgress.current = false;
             activeExport.current = null;
           }
         });
@@ -70,6 +68,5 @@ export const useImageExport = (
   React.useEffect(() => () => {
     activeExport.current?.controller.abort();
     activeExport.current = null;
-    isImageExportInProgress.current = false;
   }, []);
 };

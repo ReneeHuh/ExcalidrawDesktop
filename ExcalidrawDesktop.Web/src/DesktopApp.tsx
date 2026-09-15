@@ -136,10 +136,8 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
       },
       load: (payload, isCancelled) => loadDocumentContentIntoEditor({
         api: excalidrawAPI,
-        bridge: desktopBridge,
         fileName: payload.fileName,
         content: payload.content,
-        notifyOpened: false,
         isCancelled,
       }),
       applied: (payload, result) => {
@@ -271,7 +269,7 @@ export const DesktopApp = ({ mountNode, bridge }: { mountNode: HTMLElement; brid
     [saveDocument],
   );
 
-  useDesktopSmoke(mountNode, desktopBridge, excalidrawAPI, closeBarrier?.locked ?? false, isDocumentOperationInProgress);
+  useDesktopSmoke(mountNode, desktopBridge, excalidrawAPI, closeBarrier?.locked ?? false, isDocumentOperationInProgress, library);
   useImageExport(mountNode, desktopBridge, excalidrawAPI, language.langCode);
 
   React.useEffect(() => {

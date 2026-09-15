@@ -17,7 +17,6 @@ internal interface IImageExportHost
     Window OwnerWindow { get; }
     DocumentSession? ActiveSession { get; }
     bool IsDisposed { get; }
-    XamlRoot? DialogRoot { get; }
     void UpdateFileMenuState(DocumentSession? session);
     void UpdateStatusBar(DocumentSession session);
 }
@@ -483,33 +482,9 @@ internal sealed class ImageExportController
         await ShowImageExportErrorAsync(message);
     }
 
-    public async Task ShowImageExportErrorAsync(string message)
-    {
-        if (host.IsDisposed || host.DialogRoot is null)
-        {
-            return;
-        }
-
-        var dialog = new ContentDialog
-        {
-            XamlRoot = host.DialogRoot,
-            Title = DesktopResources.Get(
-                "PngExportErrorTitle",
-                "Could not export PNG"),
-            Content = message,
-            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
-            DefaultButton = ContentDialogButton.Close,
-        };
-        try
-        {
-            await WindowModalCoordinator.For(host.OwnerWindow).RunAsync(
-                async () => await dialog.ShowAsync());
-        }
-        catch (Exception exception)
-        {
-            AppLogger.Error("[ImageExportController] Image export error dialog failed", exception);
-        }
-    }
+    public Task ShowImageExportErrorAsync(string message) =>
+        WindowModalCoordinator.For(host.OwnerWindow).ShowMessageAsync(
+            DesktopResources.Get("PngExportErrorTitle", "Could not export PNG"), message);
 
     private static string GetImageExportFailureMessage(Exception exception) =>
         exception switch

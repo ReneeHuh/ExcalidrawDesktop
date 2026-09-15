@@ -36,13 +36,37 @@ const createBridge = () => {
 };
 
 describe("DesktopBridge", () => {
-  afterEach(() => vi.useRealTimers());
-  it("correlates and validates a cancelled document.open response", async () => {
+  it("marks explicit library retries so a declined repair can be offered again", async () => {
     const { bridge, transport } = createBridge();
-    const response = bridge.openDocument(true);
+    const response = bridge.loadLibrary(true);
+    const request = transport.posted[0];
+    expect(request.payload).toEqual({ retryRepair: true });
+    transport.respond({ version: 1, kind: "response", requestId: request.requestId, method: request.method,
+      payload: { status: "unavailable" } });
+    await expect(response).resolves.toEqual({ status: "unavailable" });
+  });
+
+  it("pauses library loading timeout while the native repair decision is open", async () => {
+    vi.useFakeTimers();
+    const { bridge, transport } = createBridge();
+    const response = bridge.loadLibrary();
+    const request = transport.posted[0];
+    transport.respond({ version: 1, kind: "event", requestId: "progress", method: "document.saveProgress",
+      payload: { requestId: request.requestId, isPickerOpen: true } });
+    await vi.advanceTimersByTimeAsync(60_000);
+    transport.respond({ version: 1, kind: "event", requestId: "progress", method: "document.saveProgress",
+      payload: { requestId: request.requestId, isPickerOpen: false } });
+    transport.respond({ version: 1, kind: "response", requestId: request.requestId, method: request.method,
+      payload: { status: "loaded", content: "[]", revision: "repaired" } });
+    await expect(response).resolves.toEqual({ status: "loaded", content: "[]", revision: "repaired" });
+  });
+  afterEach(() => vi.useRealTimers());
+  it("correlates and validates a cancelled document.save response", async () => {
+    const { bridge, transport } = createBridge();
+    const response = bridge.saveDocument("{}");
     const request = transport.posted[0];
 
-    expect(request.payload).toEqual({ hasUnsavedChanges: true });
+    expect(request.payload).toEqual({ content: "{}" });
     transport.respond({
       version: 1,
       kind: "response",
@@ -56,7 +80,7 @@ describe("DesktopBridge", () => {
 
   it("rejects a structured native error", async () => {
     const { bridge, transport } = createBridge();
-    const response = bridge.openDocument(false);
+    const response = bridge.saveDocument("{}");
     const request = transport.posted[0];
 
     transport.respond({
@@ -75,7 +99,7 @@ describe("DesktopBridge", () => {
 
   it("rejects a response whose method does not match its request", async () => {
     const { bridge, transport } = createBridge();
-    const response = bridge.openDocument(false);
+    const response = bridge.saveDocument("{}");
     const request = transport.posted[0];
 
     transport.respond({

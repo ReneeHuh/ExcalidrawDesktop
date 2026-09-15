@@ -9,6 +9,22 @@ public sealed class RecoverySnapshotStoreTests : IDisposable
         $"ExcalidrawRecoveryTests-{Guid.NewGuid():N}");
 
     [Fact]
+    public async Task SavesUtf8RecoveryWithValidatedMetadataAndRawSceneValues()
+    {
+        var store = new RecoverySnapshotStore(testDirectory);
+        var id = Guid.NewGuid().ToString("N");
+        var path = Path.Combine(testDirectory, "drawing.excalidraw");
+        var baseline = new RecoveryFileBaseline(path, new DesktopFileStamp(DateTimeOffset.UtcNow, 123), "hash");
+        const string content = """{"text":"背景色-😀","number":1.2300e+02,"desktopRecovery":{"path":"wrong"}}""";
+        await store.SaveAsync(id, content, baseline);
+        var stored = Assert.IsType<string>(await store.LoadAsync(id));
+        Assert.Equal(baseline, RecoveryFileBaseline.ReadEmbedded(stored));
+        Assert.Contains("背景色-😀", stored);
+        Assert.Contains("1.2300e+02", stored);
+        Assert.DoesNotContain("wrong", stored);
+    }
+
+    [Fact]
     public async Task SavesLoadsDeletesAndPrunesSnapshots()
     {
         var store = new RecoverySnapshotStore(testDirectory);

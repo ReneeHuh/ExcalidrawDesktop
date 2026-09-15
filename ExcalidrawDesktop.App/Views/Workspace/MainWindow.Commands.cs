@@ -432,20 +432,9 @@ public sealed partial class MainWindow
         }
     }
 
-    private async Task ShowFileLocationErrorAsync(string message)
-    {
-        var dialog = new ContentDialog
-        {
-            XamlRoot = DocumentTabs.XamlRoot,
-            Title = DesktopResources.Get(
-                "FileLocationUnavailableTitle",
-                "File location unavailable"),
-            Content = message,
-            CloseButtonText = DesktopResources.Get("OkButton", "OK"),
-            DefaultButton = ContentDialogButton.Close,
-        };
-        await WindowModalCoordinator.For(this).RunAsync(async () => await dialog.ShowAsync());
-    }
+    private Task ShowFileLocationErrorAsync(string message) =>
+        WindowModalCoordinator.For(this).ShowMessageAsync(
+            DesktopResources.Get("FileLocationUnavailableTitle", "File location unavailable"), message);
 
     private async Task CloseSessionsAsync(IEnumerable<DocumentSession> targets)
     {
