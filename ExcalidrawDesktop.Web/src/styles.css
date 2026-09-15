@@ -50,3 +50,8 @@ body {
 .library-status button {
   margin-inline-start: 12px;
 }
+
+/* The desktop shell does not expose the editor's Library button. */
+.desktop-app .excalidraw .default-sidebar-trigger {
+  display: none;
+}
