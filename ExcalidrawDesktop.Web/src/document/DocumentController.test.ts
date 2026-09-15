@@ -21,6 +21,30 @@ const createApi = (): DocumentEditorApi => ({
 });
 
 describe("loadDocumentContentIntoEditor", () => {
+  it.each(["dark", "light"] as const)("preserves the %s theme received while a startup drawing is loading", async (theme) => {
+    const api = createApi();
+    let currentState = { ...restoreAppState({ theme: theme === "dark" ? "light" : "dark" }, null),
+      width: 800, height: 600, offsetTop: 0, offsetLeft: 0 };
+    vi.mocked(api.getAppState).mockImplementation(() => currentState);
+    vi.mocked(api.updateScene).mockImplementation(({ appState }) => {
+      currentState = { ...currentState, ...appState };
+    });
+
+    // Use the real asynchronous parser: it captures the editor state before
+    // the host's startup theme arrives, then returns that stale theme.
+    const loading = loadDocumentContentIntoEditor({
+      api,
+      fileName: "startup.excalidraw",
+      content: JSON.stringify({ type: "excalidraw", version: 2, elements: [],
+        appState: { viewBackgroundColor: "#ffffff" }, files: {} }),
+    });
+    currentState = { ...currentState, theme };
+    await loading;
+
+    expect(currentState.theme).toBe(theme);
+    expect(currentState.viewBackgroundColor).toBe("#ffffff");
+  });
+
   it("uses the loaded background as the clean baseline instead of the previous editor state", async () => {
     const api = createApi();
     vi.mocked(api.getAppState).mockReturnValue({ viewBackgroundColor: "#ffffff" } as never);

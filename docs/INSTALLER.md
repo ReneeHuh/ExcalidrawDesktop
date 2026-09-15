@@ -18,12 +18,12 @@ The command restores dependencies, builds the local web bundle, creates a clean
 self-contained Release publish, and compiles setup. Output is ignored by Git:
 
 ```text
-artifacts/installer/ExcalidrawDesktop-Setup-0.1.5-x64.exe
-artifacts/installer/ExcalidrawDesktop-Setup-0.1.5-x64.exe.sha256
-artifacts/installer/ExcalidrawDesktop-Setup-0.1.5-x64.exe.build.json
+artifacts/installer/ExcalidrawDesktop-Setup-0.1.6-x64.exe
+artifacts/installer/ExcalidrawDesktop-Setup-0.1.6-x64.exe.sha256
+artifacts/installer/ExcalidrawDesktop-Setup-0.1.6-x64.exe.build.json
 ```
 
-Version defaults to `ExcalidrawDesktop.App.csproj`. Use `-Version 0.1.6` to
+Version defaults to `ExcalidrawDesktop.App.csproj`. Use `-Version 0.1.7` to
 override the app, file, assembly, and installer versions together. Three numeric
 components are required. `-SkipBuild` packages the existing Release publish and
 rejects a version mismatch; use it only after building the current source.
@@ -87,7 +87,7 @@ portable registration behavior. Old portable registrations are left alone.
 For unattended installation:
 
 ```powershell
-./ExcalidrawDesktop-Setup-0.1.5-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="setup.log"
+./ExcalidrawDesktop-Setup-0.1.6-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="setup.log"
 ```
 
 Silent setup exits unsuccessfully if the app is open, maintenance is in
@@ -116,7 +116,7 @@ publish a public release. Download its artifact after a successful run.
 ```powershell
 dotnet test ExcalidrawDesktop.Native.Tests --configuration Release
 ./SmokeTests/Invoke-InstallerSmokeTest.ps1 `
-  -InstallerPath ./artifacts/installer/ExcalidrawDesktop-Setup-0.1.5-x64.exe
+  -InstallerPath ./artifacts/installer/ExcalidrawDesktop-Setup-0.1.6-x64.exe
 ```
 
 Run the installer smoke test in an interactive Windows test account. It uses

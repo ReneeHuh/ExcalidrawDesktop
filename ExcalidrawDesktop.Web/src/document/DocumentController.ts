@@ -54,10 +54,14 @@ export const loadDocumentContentIntoEditor = async ({
     throw new Error("The document load was cancelled.");
   }
 
+  // Loading captures app state before the asynchronous parser runs. The host
+  // may supply its startup theme meanwhile; let Excalidraw's controlled theme
+  // prop keep that value instead of restoring the parser's stale snapshot.
+  const { theme: _theme, ...appState } = scene.appState;
   api.addFiles(Object.values(scene.files));
   api.updateScene({
     elements: scene.elements,
-    appState: scene.appState,
+    appState,
     captureUpdate: CaptureUpdateAction.NEVER,
   });
   api.history.clear();

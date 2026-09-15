@@ -883,7 +883,10 @@ public sealed partial class MainWindow
                     throw new InvalidOperationException(
                         $"The {theme} app-frame theme did not reach the title bar.");
                 }
+                foreach (var themedSession in sessions)
+                    await AssertEditorThemeForSmokeAsync(themedSession, theme == ElementTheme.Dark);
             }
+            await RunEditorStartupThemeSmokeAsync(sessions[0]);
             MainLayout.RequestedTheme = originalTheme;
             await Task.Delay(100);
 
