@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ExcalidrawDesktop.Core\ExcalidrawDesktop.Core.csproj" />
+    <EmbeddedResource Include="..\installer\identity.json" LogicalName="ExcalidrawDesktop.InstallerIdentity.json" />
   </ItemGroup>
 
   <ItemGroup>

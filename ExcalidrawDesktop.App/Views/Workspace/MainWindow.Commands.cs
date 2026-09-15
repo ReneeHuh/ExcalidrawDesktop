@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Editor;
 using ExcalidrawDesktop.App.Services.Platform;
@@ -8,7 +9,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using System.Diagnostics;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.System;
@@ -51,7 +51,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] OnFileDrop failed", exception);
             await documents.ShowOpenErrorAsync(DesktopResources.Get(
                 "DroppedDrawingsOpenFailed",
                 "The dropped drawings could not be opened."));
@@ -61,7 +61,7 @@ public sealed partial class MainWindow
     private void OnAddTabButtonClick(TabView sender, object args)
     {
         if (CommandsBlocked) return;
-        LogAction("tab.new", "tab_button");
+        LogAction("New tab requested", "tab_button");
         CreateTab();
     }
 
@@ -86,21 +86,21 @@ public sealed partial class MainWindow
     private void NewTabFromInput(string inputSource)
     {
         if (CommandsBlocked) return;
-        LogAction("tab.new", inputSource);
+        LogAction("New tab requested", inputSource);
         CreateTab();
     }
 
     private void NewWindowFromInput(string inputSource)
     {
         if (CommandsBlocked) return;
-        LogAction("window.new", inputSource);
+        LogAction("New window requested", inputSource);
         workspaceCoordinator.CreateWindow();
     }
 
     private void OpenFromInput(string inputSource)
     {
         if (CommandsBlocked) return;
-        LogAction("document.open", inputSource);
+        LogAction("Open drawing requested", inputSource);
         var session = ActiveSession ?? lastDocumentSession ?? sessions.FirstOrDefault() ?? CreateTab();
         _ = documents.RequestOpenDocumentAsync(session);
     }
@@ -108,21 +108,21 @@ public sealed partial class MainWindow
     private void SaveFromInput(bool saveAs, string inputSource)
     {
         if (CommandsBlocked) return;
-        LogAction(saveAs ? "document.save_as" : "document.save", inputSource);
+        LogAction(saveAs ? "Save As requested" : "Save requested", inputSource);
         RequestSaveFromFileMenu(saveAs);
     }
 
     private void SaveAllFromInput(string inputSource)
     {
         if (CommandsBlocked) return;
-        LogAction("document.save_all", inputSource);
+        LogAction("Save all requested", inputSource);
         _ = SaveAllFromFileMenuAsync();
     }
 
     private void CloseActiveTabFromInput(string inputSource)
     {
         if (CommandsBlocked) return;
-        LogAction("tab.close", inputSource);
+        LogAction("Close tab requested", inputSource);
         if (settingsTabItem is not null &&
             ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem))
         {
@@ -138,14 +138,14 @@ public sealed partial class MainWindow
 
     private void CloseWindowFromInput(string inputSource)
     {
-        LogAction("window.close", inputSource);
+        LogAction("Close window requested", inputSource);
         Close();
     }
 
     private async void OnFileExportPngClick(object sender, RoutedEventArgs args)
     {
         if (CommandsBlocked) return;
-        LogAction("document.export_png", "menu");
+        LogAction("PNG export requested", "menu");
         await imageExports.ExportActiveSessionAsPngAsync();
     }
 
@@ -191,7 +191,7 @@ public sealed partial class MainWindow
 
     private void OnFileExitClick(object sender, RoutedEventArgs args)
     {
-        LogAction("application.exit", "menu");
+        LogAction("Exit requested", "menu");
         _ = workspaceCoordinator.RequestExitAsync();
     }
 
@@ -264,7 +264,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
-        LogAction("tab.next", "keyboard");
+        LogAction("Next tab requested", "keyboard");
         if (DocumentTabs.SelectedItem is TabViewItem tab)
         {
             SelectAdjacentTabItem(tab, next: true);
@@ -276,7 +276,7 @@ public sealed partial class MainWindow
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
-        LogAction("tab.previous", "keyboard");
+        LogAction("Previous tab requested", "keyboard");
         if (DocumentTabs.SelectedItem is TabViewItem tab)
         {
             SelectAdjacentTabItem(tab, next: false);
@@ -383,7 +383,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] CopyDocumentPathAsync failed", exception);
             await ShowFileLocationErrorAsync(
                 DesktopResources.Get(
                     "DrawingPathCopyFailed",
@@ -424,7 +424,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RevealDocumentInExplorerAsync failed", exception);
             await ShowFileLocationErrorAsync(
                 DesktopResources.Get(
                     "DrawingLocationMissing",
@@ -488,11 +488,11 @@ public sealed partial class MainWindow
         try
         {
             if (!await Launcher.LaunchUriAsync(uri))
-                DiagnosticLogService.Info("external_uri.not_launched");
+                AppLogger.Warning("[MainWindow] External URI not launched");
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("external_uri.launch_failed", exception);
+            AppLogger.Error("[MainWindow] External URI launch failed", exception);
         }
     }
 }

@@ -1,3 +1,5 @@
+using ExcalidrawDesktop.App.Services.Logging;
+using System.Runtime.CompilerServices;
 using ExcalidrawDesktop.App.Models;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Editor;
@@ -10,7 +12,6 @@ using ExcalidrawDesktop.Core;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Diagnostics;
 
 namespace ExcalidrawDesktop.App;
 
@@ -368,32 +369,29 @@ public sealed partial class MainWindow : Window
     private void LogAction(
         string action,
         string inputSource,
-        DocumentSession? targetSession = null)
+        DocumentSession? targetSession = null,
+        [CallerMemberName] string member = "",
+        [CallerLineNumber] int line = 0)
     {
         var windowId = workspaceCoordinator.TryGetLogicalWindowId(this, out var id)
             ? id
             : null;
         var active = ActiveSession;
         var target = targetSession ?? active;
-        DiagnosticLogService.Info("action.invoked", new
-        {
-            action,
-            inputSource,
-            windowId,
-            windowCount = workspaceCoordinator.Windows.Count,
-            tabCount = sessions.Count,
-            settingsSelected = settingsTabItem is not null &&
-                ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem),
-            activeSessionId = active?.RecoveryId,
-            targetSessionId = target?.RecoveryId,
-            targetDirty = target?.IsDirty,
-            targetReady = target?.IsReady,
-            targetSuspended = target?.IsSuspended,
-            targetUnloaded = target?.IsUnloaded,
-            targetMoving = target?.IsMoving,
-            targetExporting = target?.IsExporting,
-            targetClosePromptOpen = target?.ClosePromptOpen,
-        });
+        AppLogger.Info($"[MainWindow] {action} (InputSource={inputSource}, " +
+            $"WindowId={windowId}, " +
+            $"WindowCount={workspaceCoordinator.Windows.Count}, " +
+            $"TabCount={sessions.Count}, " +
+            $"SettingsSelected={settingsTabItem is not null && ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem)}, " +
+            $"ActiveSessionId={active?.RecoveryId}, " +
+            $"TargetSessionId={target?.RecoveryId}, " +
+            $"TargetDirty={target?.IsDirty}, " +
+            $"TargetReady={target?.IsReady}, " +
+            $"TargetSuspended={target?.IsSuspended}, " +
+            $"TargetUnloaded={target?.IsUnloaded}, " +
+            $"TargetMoving={target?.IsMoving}, " +
+            $"TargetExporting={target?.IsExporting}, " +
+            $"TargetClosePromptOpen={target?.ClosePromptOpen})", member, line);
     }
 
     internal bool IsClosed => resourcesDisposed;
@@ -433,7 +431,7 @@ public sealed partial class MainWindow : Window
             }
             catch (TimeoutException)
             {
-                Debug.WriteLine("Window activation timed out during application exit.");
+                AppLogger.Warning("[MainWindow] Window activation timed out during application exit.");
                 return false;
             }
             return !resourcesDisposed;
@@ -482,13 +480,9 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("window.close_failed", exception, new
-            {
-                windowCount = workspaceCoordinator.Windows.Count,
-                tabCount = sessions.Count,
-                dirtyTabCount = sessions.Count(session => session.IsDirty),
-            });
-            Debug.WriteLine(exception);
+            AppLogger.Error($"[MainWindow] Window close failed (WindowCount={workspaceCoordinator.Windows.Count}, " +
+                $"TabCount={sessions.Count}, " +
+                $"DirtyTabCount={sessions.Count(session => session.IsDirty)})", exception);
             return false;
         }
         finally
@@ -534,7 +528,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] OnAppWindowClosing failed", exception);
         }
         finally
         {

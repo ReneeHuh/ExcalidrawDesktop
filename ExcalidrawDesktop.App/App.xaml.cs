@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Services.Workspace;
 using ExcalidrawDesktop.App.Testing;
@@ -26,7 +27,12 @@ public partial class App : Application
 
     public App()
     {
-        DiagnosticLogService.Initialize();
+        DesktopLogging.Initialize();
+        if (!DesktopInstallation.TryHoldProcessLifetime())
+        {
+            AppLogger.Info("[App] Startup deferred because installation or uninstall is in progress");
+            Environment.Exit(0);
+        }
         UnhandledException += OnUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
@@ -62,7 +68,7 @@ public partial class App : Application
         object sender,
         Microsoft.UI.Xaml.UnhandledExceptionEventArgs args)
     {
-        DiagnosticLogService.Error("exception.xaml_unhandled", args.Exception);
+        CrashLogger.LogException(args.Exception);
 #if DEBUG
         if (localizationSmokeLanguage is null)
         {
@@ -83,17 +89,15 @@ public partial class App : Application
     {
         var exception = args.ExceptionObject as Exception ??
             new InvalidOperationException(args.ExceptionObject?.ToString());
-        DiagnosticLogService.Error(
-            "exception.runtime_unhandled",
-            exception,
-            new { args.IsTerminating });
+        AppLogger.Critical($"[App] Unhandled runtime exception (IsTerminating={args.IsTerminating})", exception);
+        CrashLogger.LogException(exception);
     }
 
     private static void OnUnobservedTaskException(
         object? sender,
         UnobservedTaskExceptionEventArgs args)
     {
-        DiagnosticLogService.Error("exception.task_unobserved", args.Exception);
+        AppLogger.Error("[App] Unobserved task exception", args.Exception);
         args.SetObserved();
     }
 
@@ -105,7 +109,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("application.launch_failed", exception);
+            AppLogger.Error("[App] Application launch failed", exception);
             var failureWindow = new Window { Title = DesktopResources.Get("StartupFailureTitle", "Excalidraw Desktop could not start") };
             var close = new Microsoft.UI.Xaml.Controls.Button
             {
@@ -127,7 +131,7 @@ public partial class App : Application
 
     private async Task LaunchAsync(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
-        DiagnosticLogService.Info("application.launch_requested");
+        AppLogger.Info("[App] Application launch requested");
         var smokeOptions = ResolveSmokeOptions(args.Arguments);
         var isSmokeTest = Environment.GetEnvironmentVariable("EXCALIDRAW_DESKTOP_SMOKE_TEST") == "1" ||
             smokeOptions != DesktopSmokeOptions.None;
@@ -139,7 +143,7 @@ public partial class App : Application
         var mainInstance = AppInstance.FindOrRegisterForKey(instanceKey);
         if (!mainInstance.IsCurrent)
         {
-            DiagnosticLogService.Info("application.activation_redirected");
+            AppLogger.Info("[App] Application activation redirected");
             await mainInstance.RedirectActivationToAsync(activation);
             Exit();
             return;
@@ -147,7 +151,8 @@ public partial class App : Application
 
         // Only the surviving main instance repairs file associations; a
         // redirected launch must not touch the registry on its way out.
-        if (!isSmokeTest) EnsureFileTypeRegistration();
+        if (!isSmokeTest && !DesktopInstallation.IsInstallerManaged(AppContext.BaseDirectory))
+            EnsureFileTypeRegistration();
         dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         mainInstance.Activated += OnInstanceActivated;
         workspaceCoordinator = new ApplicationWorkspaceCoordinator(
@@ -177,19 +182,13 @@ public partial class App : Application
         }
         restoredActiveWindow?.Activate();
         QueueActivatedFiles(activation, includeProcessArguments: true);
-        DiagnosticLogService.Info("application.launch_completed", new
-        {
-            restoredWindowCount = restoredWindows.Count,
-            windowCount = workspaceCoordinator.Windows.Count,
-        });
+        AppLogger.Info($"[App] Application launch completed (RestoredWindowCount={restoredWindows.Count}, " +
+            $"WindowCount={workspaceCoordinator.Windows.Count})");
     }
 
     private void OnInstanceActivated(object? sender, AppActivationArguments args)
     {
-        DiagnosticLogService.Info("application.instance_activated", new
-        {
-            activationKind = args.Kind.ToString(),
-        });
+        AppLogger.Info($"[App] Application instance activated (ActivationKind={args.Kind.ToString()})");
         dispatcherQueue?.TryEnqueue(() =>
         {
             workspaceCoordinator?.ActivateMostRecentWindow();
@@ -215,7 +214,7 @@ public partial class App : Application
                 .Select(file => file.Path),
             ExtendedActivationKind.Launch
                 when activation.Data is ILaunchActivatedEventArgs launchActivation =>
-                ParseLaunchFile(launchActivation.Arguments),
+                DesktopCommandLine.ParseArguments(launchActivation.Arguments),
             _ => [],
         };
 
@@ -230,14 +229,6 @@ public partial class App : Application
         var activatedPaths = DesktopDropPaths.SelectSupported(candidates)
             .Where(File.Exists);
         workspaceCoordinator.QueueActivatedFiles(activatedPaths);
-    }
-
-    private static IEnumerable<string> ParseLaunchFile(string arguments)
-    {
-        var path = DesktopLaunchFile.ParseArguments(arguments);
-        return path is not null && File.Exists(path)
-                ? [path]
-                : [];
     }
 
     /// <summary>
@@ -272,15 +263,13 @@ public partial class App : Application
                 ["open"],
                 executablePath);
             AtomicFile.WriteAllText(stampPath, stamp);
-            DiagnosticLogService.Info("application.file_type_registered");
+            AppLogger.Info("[App] Application file type registered");
         }
         catch (Exception exception)
         {
             // File association repair is best effort and must never block the
             // editor from opening directly or accepting command-line paths.
-            DiagnosticLogService.Error(
-                "application.file_type_registration_failed",
-                exception);
+            AppLogger.Error("[App] Application file type registration failed", exception);
         }
     }
 

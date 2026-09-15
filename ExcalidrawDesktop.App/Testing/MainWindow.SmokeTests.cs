@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
@@ -291,7 +292,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RunMultiWindowExitSmokeAsync failed", exception);
             if (!resourcesDisposed)
             {
                 Title = $"Excalidraw Desktop — Multi-window Exit smoke failed: {exception.Message}";
@@ -743,8 +744,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
-            DiagnosticLogService.Error("smoke.multi_window_failed", exception);
+            AppLogger.Error("[MainWindow] Smoke multi window failed", exception);
             await File.WriteAllTextAsync(
                 Path.Combine(AppContext.BaseDirectory, "multi-window-smoke-error.txt"), exception.ToString());
             Title = $"Excalidraw Desktop — Multi-window smoke failed: {exception.Message}";
@@ -1110,7 +1110,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RunTitleBarSmokeAsync failed", exception);
             await File.WriteAllTextAsync(
                 Path.Combine(AppContext.BaseDirectory, "titlebar-smoke-error.txt"),
                 exception.ToString());
@@ -1217,7 +1217,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RunPerformanceSmokeAsync failed", exception);
             Title = "Excalidraw Desktop — Performance smoke failed";
         }
     }
@@ -1395,7 +1395,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RunSuspensionSmokeAsync failed", exception);
             Title = $"Excalidraw Desktop — Suspension smoke failed: {exception.Message}";
         }
         finally
@@ -1640,7 +1640,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RunTabSmokeAsync failed", exception);
             Title = $"Excalidraw Desktop — Tab smoke failed: {exception.Message}";
         }
     }
@@ -2033,7 +2033,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RunDocumentSafetySmokeAsync failed", exception);
             Title = $"Excalidraw Desktop — Document safety smoke failed: {exception.Message}";
         }
         finally
@@ -2331,7 +2331,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RunCloseDecisionsSmokeAsync failed", exception);
             Title = $"Excalidraw Desktop — Close decisions smoke failed: {exception.Message}";
             await File.WriteAllTextAsync(
                 Path.Combine(AppContext.BaseDirectory, "close-decisions-smoke.result"),
@@ -2506,7 +2506,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[MainWindow] RunImageExportSmokeAsync failed", exception);
             Title = $"Excalidraw Desktop — Image export smoke failed: {exception.Message}";
         }
     }

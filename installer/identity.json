@@ -1,0 +1,8 @@
+{
+  "appId": "8BE2E07D-03E5-4B19-A123-F2BF076FB426",
+  "appName": "Excalidraw Desktop",
+  "progId": "ExcalidrawDesktop.Drawing",
+  "markerFile": "excalidraw-desktop.install",
+  "mutexPrefix": "Global\\ExcalidrawDesktop.Running.",
+  "maintenanceMutexPrefix": "Global\\ExcalidrawDesktop.Maintenance."
+}

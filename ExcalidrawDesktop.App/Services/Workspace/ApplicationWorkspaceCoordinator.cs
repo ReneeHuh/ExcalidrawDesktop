@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
@@ -102,20 +103,17 @@ internal sealed class ApplicationWorkspaceCoordinator
             // The in-memory preferences still apply for this session; the
             // failure is recorded rather than allowed to unwind a XAML event
             // handler and terminate the process.
-            DiagnosticLogService.Error("settings.save_failed", exception);
+            AppLogger.Error("[ApplicationWorkspaceCoordinator] Settings save failed", exception);
             LastSettingsPersistenceResult = new(SettingsPersistenceOutcome.AppliedInMemoryOnly, exception);
         }
         if (LastSettingsPersistenceResult is null || LastSettingsPersistenceResult.Error is null)
             LastSettingsPersistenceResult = new(SettingsPersistenceOutcome.AppliedAndPersisted);
-        DiagnosticLogService.Info("settings.changed", new
-        {
-            theme = preferences.Theme.ToString(),
-            preferences.ReopenSavedTabs,
-            preferences.SaveDirtyDrawingsOnClose,
-            preferences.SuspendInactiveTabs,
-            preferences.UnloadInactiveTabs,
-            language = preferences.Language,
-        });
+        AppLogger.Info($"[ApplicationWorkspaceCoordinator] Settings changed (Theme={preferences.Theme.ToString()}, " +
+            $"ReopenSavedTabs={preferences.ReopenSavedTabs}, " +
+            $"SaveDirtyDrawingsOnClose={preferences.SaveDirtyDrawingsOnClose}, " +
+            $"SuspendInactiveTabs={preferences.SuspendInactiveTabs}, " +
+            $"UnloadInactiveTabs={preferences.UnloadInactiveTabs}, " +
+            $"Language={preferences.Language})");
         foreach (var window in windows.ToArray())
         {
             window.ApplySharedPreferences(preferences);
@@ -231,12 +229,9 @@ internal sealed class ApplicationWorkspaceCoordinator
             restoreStates[window] = restoreState;
         }
         mostRecentlyActiveWindow ??= window;
-        DiagnosticLogService.Info("window.registered", new
-        {
-            windowId = logicalId,
-            windowCount = windows.Count,
-            restored = restoreState is not null,
-        });
+        AppLogger.Info($"[ApplicationWorkspaceCoordinator] Window registered (WindowId={logicalId}, " +
+            $"WindowCount={windows.Count}, " +
+            $"Restored={restoreState is not null})");
     }
 
     public WorkspaceWindowState? GetRestoreState(MainWindow window) =>
@@ -266,12 +261,9 @@ internal sealed class ApplicationWorkspaceCoordinator
                 return;
             }
             mostRecentlyActiveWindow = window;
-            DiagnosticLogService.Info("window.activated", new
-            {
-                windowId = GetLogicalWindowId(window),
-                windowCount = windows.Count,
-                tabCount = window.OpenSessions.Count,
-            });
+            AppLogger.Info($"[ApplicationWorkspaceCoordinator] Window activated (WindowId={GetLogicalWindowId(window)}, " +
+                $"WindowCount={windows.Count}, " +
+                $"TabCount={window.OpenSessions.Count})");
             if (window.IsReadyForActivation)
             {
                 QueuePersistWorkspace();
@@ -297,12 +289,9 @@ internal sealed class ApplicationWorkspaceCoordinator
         windows.Remove(window);
         logicalWindowIds.Remove(window);
         restoreStates.Remove(window);
-        DiagnosticLogService.Info("window.unregistered", new
-        {
-            windowId = removedWindowId,
-            windowCount = windows.Count,
-            exiting = isExiting,
-        });
+        AppLogger.Info($"[ApplicationWorkspaceCoordinator] Window unregistered (WindowId={removedWindowId}, " +
+            $"WindowCount={windows.Count}, " +
+            $"Exiting={isExiting})");
         if (ReferenceEquals(mostRecentlyActiveWindow, window))
         {
             mostRecentlyActiveWindow = windows.LastOrDefault();
@@ -313,11 +302,8 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
         else if (windows.Count == 0 && !isExiting)
         {
-            DiagnosticLogService.Info("application.exiting", new
-            {
-                reason = "last_window_closed",
-            });
-            DiagnosticLogService.Flush();
+            AppLogger.Info("[ApplicationWorkspaceCoordinator] Application exiting after the last window closed");
+            DesktopLogging.Flush();
             Microsoft.UI.Xaml.Application.Current.Exit();
         }
     }
@@ -360,9 +346,7 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("workspace.persistence_failed", exception);
-            System.Diagnostics.Debug.WriteLine(
-                $"Workspace persistence failed: {exception}");
+            AppLogger.Error("[ApplicationWorkspaceCoordinator] Workspace persistence failed", exception);
         }
     }
 
@@ -403,12 +387,9 @@ internal sealed class ApplicationWorkspaceCoordinator
         try
         {
             await workspaceStateStore.SaveAsync(state);
-            DiagnosticLogService.Info("workspace.persisted", new
-            {
-                windowCount = snapshotWindows.Length,
-                recentFileCount = RecentFiles.Count,
-                exiting = isExiting,
-            });
+            AppLogger.Info($"[ApplicationWorkspaceCoordinator] Workspace persisted (WindowCount={snapshotWindows.Length}, " +
+                $"RecentFileCount={RecentFiles.Count}, " +
+                $"Exiting={isExiting})");
         }
         finally
         {
@@ -466,21 +447,16 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
 
         startupRecoveryPruned = true;
-        DiagnosticLogService.Info("window.ready", new
-        {
-            windowId = GetLogicalWindowId(window),
-            windowCount = windows.Count,
-            tabCount = window.OpenSessions.Count,
-        });
+        AppLogger.Info($"[ApplicationWorkspaceCoordinator] Window ready (WindowId={GetLogicalWindowId(window)}, " +
+            $"WindowCount={windows.Count}, " +
+            $"TabCount={window.OpenSessions.Count})");
         try
         {
             await PruneRecoverySnapshotsAsync();
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("recovery.prune_failed", exception);
-            System.Diagnostics.Debug.WriteLine(
-                $"Startup recovery snapshot cleanup failed: {exception}");
+            AppLogger.Error("[ApplicationWorkspaceCoordinator] Recovery prune failed", exception);
         }
     }
 
@@ -631,12 +607,8 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
 
         isExiting = true;
-        DiagnosticLogService.Info("application.exit_requested", new
-        {
-            windowCount = windows.Count,
-            dirtyTabCount = windows.Sum(window =>
-                window.OpenSessions.Count(session => session.IsDirty)),
-        });
+        AppLogger.Info($"[ApplicationWorkspaceCoordinator] Application exit requested (WindowCount={windows.Count}, " +
+            $"DirtyTabCount={windows.Sum(window => window.OpenSessions.Count(session => session.IsDirty))})");
         queuedPersistence?.Cancel();
         queuedPersistence?.Dispose();
         queuedPersistence = null;
@@ -664,24 +636,17 @@ internal sealed class ApplicationWorkspaceCoordinator
                     // Windows may refuse to bring a window to the foreground
                     // (foreground lock). Any dialog the close flow shows still
                     // renders inside the window, so continue rather than abort.
-                    DiagnosticLogService.Info("application.exit_activation_skipped", new
-                    {
-                        windowId = LogicalWindowIdOrNull(window),
-                    });
+                    AppLogger.Warning($"[ApplicationWorkspaceCoordinator] Application exit activation skipped (WindowId={LogicalWindowIdOrNull(window)})");
                 }
                 if (!await window.RequestCloseAsync())
                 {
-                    DiagnosticLogService.Info("application.exit_cancelled", new
-                    {
-                        reason = "window_close_cancelled",
-                        windowId = LogicalWindowIdOrNull(window),
-                    });
+                    AppLogger.Info($"[ApplicationWorkspaceCoordinator] Application exit cancelled by window (WindowId={LogicalWindowIdOrNull(window)})");
                     return;
                 }
             }
             await PersistWorkspaceAsync();
-            DiagnosticLogService.Info("application.exit_completed");
-            DiagnosticLogService.Flush();
+            AppLogger.Info("[ApplicationWorkspaceCoordinator] Application exit completed");
+            DesktopLogging.Flush();
         }
         finally
         {

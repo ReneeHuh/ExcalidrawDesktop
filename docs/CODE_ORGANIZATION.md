@@ -18,7 +18,8 @@ different environments and have different lifetimes.
 | Open/save, recovery integration, export | `ExcalidrawDesktop.App/Services/Documents/` |
 | WebView lifecycle and native bridge dispatch | `ExcalidrawDesktop.App/Services/Editor/` |
 | Shared settings, windows, close coordination, modal ownership | `ExcalidrawDesktop.App/Services/Workspace/` |
-| Windows resources, settings storage, paths, diagnostics | `ExcalidrawDesktop.App/Services/Platform/` |
+| Windows resources, settings storage, paths | `ExcalidrawDesktop.App/Services/Platform/` |
+| ReadPlease-style usage logs and crash reports | `ExcalidrawDesktop.App/Services/Logging/` |
 | Protocol, validation, persistence and recovery rules | `ExcalidrawDesktop.Core/` |
 | Native smoke scenarios and fixtures | `ExcalidrawDesktop.App/Testing/` |
 | Desktop smoke-test launchers | `SmokeTests/` |

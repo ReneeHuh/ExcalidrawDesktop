@@ -19,8 +19,9 @@ internal static class DesktopPaths
     public static string WorkspaceStatePath =>
         Path.Combine(DataRoot, "workspace-state.json");
 
-    public static string DiagnosticsDirectory =>
-        Path.Combine(DataRoot, "Diagnostics");
+    public static string UsageLogs => Path.Combine(DataRoot, "UsageLogs");
+
+    public static string CrashLogs => Path.Combine(DataRoot, "CrashLogs");
 
     public static string WebView2DataDirectory =>
         Path.Combine(DataRoot, "WebView2");

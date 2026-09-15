@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
@@ -232,7 +233,7 @@ internal sealed class EditorSessionController
         catch (Exception exception)
         {
             session.LastLifecycleFailure = exception.Message;
-            Debug.WriteLine($"Tab unload failed: {exception}");
+            AppLogger.Error($"[EditorSessionController] Tab unload failed (SessionId={session.RecoveryId})", exception);
             return false;
         }
         finally
@@ -346,7 +347,7 @@ internal sealed class EditorSessionController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"Tab suspension failed: {exception}");
+            AppLogger.Error($"[EditorSessionController] Tab suspension failed (SessionId={session.RecoveryId})", exception);
             return false;
         }
         finally
@@ -387,7 +388,7 @@ internal sealed class EditorSessionController
         catch (Exception exception)
         {
             session.IsResuming = false;
-            Debug.WriteLine($"Tab resume failed: {exception}");
+            AppLogger.Error($"[EditorSessionController] Tab resume failed (SessionId={session.RecoveryId})", exception);
         }
     }
 
@@ -490,7 +491,7 @@ internal sealed class EditorSessionController
             TitleChanged?.Invoke(session, DesktopResources.Get(
                 "EditorStartupFailedTitle",
                 "Excalidraw Desktop — Editor startup failed"));
-            Debug.WriteLine(exception);
+            AppLogger.Error($"[EditorSessionController] InitializeCoreAsync failed (SessionId={session.RecoveryId})", exception);
         }
         finally
         {
@@ -596,7 +597,7 @@ internal sealed class EditorSessionController
         catch (Exception exception)
         {
             session.LastLifecycleFailure = exception.Message;
-            Debug.WriteLine($"WebView cleanup failed: {exception}");
+            AppLogger.Error($"[EditorSessionController] WebView cleanup failed (SessionId={session.RecoveryId})", exception);
         }
     }
 
@@ -684,7 +685,7 @@ internal sealed class EditorSessionController
             {
                 session.IsRetrying = false;
             }
-            DiagnosticLogService.Error("editor.retry_failed", exception);
+            AppLogger.Error($"[EditorSessionController] Editor retry failed (SessionId={session.RecoveryId})", exception);
         }
     }
 
@@ -819,10 +820,10 @@ internal sealed class EditorSessionController
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("editor.startup_diagnostics_failed", exception);
+            AppLogger.Error($"[EditorSessionController] Editor startup diagnostics failed (SessionId={session.RecoveryId})", exception);
             return;
         }
-        Debug.WriteLine($"Editor bridge startup diagnostics: {diagnostics}");
+        AppLogger.Debug($"[EditorSessionController] Editor bridge startup diagnostics: {diagnostics}");
         session.Content.ShowFailure(
             $"The editor loaded but its desktop bridge did not become ready. {diagnostics}");
 #else
@@ -894,7 +895,7 @@ internal sealed class EditorSessionController
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("editor.external_uri_failed", exception);
+            AppLogger.Error("[EditorSessionController] Editor external URI failed", exception);
         }
     }
 
@@ -946,7 +947,7 @@ internal sealed class EditorSessionController
                 }
                 catch (Exception exception)
                 {
-                    DiagnosticLogService.Error("library.operation_failed", exception);
+                    AppLogger.Error($"[EditorSessionController] Library operation failed (SessionId={session.RecoveryId})", exception);
                     session.TryPostEditorMessage(BridgeResponseJson.Error(message, "LibraryUnavailable",
                         "The shared library could not be read or saved."));
                 }
@@ -1016,11 +1017,11 @@ internal sealed class EditorSessionController
         }
         catch (BridgeProtocolException exception)
         {
-            Debug.WriteLine($"Rejected bridge message ({exception.Code}): {exception.Message}");
+            AppLogger.Warning($"[EditorSessionController] Rejected bridge message ({exception.Code}): {exception.Message}");
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("editor.bridge_dispatch_failed", exception);
+            AppLogger.Error($"[EditorSessionController] Editor bridge dispatch failed (SessionId={session.RecoveryId})", exception);
             session.LastLifecycleFailure = exception.Message;
             StateChanged?.Invoke(session);
         }

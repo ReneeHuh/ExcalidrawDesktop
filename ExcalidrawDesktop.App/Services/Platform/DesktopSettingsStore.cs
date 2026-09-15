@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Models;
 using System.Text.Json;
 
@@ -46,7 +47,7 @@ internal sealed class DesktopSettingsStore
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or JsonException)
         {
-            DiagnosticLogService.Error("settings.load_failed", exception);
+            AppLogger.Error("[DesktopSettingsStore] Settings load failed", exception);
             return DesktopPreferences.Default;
         }
     }

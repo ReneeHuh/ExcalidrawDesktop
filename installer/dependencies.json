@@ -1,0 +1,13 @@
+{
+  "innoSetup": {
+    "version": "6.7.3",
+    "url": "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe",
+    "sha256": "9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732"
+  },
+  "webView2": {
+    "architecture": "x64",
+    "discoveredFrom": "https://go.microsoft.com/fwlink/?linkid=2124701",
+    "url": "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/5bdafa0b-8f06-4cab-b664-252bfeca6c75/MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
+    "sha256": "EBEBC5EC130378FF1AB513F3917BE791A9CF84F849E970B1695FF01801A9D348"
+  }
+}

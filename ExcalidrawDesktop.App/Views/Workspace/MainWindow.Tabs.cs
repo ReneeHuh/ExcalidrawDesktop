@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Editor;
 using ExcalidrawDesktop.App.Services.Platform;
@@ -9,7 +10,6 @@ using ExcalidrawDesktop.Core;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Diagnostics;
 
 namespace ExcalidrawDesktop.App;
 
@@ -142,7 +142,7 @@ public sealed partial class MainWindow
         TabView sender,
         TabViewTabCloseRequestedEventArgs args)
     {
-        LogAction("tab.close", "tab", FindSession(args.Tab));
+        LogAction("Close tab requested", "tab", FindSession(args.Tab));
         if (settingsTabItem is not null && ReferenceEquals(args.Tab, settingsTabItem))
         {
             QueueHideSettingsPage();
@@ -170,15 +170,11 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("tab.close_failed", exception, new
-            {
-                sessionId = session.RecoveryId,
-                session.IsDirty,
-                session.IsReady,
-                session.IsSuspended,
-                session.IsUnloaded,
-            });
-            Debug.WriteLine($"Tab close failed: {exception}");
+            AppLogger.Error($"[MainWindow] Tab close failed (SessionId={session.RecoveryId}, " +
+                $"IsDirty={session.IsDirty}, " +
+                $"IsReady={session.IsReady}, " +
+                $"IsSuspended={session.IsSuspended}, " +
+                $"IsUnloaded={session.IsUnloaded})", exception);
             return false;
         }
     }
@@ -265,7 +261,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        LogAction("tab.external_drop", "drag", session);
+        LogAction("Tab dropped into window", "drag", session);
         workspaceCoordinator.MoveSession(source, session, this, args.DropIndex);
     }
 
@@ -273,7 +269,7 @@ public sealed partial class MainWindow
         object sender,
         SelectionChangedEventArgs args)
     {
-        LogAction("tab.selected", "tab");
+        LogAction("Tab selected", "tab");
         var settingsSelected = settingsTabItem is not null &&
             ReferenceEquals(DocumentTabs.SelectedItem, settingsTabItem);
         settingsPageVisible = settingsSelected;

@@ -1,0 +1,45 @@
+name: Windows installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.x'
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Install Corepack
+        run: npm install --global corepack@0.31.0 --force
+      - name: Test core and native services
+        run: |
+          dotnet test ExcalidrawDesktop.Core.Tests/ExcalidrawDesktop.Core.Tests.csproj --configuration Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test ExcalidrawDesktop.Native.Tests/ExcalidrawDesktop.Native.Tests.csproj --configuration Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build installer
+        run: ./installer/build-installer.ps1
+      - name: Upload setup, checksum and build metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ExcalidrawDesktop-Windows-x64
+          path: artifacts/installer/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

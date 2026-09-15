@@ -6,7 +6,8 @@ connection.
 
 > [!NOTE]
 > Excalidraw Desktop is in active development. There is not yet a public
-> installer, so the current version must be built from source.
+> installer release. You can build a Windows setup executable using the
+> [installer build instructions](docs/INSTALLER.md).
 
 ## For users
 
@@ -77,11 +78,20 @@ the app so the native shell and every editor stay in the same language.
 ### Current availability
 
 Excalidraw Desktop currently targets Windows 11 on x64 PCs and requires the
-Microsoft Edge WebView2 Runtime. The application is distributed as a
-self-contained folder: extract the complete archive and run
-`ExcalidrawDesktop.exe`. Keep the executable and its accompanying files
-together. Windows may ask you to choose Excalidraw Desktop the first time you
-open an `.excalidraw` file from Explorer.
+Microsoft Edge WebView2 Runtime. The Windows installer bundles the app and an
+offline WebView2 installer, installs for the current user without administrator
+rights, and adds a Start menu shortcut. Desktop shortcuts are optional.
+
+Setup installs under `%LOCALAPPDATA%\Programs\ExcalidrawDesktop`; settings,
+recovery data, logs, and editor data stay in `%LOCALAPPDATA%\ExcalidrawDesktop`.
+Close the app before upgrading or uninstalling. Uninstall preserves user data
+and drawings. Setup adds Excalidraw Desktop to **Open with** while preserving
+your existing default app for `.excalidraw` files.
+
+The self-contained publish folder also remains usable as a portable build:
+run `ExcalidrawDesktop.exe` and keep all accompanying files together. Portable
+builds require an installed WebView2 Runtime. See [Installer](docs/INSTALLER.md)
+for build, signing, and validation commands.
 
 If an editor tab cannot start, use its **Retry** action first. The failure view
 also links to Microsoft's
@@ -164,16 +174,17 @@ not committed.
 ExcalidrawDesktop.App/         WinUI shell, native file lifecycle, and WebView2 host
 ExcalidrawDesktop.Core/        Shared protocol, validation, recovery, and workspace logic
 ExcalidrawDesktop.Core.Tests/  C# protocol and domain tests
-ExcalidrawDesktop.Native.Tests/ Windows file-transaction tests
+ExcalidrawDesktop.Native.Tests/ Windows file-transaction and logging tests
 ExcalidrawDesktop.Web/         React entry point and TypeScript bridge
 SmokeTests/                    Unpackaged desktop integration tests
+installer/                     Windows setup, prerequisites, and packaging scripts
 tools/                         Build and dependency-update scripts
 docs/                          Plans, backlog, and validation records
 ExcalidrawDesktop.sln          Visual Studio solution
 ```
 
 Inside the native app, `Services/Documents`, `Services/Editor`,
-`Services/Workspace`, and `Services/Platform` group workflows and Windows
+`Services/Workspace`, `Services/Platform`, and `Services/Logging` group workflows and Windows
 integration. `Sessions` owns live editor resources, while `Testing` contains
 Debug-only smoke scenarios. In the web project, `main.tsx` mounts the app;
 `DesktopApp.tsx` hosts the editor and uses feature hooks for library, export,
@@ -220,6 +231,15 @@ To build only the local web bundle:
 ```powershell
 .\tools\Build-WebAssets.ps1
 ```
+
+### Logging
+
+Logging follows ReadPlease's `AppLogger` style: plain-text entries with a
+timestamp, level, thread, component, caller method, and source line. Each run
+writes `UsageLogs\AppLog_yyyy-MM-dd_HH-mm-ss.txt`; unhandled exceptions write
+`CrashLogs\Crash_yyyy-MM-dd_HH-mm-ss.txt` with exception details and the session
+history. Both folders live under `%LOCALAPPDATA%\ExcalidrawDesktop` (or the
+configured data folder). See [Logging](docs/LOGGING.md) for examples and usage.
 
 ### Update Excalidraw
 

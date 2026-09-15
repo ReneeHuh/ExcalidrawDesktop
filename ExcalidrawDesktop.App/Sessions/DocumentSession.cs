@@ -1,10 +1,10 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Views.Workspace;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Editor;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Views.Workspace.UserControls;
 using ExcalidrawDesktop.Core;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
@@ -152,8 +152,7 @@ internal sealed class DocumentSession : IDisposable
             ObjectDisposedException or
             InvalidOperationException)
         {
-            Debug.WriteLine(
-                $"Editor message dropped ({exception.GetType().Name} 0x{exception.HResult:X8}): {exception.Message}");
+            AppLogger.Warning($"[DocumentSession] Editor message dropped ({exception.GetType().Name} 0x{exception.HResult:X8}): {exception.Message}");
             return false;
         }
     }
@@ -193,7 +192,7 @@ internal sealed class DocumentSession : IDisposable
         catch (Exception exception)
         {
             LastLifecycleFailure = exception.Message;
-            Debug.WriteLine($"File-watcher cleanup failed: {exception}");
+            AppLogger.Error($"[DocumentSession] File-watcher cleanup failed (SessionId={RecoveryId})", exception);
         }
 
         var detachWebViewHandlers = DetachWebViewHandlers;
@@ -206,7 +205,7 @@ internal sealed class DocumentSession : IDisposable
         catch (Exception exception)
         {
             LastLifecycleFailure = exception.Message;
-            Debug.WriteLine($"WebView event cleanup failed: {exception}");
+            AppLogger.Error($"[DocumentSession] WebView event cleanup failed (SessionId={RecoveryId})", exception);
         }
 
         var detachEditorHandlers = DetachEditorHandlers;
@@ -218,7 +217,7 @@ internal sealed class DocumentSession : IDisposable
         catch (Exception exception)
         {
             LastLifecycleFailure = exception.Message;
-            Debug.WriteLine($"Editor input cleanup failed: {exception}");
+            AppLogger.Error($"[DocumentSession] Editor input cleanup failed (SessionId={RecoveryId})", exception);
         }
 
         var detachWindowHandlers = DetachWindowHandlers;
@@ -230,7 +229,7 @@ internal sealed class DocumentSession : IDisposable
         catch (Exception exception)
         {
             LastLifecycleFailure = exception.Message;
-            Debug.WriteLine($"Window session-host cleanup failed: {exception}");
+            AppLogger.Error($"[DocumentSession] Window session-host cleanup failed (SessionId={RecoveryId})", exception);
         }
 
         Content.CloseEditor();

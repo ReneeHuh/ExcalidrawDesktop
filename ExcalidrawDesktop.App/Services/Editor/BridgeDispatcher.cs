@@ -1,6 +1,6 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Platform;
-using System.Diagnostics;
 using System.Text.Json;
 using ExcalidrawDesktop.Core;
 using Microsoft.Web.WebView2.Core;
@@ -121,7 +121,7 @@ public sealed class BridgeDispatcher
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[BridgeDispatcher] DispatchAsync failed", exception);
             TryPostResponse(
                 webView,
                 BridgeResponseJson.Error(
@@ -149,12 +149,8 @@ public sealed class BridgeDispatcher
             ObjectDisposedException or
             InvalidOperationException)
         {
-            Debug.WriteLine($"Bridge response dropped; the editor is no longer reachable: {exception.Message}");
-            DiagnosticLogService.Info("bridge.response_dropped", new
-            {
-                reason = exception.GetType().Name,
-                hresult = exception.HResult,
-            });
+            AppLogger.Warning($"[BridgeDispatcher] Bridge response dropped (Reason={exception.GetType().Name}, " +
+                $"Hresult={exception.HResult})");
             return false;
         }
     }

@@ -1,7 +1,7 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Services.Workspace;
 using ExcalidrawDesktop.App.Sessions;
-using System.Diagnostics;
 using ExcalidrawDesktop.App.Models;
 using ExcalidrawDesktop.Core;
 using Microsoft.UI.Xaml;
@@ -56,7 +56,7 @@ internal sealed class ImageExportController
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("image_export.callback_failed", exception);
+            AppLogger.Error($"[ImageExportController] Image export callback failed (SessionId={session.RecoveryId})", exception);
             try
             {
                 if (session.PendingImageExport is { } pending)
@@ -66,7 +66,7 @@ internal sealed class ImageExportController
             }
             catch (Exception cleanupException)
             {
-                DiagnosticLogService.Error("image_export.cleanup_failed", cleanupException);
+                AppLogger.Error($"[ImageExportController] Image export cleanup failed (SessionId={session.RecoveryId})", cleanupException);
             }
         }
 #if DEBUG
@@ -203,7 +203,7 @@ internal sealed class ImageExportController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"PNG export failed: {exception}");
+            AppLogger.Error($"[ImageExportController] PNG export failed (SessionId={session.RecoveryId})", exception);
             committingExports.Remove(pending.ExportId);
             _ = FailImageExportAsync(
                 session,
@@ -223,7 +223,7 @@ internal sealed class ImageExportController
             }
             catch (Exception exception) when (IsClosedWebViewException(exception))
             {
-                DiagnosticLogService.Info("image_export.deferral_dropped", new { reason = exception.GetType().Name });
+                AppLogger.Warning($"[ImageExportController] Image export deferral dropped (Reason={exception.GetType().Name})");
             }
         }
     }
@@ -247,7 +247,7 @@ internal sealed class ImageExportController
         }
         catch (Exception exception) when (IsClosedWebViewException(exception))
         {
-            DiagnosticLogService.Info("image_export.response_dropped", new { reason = exception.GetType().Name });
+            AppLogger.Warning($"[ImageExportController] Image export response dropped (Reason={exception.GetType().Name})");
             return false;
         }
     }
@@ -307,11 +307,7 @@ internal sealed class ImageExportController
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error(
-                "image_export.start_failed",
-                exception,
-                new { sessionId = session.RecoveryId });
-            Debug.WriteLine($"Could not start PNG export: {exception}");
+            AppLogger.Error($"[ImageExportController] Image export start failed (SessionId={session.RecoveryId})", exception);
             if (session.PendingImageExport is { } pending)
             {
                 await FailImageExportAsync(
@@ -511,7 +507,7 @@ internal sealed class ImageExportController
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("image_export.error_dialog_failed", exception);
+            AppLogger.Error("[ImageExportController] Image export error dialog failed", exception);
         }
     }
 

@@ -116,13 +116,13 @@ public sealed partial class MainWindow
 
     private void OnSettingsClick(object sender, RoutedEventArgs args)
     {
-        LogAction("settings.open", "menu");
+        LogAction("Settings requested", "menu");
         ShowSettingsPage();
     }
 
     private void OnSettingsButtonClick(object sender, RoutedEventArgs args)
     {
-        LogAction("settings.open", "button");
+        LogAction("Settings requested", "button");
         ShowSettingsPage();
     }
 

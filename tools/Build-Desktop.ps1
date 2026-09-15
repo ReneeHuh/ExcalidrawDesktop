@@ -14,6 +14,9 @@ param(
     # published to a folder; there is no package-registration deployment step.
     [switch] $Deploy,
 
+    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [string] $Version,
+
     [switch] $Launch
 )
 
@@ -26,6 +29,10 @@ $projectPath = Join-Path $nativeRoot "ExcalidrawDesktop.App.csproj"
 $webAssetsBuildScript = Join-Path $scriptRoot "Build-WebAssets.ps1"
 $localizationTestScript = Join-Path $scriptRoot "Test-Localization.ps1"
 $publishRoot = Join-Path $nativeRoot "bin\$Platform\$Configuration\unpacked"
+$versionArguments = @()
+if ($Version) {
+    $versionArguments = @("-p:Version=$Version", "-p:AssemblyVersion=$Version.0", "-p:FileVersion=$Version.0")
+}
 
 Push-Location $repositoryRoot
 try {
@@ -51,7 +58,7 @@ try {
 
     & dotnet build $projectPath `
         --configuration $Configuration `
-        -p:Platform=$Platform
+        -p:Platform=$Platform @versionArguments
     if ($LASTEXITCODE -ne 0) {
         throw "WinUI build failed with exit code $LASTEXITCODE."
     }
@@ -78,7 +85,7 @@ try {
             --output $publishRoot `
             -p:Platform=$Platform `
             -p:WindowsPackageType=None `
-            -p:WindowsAppSDKSelfContained=true
+            -p:WindowsAppSDKSelfContained=true @versionArguments
         if ($LASTEXITCODE -ne 0) {
             throw "Unpackaged WinUI publish failed with exit code $LASTEXITCODE."
         }
@@ -92,7 +99,7 @@ try {
     }
 
     if ($Launch) {
-        Start-Process -FilePath $executablePath -WorkingDirectory $publishRoot
+        Start-Process -FilePath $executablePath -WorkingDirectory $publishRoot -WindowStyle Hidden
     }
 }
 finally {

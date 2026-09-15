@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Platform;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Input;
@@ -24,7 +25,7 @@ public sealed partial class MainWindow
         // property: WinUI unconditionally uses NewWindowId after it returns.
         // A loading/failed editor (or Settings tab) must still get a valid HWND.
         // Apply transfer eligibility only when an actual tear-out is requested.
-        LogAction("tab.tear_out_window_requested", "native", tab is null ? null : FindSession(tab));
+        LogAction("Tear-out window requested", "native", tab is null ? null : FindSession(tab));
         return PreparePendingTearOutWindow();
     }
 
@@ -32,7 +33,7 @@ public sealed partial class MainWindow
     {
         var destination = pendingTearOutWindow;
         var session = tab is null ? null : FindSession(tab);
-        LogAction("tab.tear_out_started", "drag", session);
+        LogAction("Tab tear-out started", "drag", session);
         try
         {
             if (destination is not null && session is not null &&
@@ -41,19 +42,16 @@ public sealed partial class MainWindow
             {
                 destination.Closed -= OnPendingTearOutWindowClosed;
                 pendingTearOutWindow = null;
-                LogAction("tab.tear_out_completed", "drag", session);
+                LogAction("Tab tear-out completed", "drag", session);
                 return true;
             }
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("tab.tear_out_failed", exception, new
-            {
-                sessionId = session?.RecoveryId,
-            });
+            AppLogger.Error($"[MainWindow] Tab tear out failed (SessionId={session?.RecoveryId})", exception);
         }
 
-        LogAction("tab.tear_out_rejected", "drag", session);
+        LogAction("Tab tear-out rejected", "drag", session);
         if (destination is { IsClosed: false })
         {
             // WinUI still calls Show and queries this AppWindow after our
@@ -126,7 +124,7 @@ public sealed partial class MainWindow
                 }
                 catch (COMException exception)
                 {
-                    DiagnosticLogService.Error("window.tear_out_animation_restore_failed", exception);
+                    AppLogger.Error("[MainWindow] Window tear out animation restore failed", exception);
                 }
             }
         });

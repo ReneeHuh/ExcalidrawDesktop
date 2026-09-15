@@ -1,8 +1,8 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Editor;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
-using System.Diagnostics;
 using ExcalidrawDesktop.App.Models;
 using ExcalidrawDesktop.Core;
 using Microsoft.UI.Xaml;
@@ -115,7 +115,7 @@ internal sealed class WindowCloseController
                 () => session.DocumentService.IsSavePickerOpen);
             if (!saved && !completion.Task.IsCompleted)
             {
-                DiagnosticLogService.Info("window.close_save_timeout", new { sessionId = session.RecoveryId });
+                AppLogger.Warning($"[WindowCloseController] Window close save timeout (SessionId={session.RecoveryId})");
                 session.Dispatcher.CancelCloseSave(requestId);
                 session.TryPostEditorMessage(BridgeEventJson.Create(
                     "document.saveCancelled", new { closeRequestId = requestId }));
@@ -209,7 +209,7 @@ internal sealed class WindowCloseController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error($"[WindowCloseController] RequestCloseSessionCoreAsync failed (SessionId={session.RecoveryId})", exception);
             OnCloseCancelled(session);
             return false;
         }
@@ -437,7 +437,7 @@ internal sealed class WindowCloseController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error($"[WindowCloseController] RequestSaveForWindowCloseAsync failed (SessionId={session.RecoveryId})", exception);
             return false;
         }
     }

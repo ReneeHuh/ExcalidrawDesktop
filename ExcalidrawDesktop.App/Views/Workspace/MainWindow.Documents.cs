@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Sessions;
@@ -6,7 +7,6 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using System.Diagnostics;
 using Windows.Foundation;
 using Windows.UI.StartScreen;
 
@@ -153,7 +153,7 @@ public sealed partial class MainWindow
                         CloseSession(target, discardRecovery: false);
                         if (ReferenceEquals(target, initialSession)) initialSession = sessions[0];
                     }
-                    Debug.WriteLine($"Skipped workspace drawing '{path}': {exception}");
+                    AppLogger.Error($"[MainWindow] Skipped workspace drawing '{path}'", exception);
                     recentFiles.RemoveAll(recent =>
                         DesktopDocumentPath.Equals(recent, path));
                 }
@@ -173,7 +173,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"Workspace restore failed: {exception}");
+            AppLogger.Error("[MainWindow] Workspace restore failed", exception);
         }
         finally
         {
@@ -300,7 +300,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"Jump list update failed: {exception}");
+            AppLogger.Error("[MainWindow] Jump list update failed", exception);
         }
         finally
         {
@@ -480,7 +480,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"Workspace persistence failed: {exception}");
+            AppLogger.Error("[MainWindow] Workspace persistence failed", exception);
         }
     }
 
@@ -511,7 +511,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"Window placement capture skipped during close: {exception}");
+            AppLogger.Error("[MainWindow] Window placement capture skipped during close", exception);
         }
         return new WorkspaceWindowState(
             workspaceCoordinator.GetLogicalWindowId(this),

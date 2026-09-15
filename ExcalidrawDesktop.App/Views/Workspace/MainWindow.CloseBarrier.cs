@@ -1,3 +1,4 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Documents;
 using ExcalidrawDesktop.App.Services.Editor;
 using ExcalidrawDesktop.App.Services.Platform;
@@ -84,7 +85,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            DiagnosticLogService.Error("window.close_barrier_failed", exception);
+            AppLogger.Error("[MainWindow] Window close barrier failed", exception);
             return false;
         }
     }

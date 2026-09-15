@@ -1,7 +1,7 @@
+using ExcalidrawDesktop.App.Services.Logging;
 using ExcalidrawDesktop.App.Services.Platform;
 using ExcalidrawDesktop.App.Services.Workspace;
 using ExcalidrawDesktop.App.Sessions;
-using System.Diagnostics;
 using ExcalidrawDesktop.App.Models;
 using ExcalidrawDesktop.Core;
 using Microsoft.UI.Xaml.Controls;
@@ -122,7 +122,7 @@ internal sealed class DocumentLifecycleController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[DocumentLifecycleController] OpenPathInTabAsync failed", exception);
             await ShowOpenErrorAsync(DesktopResources.Get(
                 "ActivatedDrawingOpenFailed",
                 "The activated drawing could not be opened."));
@@ -173,7 +173,7 @@ internal sealed class DocumentLifecycleController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[DocumentLifecycleController] RequestOpenDocumentAsync failed", exception);
             await ShowOpenErrorAsync(DesktopResources.Get(
                 "SelectedDrawingOpenFailed",
                 "The selected drawing could not be opened."));
@@ -410,7 +410,7 @@ internal sealed class DocumentLifecycleController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(exception);
+            AppLogger.Error("[DocumentLifecycleController] OpenRecentFileAsync failed", exception);
             await ShowOpenErrorAsync(DesktopResources.Get(
                 "RecentDrawingOpenFailed",
                 "The recent drawing could not be opened."));
@@ -457,7 +457,7 @@ internal sealed class DocumentLifecycleController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"External file check failed: {exception}");
+            AppLogger.Error($"[DocumentLifecycleController] External file check failed (SessionId={session.RecoveryId})", exception);
         }
     }
 
@@ -523,7 +523,7 @@ internal sealed class DocumentLifecycleController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"External conflict resolution failed: {exception}");
+            AppLogger.Error($"[DocumentLifecycleController] External conflict resolution failed (SessionId={session.RecoveryId})", exception);
             await ShowOpenErrorAsync(DesktopResources.Get(
                 "FileConflictResolutionFailed",
                 "The file conflict could not be resolved."));
@@ -613,7 +613,7 @@ internal sealed class DocumentLifecycleController
             session.RecoveryFailed = true;
             host.UpdateTabHeader(session);
             host.UpdateWindowTitle();
-            DiagnosticLogService.Error("recovery.write_failed", exception);
+            AppLogger.Error($"[DocumentLifecycleController] Recovery write failed (SessionId={session.RecoveryId})", exception);
             throw;
         }
         finally
@@ -636,7 +636,7 @@ internal sealed class DocumentLifecycleController
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"Recovery snapshot cleanup failed: {exception}");
+            AppLogger.Error($"[DocumentLifecycleController] Recovery snapshot cleanup failed (SessionId={session.RecoveryId})", exception);
         }
         finally
         {
@@ -658,7 +658,7 @@ internal sealed class DocumentLifecycleController
         catch (Exception exception)
         {
             session.RecoveryFailed = true;
-            DiagnosticLogService.Error("recovery.baseline_refresh_failed", exception);
+            AppLogger.Error($"[DocumentLifecycleController] Recovery baseline refresh failed (SessionId={session.RecoveryId})", exception);
         }
         finally
         {
