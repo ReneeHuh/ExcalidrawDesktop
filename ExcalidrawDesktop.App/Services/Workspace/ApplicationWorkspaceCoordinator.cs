@@ -204,30 +204,6 @@ internal sealed class ApplicationWorkspaceCoordinator
         return window;
     }
 
-    /// <summary>
-    /// Creates the hidden destination window for a tab tear-out drag without
-    /// registering it. It becomes a workspace member only once a session is
-    /// actually moved into it (see <see cref="MoveSession"/>), so persistence,
-    /// exit, and activation fallback never observe an empty placeholder.
-    /// </summary>
-    public MainWindow CreateTearOutPlaceholder()
-    {
-        // WinUI requires a valid destination even if a click arrives while an
-        // exit prompt is open. This unregistered placeholder can be discarded;
-        // MoveSession still rejects all transfers while isExiting is true.
-        var window = new MainWindow(this, restoreWorkspace: false, createInitialTab: false);
-        try
-        {
-            window.PrepareTearOutWindow();
-            return window;
-        }
-        catch
-        {
-            window.CloseIfEmptyAfterMove();
-            throw;
-        }
-    }
-
     public void RegisterWindow(
         MainWindow window,
         WorkspaceWindowState? restoreState = null)
@@ -428,9 +404,9 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
 
         // A restored window can be persisted from its saved state until it
-        // finishes loading. A tear-out destination that already owns a tab
-        // must also be captured, but its empty placeholder must not become a
-        // blank window on the next launch.
+        // finishes loading. A window opened for a dropped tab owns that tab
+        // before it is shown and must be captured, but a window with no tabs
+        // must not become a blank window on the next launch.
         return restoreStates.GetValueOrDefault(window) ??
             (window.OpenSessions.Count > 0
                 ? window.CaptureWorkspaceState(
@@ -563,13 +539,25 @@ internal sealed class ApplicationWorkspaceCoordinator
         }
     }
 
-    public bool MoveSessionToNewWindow(MainWindow source, DocumentSession session)
+    /// <summary>
+    /// Moves a session into a new window. <paramref name="placement"/> positions
+    /// the window before it is shown, for example under the pointer that
+    /// dropped the tab; otherwise the window takes the default placement.
+    /// </summary>
+    public bool MoveSessionToNewWindow(
+        MainWindow source,
+        DocumentSession session,
+        WorkspaceWindowBounds? placement = null)
     {
         if (!windows.Contains(source))
         {
             return false;
         }
-        var destination = CreateWindow(activate: true, createInitialTab: false);
+        var destination = CreateWindow(activate: false, createInitialTab: false);
+        if (placement is { } bounds)
+        {
+            destination.PlaceWindow(bounds);
+        }
         if (MoveSession(source, session, destination))
         {
             return true;
@@ -582,8 +570,7 @@ internal sealed class ApplicationWorkspaceCoordinator
         MainWindow source,
         DocumentSession session,
         MainWindow destination,
-        int? index = null,
-        bool closeDestinationOnFailure = true)
+        int? index = null)
     {
         if (isExiting || ReferenceEquals(source, destination) ||
             !windows.Contains(source) || destination.IsClosed)
@@ -603,7 +590,6 @@ internal sealed class ApplicationWorkspaceCoordinator
             }
             destination.AttachMovedSession(transfer, index);
             destination.Activate();
-            destination.RevealTearOutWindow();
             mostRecentlyActiveWindow = destination;
             source.CloseIfEmptyAfterMove();
             QueuePersistWorkspace();
@@ -614,7 +600,7 @@ internal sealed class ApplicationWorkspaceCoordinator
             session.IsMoving = false;
             var rollback = destination.DetachSessionForMove(session) ?? transfer;
             source.AttachMovedSession(rollback, transfer.SourceIndex);
-            if (closeDestinationOnFailure) destination.CloseIfEmptyAfterMove();
+            destination.CloseIfEmptyAfterMove();
             source.Activate();
             throw;
         }

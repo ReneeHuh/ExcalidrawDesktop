@@ -1,5 +1,11 @@
 # Tab-switch crash: native tear-out window contract
 
+> [!NOTE]
+> Historical record. Native tear-out was later replaced by `TabView`
+> drag-and-drop, which needs no placeholder windows; see
+> [`MULTI_WINDOW_TABS_PLAN.md`](../MULTI_WINDOW_TABS_PLAN.md). The manual
+> interaction checkpoint file is now `tab-drag-interaction-smoke.request`.
+
 ## Reproduction and cause
 
 The reported runs ended after `tab.selected` and `tab.tear_out_started` with

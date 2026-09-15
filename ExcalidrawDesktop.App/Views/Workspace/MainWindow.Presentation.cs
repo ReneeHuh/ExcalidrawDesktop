@@ -1,4 +1,5 @@
 using ExcalidrawDesktop.App.Sessions;
+using ExcalidrawDesktop.Core;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -76,26 +77,13 @@ public sealed partial class MainWindow
         var state = workspaceCoordinator.GetRestoreState(this);
         if (state?.Bounds is { Width: >= 320, Height: >= 240 } bounds)
         {
-            var requested = new RectInt32(
-                bounds.X,
-                bounds.Y,
-                bounds.Width,
-                bounds.Height);
             var display = DisplayArea.GetFromRect(
-                requested,
+                new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height),
                 DisplayAreaFallback.Primary);
             var workArea = display.WorkArea;
-            var width = Math.Min(requested.Width, workArea.Width);
-            var height = Math.Min(requested.Height, workArea.Height);
-            var x = Math.Clamp(
-                requested.X,
-                workArea.X,
-                workArea.X + workArea.Width - width);
-            var y = Math.Clamp(
-                requested.Y,
-                workArea.Y,
-                workArea.Y + workArea.Height - height);
-            AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
+            PlaceWindow(WindowPlacement.ClampToWorkArea(
+                bounds,
+                new WorkspaceWindowBounds(workArea.X, workArea.Y, workArea.Width, workArea.Height)));
         }
 
         if (state?.IsMaximized == true &&
@@ -104,6 +92,10 @@ public sealed partial class MainWindow
             presenter.Maximize();
         }
     }
+
+    /// <summary>Moves and resizes the native window to physical-pixel bounds.</summary>
+    internal void PlaceWindow(WorkspaceWindowBounds bounds) =>
+        AppWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height));
 
     private void UpdateTabHeader(DocumentSession session) => session.ViewModel.Refresh();
 

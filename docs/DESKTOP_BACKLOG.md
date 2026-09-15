@@ -188,8 +188,8 @@ cases below still need purpose-built automation or manual evidence.
 
 ### Power-user workflow
 
-- [x] Add multiple tabbed windows, command-driven tab moves, native tab
-  tear-out, and cross-window restoration according to
+- [x] Add multiple tabbed windows, command-driven tab moves, tab drag-and-drop
+  between windows, and cross-window restoration according to
   [`MULTI_WINDOW_TABS_PLAN.md`](MULTI_WINDOW_TABS_PLAN.md). Release hardening
   and the manual cross-window matrix remain tracked in that plan.
 - [ ] Add a native command palette for tabs, files, export, view, and app

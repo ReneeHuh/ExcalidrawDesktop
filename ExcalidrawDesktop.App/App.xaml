@@ -9,6 +9,9 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+            <!-- TabView reads these at construction, before local XAML resources are applied. -->
+            <x:Double x:Key="TabViewItemMinWidth">100</x:Double>
+            <x:Double x:Key="TabViewItemMaxWidth">220</x:Double>
             <shared:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         </ResourceDictionary>
     </Application.Resources>

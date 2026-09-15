@@ -48,6 +48,12 @@ new tab, and the gear button to open Settings. The status bar at the bottom of
 the native window reports the active drawing's file path, save state, recovery
 state, and any external file conflict.
 
+Tabs use equal widths and shrink together as more tabs are opened, down to a
+minimum width before the strip scrolls. Drag a tab along the strip to reorder
+it, drop it onto another window's tab strip to move it there, or drop it
+outside the strip to open a new window under the pointer. Clicking a tab keeps
+the current window in place.
+
 Use **File > Export whole drawing as PNG…** to create a 2× PNG containing the
 entire scene. Exporting does not change the drawing's `.excalidraw` file,
 recent-file entry, recovery snapshot, or unsaved status.

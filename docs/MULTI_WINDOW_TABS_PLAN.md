@@ -37,15 +37,15 @@ file ownership, dirty state, recovery identity, and external-file monitoring.
 
 - File > New window creates and activates a new window with one untitled tab.
 - A drawing-tab context command moves that tab to a new window.
-- `TabView` tab tear-out creates a new window during the drag.
-- A torn-out tab can be dragged into another Excalidraw Desktop window at the
-  indicated tab position.
+- Dropping a tab outside every tab strip opens a new window under the pointer.
+- A dragged tab can be dropped onto another Excalidraw Desktop window's tab
+  strip at the indicated tab position.
 - Opening a file that is already open in any window activates its existing
   window and tab rather than opening a duplicate.
 - Incoming file activations open in the most recently active usable window.
 - Save, Save As, Close Tab, Save All, and adjacent-tab shortcuts apply to the
   window that received the command.
-- Settings remains a window-local shell tab and cannot be torn out or moved.
+- Settings remains a window-local shell tab and cannot be dragged or moved.
 
 ### Window and last-tab rules
 
@@ -75,21 +75,29 @@ file ownership, dirty state, recovery identity, and external-file monitoring.
 Use multiple WinUI `Window` instances in one application process and on the
 existing UI thread. Do not use one operating-system process per window.
 
-Windows App SDK 2.1.3 already exceeds the version that introduced native
-`TabView` tear-out. Enable `CanTearOutTabs` and implement:
+Use `TabView` drag-and-drop rather than native tear-out. Keep `CanTearOutTabs`
+off, enable `CanDragTabs` and `AllowDropTabs`, and implement:
 
-- `TabTearOutWindowRequested`
-- `TabTearOutRequested`
-- `ExternalTornOutTabsDropping`
-- `ExternalTornOutTabsDropped`
+- `TabDragStarting` to tag the dragged tab. Every drawing tab may start a drag
+  so reordering works for sleeping and not-yet-initialized tabs; the stricter
+  session move rules apply only where a drop would leave the window.
+- `TabStripDragOver` and `TabStripDrop` to accept a tab from another window
+  when the source session can move and the destination window has no dialog,
+  picker, or close in progress. The insertion index comes from
+  `TabStripDropIndex` in Core.
+- `TabDroppedOutside` to open a new window sized like the source and placed so
+  the pointer rests on its tab strip, using `WindowPlacement` in Core.
 
-Enabling native tear-out suppresses the existing drag/drop completion events,
-including `TabDragCompleted`. Tab-order synchronization must therefore move to
-the new tear-out/reorder flow or to the collection that backs `TabItemsSource`.
+Native tear-out (`CanTearOutTabs`) was implemented first and reverted. WinUI
+raises `TabTearOutWindowRequested` for ordinary tab clicks and uses the
+supplied window unconditionally, which required hidden placeholder windows,
+DWM transition suppression, and move-loop tracking, and crashed natively when
+a tab was not ready. See
+[`validation/TAB_SWITCH_CRASH_FIX_2026-09-06.md`](validation/TAB_SWITCH_CRASH_FIX_2026-09-06.md).
 
 Primary platform references:
 
-- [WinUI TabView tab tear-out](https://learn.microsoft.com/windows/apps/develop/ui/controls/tab-view#tab-tear-out)
+- [WinUI TabView](https://learn.microsoft.com/windows/apps/develop/ui/controls/tab-view)
 - [Show multiple windows for a WinUI app](https://learn.microsoft.com/windows/apps/develop/ui/multiple-windows)
 - [Windowing overview](https://learn.microsoft.com/windows/apps/develop/ui/windowing-overview)
 
@@ -334,20 +342,20 @@ Exit criteria:
 - Repeated moves do not duplicate handlers, watchers, tabs, or WebViews.
 - Moving the only tab closes the empty source window safely.
 
-### Phase M3: Native tear-out and cross-window drag
+### Phase M3: Cross-window tab drag-and-drop
 
-- [x] Enable `CanTearOutTabs` for drawing tabs.
-- [x] Create a destination window in `TabTearOutWindowRequested`.
-- [x] Transfer the session in `TabTearOutRequested`.
-- [x] Accept and place application-owned tabs through the external tear-out
-  events.
-- [x] Replace `TabDragCompleted`-dependent ordering logic.
+- [x] Keep `CanTearOutTabs` off; enable `CanDragTabs` and `AllowDropTabs`.
+- [x] Open a window under the pointer from `TabDroppedOutside`.
+- [x] Accept and place application-owned tabs in `TabStripDragOver` and
+  `TabStripDrop`, gated on both the source session and the destination window.
+- [x] Keep every drawing tab reorderable regardless of editor state.
 - [x] Reject settings tabs and invalid or concurrent transfers.
+- [x] Keep tab widths equal and shrink them together as tabs are added.
 
 Exit criteria:
 
-- A drag can tear a tab into a window, snap that window during the drag, and
-  merge the tab into another existing window.
+- A drag can drop a tab into a new window at the pointer, and drop a tab into
+  another existing window at the indicated position.
 - Cancelled and failed drags leave a valid selected tab in every open window.
 - Keyboard and pointer tab reordering still persist correctly.
 
@@ -380,8 +388,8 @@ Exit criteria:
 - [ ] Test narrow, maximized, snapped, and mixed-DPI windows.
 - [ ] Test keyboard-only use, Narrator, touch, pen, and title-bar input.
 - [ ] Rerun the 1/5/10/20-tab memory matrix across one and several windows.
-- [x] Verify all WebViews, file watchers, handlers, and empty tear-out windows
-  are released.
+- [x] Verify all WebViews, file watchers, handlers, and empty destination
+  windows are released.
 
 Exit criteria:
 
@@ -411,7 +419,7 @@ ExcalidrawDesktop.Core/
 Likely modifications:
 
 - `App.xaml.cs`: track windows and delegate activation.
-- `MainWindow.xaml`: add native tear-out events and New window UI.
+- `MainWindow.xaml`: add tab drag-and-drop events and New window UI.
 - `MainWindow.xaml.cs`: become a per-window host and delegate global work.
 - `DocumentSession.cs`: add move state and replaceable host attachment.
 - `DocumentService.cs`: use the currently attached window for pickers/dialogs.
@@ -430,7 +438,7 @@ creating abstractions solely to match this file layout.
 | Two windows race to persist | One aggregate writer with coalescing and atomic replacement |
 | A window prunes another window's recovery | Compute retained IDs globally after restore/close transactions |
 | Save As creates duplicate ownership | Enforce canonical paths in an application-wide registry |
-| Empty tear-out windows leak | Track provisional windows and close them on cancel/failure |
+| Empty destination windows leak | Create the window only after a drop and close it when the move fails |
 | Restored bounds are off-screen | Validate monitor availability and clamp to a work area |
 | Exit partially closes the workspace | Deterministic application-level close transaction with cancellation |
 
@@ -443,7 +451,7 @@ For one developer familiar with this codebase:
 | M0 ownership extraction | 3-5 days |
 | M1 independent windows | 2-3 days |
 | M2 safe session moves | 4-6 days |
-| M3 native tear-out | 3-5 days |
+| M3 cross-window drag-and-drop | 3-5 days |
 | M4 persistence and restoration | 3-5 days |
 | M5 automation and hardening | 4-7 days |
 
@@ -457,8 +465,8 @@ WebView reparenting.
 Multi-window tabs are complete when:
 
 - Users can create, close, snap, and restore multiple tabbed windows.
-- A live tab can move between windows through both a command and native drag
-  tear-out without losing editor state.
+- A live tab can move between windows through both a command and
+  drag-and-drop without losing editor state.
 - File activations and duplicate-file checks work across the entire process.
 - Window Close and application Exit protect every dirty document.
 - Workspace and recovery state survive forced termination at each tested move

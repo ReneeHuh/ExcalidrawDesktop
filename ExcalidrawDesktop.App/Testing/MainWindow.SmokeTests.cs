@@ -415,7 +415,7 @@ public sealed partial class MainWindow
                     "A process-failed drawing entered a transfer.");
             }
 
-            await RunUnavailableTabTearOutSmokeAsync(session);
+            await RunUnavailableTabDropSmokeAsync(session);
             multiWindowInitializationRelease = new TaskCompletionSource(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             var retryTask = editorSessions.RetryAsync(session);
@@ -428,8 +428,8 @@ public sealed partial class MainWindow
                 throw new InvalidOperationException(
                     "An initializing drawing was allowed to enter a transfer.");
             }
-            await RunUnavailableTabTearOutSmokeAsync(session);
-            await PauseTearOutInteractionForSmokeAsync(session);
+            await RunUnavailableTabDropSmokeAsync(session);
+            await PauseTabDragInteractionForSmokeAsync(session);
             multiWindowInitializationRelease.TrySetResult();
             multiWindowInitializationRelease = null;
             await retryTask;
@@ -737,7 +737,7 @@ public sealed partial class MainWindow
                     "A repeated transfer leaked an empty window.");
             }
 
-            await RunTearOutPresentationSmokeAsync(session);
+            await RunTabDragSmokeAsync(session);
             Title = "Excalidraw Desktop — Multi-window smoke passed";
             await File.WriteAllTextAsync(
                 Path.Combine(AppContext.BaseDirectory, "multi-window-smoke.passed"), "passed");
@@ -807,7 +807,7 @@ public sealed partial class MainWindow
                 Math.Abs(TitleBarRightInset.Width.Value - expectedRightInset) > 0.75 ||
                 Math.Abs(TitleBarContainer.ActualHeight - 48) > 0.75 ||
                 Math.Abs(DocumentTabs.ActualHeight - 48) > 0.75 ||
-                !DocumentTabs.CanTearOutTabs ||
+                DocumentTabs.CanTearOutTabs || !DocumentTabs.CanDragTabs ||
                 WindowDragRegion.ActualWidth <= 0 ||
                 !string.Equals(
                     FileMenu.Title?.ToString(),

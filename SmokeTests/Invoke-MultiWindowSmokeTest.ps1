@@ -119,11 +119,12 @@ try {
                 DirtyStatePreserved = $true
                 WatcherRebound = $true
                 RepeatedMoveCleanup = $true
-                TearOutPreparationHiddenFromSwitchers = $true
-                CancelledTearOutCleanedUp = $true
-                TornOutWindowRevealed = $true
-                UnavailableTabTearOutWindowValid = $true
-                RejectedTearOutWindowLifetimePreserved = $true
+                TabSelectionKeepsWindow = $true
+                ConsistentTabWidths = $true
+                DropOutsideCreatesWindow = $true
+                DroppedWindowPlacedUnderPointer = $true
+                SleepingTabsReorderable = $true
+                UnavailableTabDropCreatesNoWindow = $true
                 SaveIsolation = $true
                 SaveAsIsolation = $true
                 ExternalChangeIsolation = $true

@@ -50,7 +50,6 @@ public sealed partial class MainWindow : Window
     private bool titleBarRegistered;
 #endif
     private bool titleBarRootSubscribed;
-    private MainWindow? pendingTearOutWindow;
     private bool settingsPageVisible;
     private bool windowClosePromptOpen;
     private bool openingActivatedFiles;
@@ -130,7 +129,6 @@ public sealed partial class MainWindow : Window
             SettingsButton,
             DesktopResources.Get("SettingsButtonToolTip", "Show Settings tab"));
         InitializeTitleBar();
-        InitializeTearOutLifetime();
         // Windows share the coordinator's store so snapshot writes and the
         // coordinator's pruning always target the same directory.
         recoverySnapshotStore = workspaceCoordinator.RecoverySnapshotStore;
@@ -263,17 +261,10 @@ public sealed partial class MainWindow : Window
         suspensionTimer.Tick -= OnSuspensionTimerTick;
         Activated -= OnWindowActivated;
         Closed -= OnWindowClosed;
-        if (tearOutPointerSource is not null)
-        {
-            tearOutPointerSource.ExitedMoveSize -= OnTearOutMoveSizeExited;
-            tearOutPointerSource = null;
-        }
         workspaceCoordinator.LibraryChanged -= OnSharedLibraryChanged;
         AppWindow.Closing -= OnAppWindowClosing;
         AppWindow.Changed -= OnAppWindowChanged;
         DocumentTabs.TabItemsChanged -= OnTabItemsChanged;
-        pendingTearOutWindow?.CloseIfEmptyAfterMove();
-        pendingTearOutWindow = null;
         ViewModel.SettingsVM.PreferencesChanged -= OnPreferencesChanged;
         ViewModel.SettingsVM.SettingsPersistenceRetryRequested -= OnSettingsPersistenceRetry;
         MainLayout.ActualThemeChanged -= OnActualThemeChanged;

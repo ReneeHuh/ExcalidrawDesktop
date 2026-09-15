@@ -179,29 +179,11 @@ public sealed partial class MainWindow
         }
     }
 
-    private void OnTabTearOutWindowRequested(
-        TabView sender,
-        TabViewTabTearOutWindowRequestedEventArgs args)
-    {
-        var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
-        args.NewWindowId = RequestTearOutWindow(tab).AppWindow.Id;
-    }
-
-    private void OnPendingTearOutWindowClosed(object sender, WindowEventArgs args)
-    {
-        ((MainWindow)sender).Closed -= OnPendingTearOutWindowClosed;
-        if (ReferenceEquals(pendingTearOutWindow, sender))
-        {
-            // Native tear-out posts WM_CLOSE for an unused destination; it does
-            // not raise TabDragCompleted after an ordinary tab click.
-            pendingTearOutWindow = null;
-        }
-    }
-
     private void OnTabItemsChanged(
         TabView sender,
         Windows.Foundation.Collections.IVectorChangedEventArgs args)
     {
+        UpdateTabWidths();
         var orderedSessions = GetOrderedSessions();
         if (orderedSessions.Count == sessions.Count &&
             !orderedSessions.SequenceEqual(sessions))
@@ -210,59 +192,6 @@ public sealed partial class MainWindow
             sessions.AddRange(orderedSessions);
             QueuePersistWorkspace();
         }
-    }
-
-    private void OnTabDragCompleted(
-        TabView sender,
-        TabViewTabDragCompletedEventArgs args)
-    {
-        // TabTearOutRequested consumes and clears a successful destination.
-        // If the drag ended without that event, discard the hidden placeholder
-        // so it cannot linger in the workspace or receive future activation.
-        QueueDiscardPendingTearOutWindow();
-    }
-
-    private void OnTabTearOutRequested(
-        TabView sender,
-        TabViewTabTearOutRequestedEventArgs args)
-    {
-        var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
-        TryCompletePendingTearOut(tab);
-    }
-
-    private void OnExternalTornOutTabsDropping(
-        TabView sender,
-        TabViewExternalTornOutTabsDroppingEventArgs args)
-    {
-        var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
-        args.AllowDrop = tab is not null &&
-            workspaceCoordinator.FindSessionByTab(tab) is
-            {
-                Window: var source,
-                Session: var session,
-            } &&
-            !ReferenceEquals(source, this) &&
-            source.CanMoveSession(session);
-    }
-
-    private void OnExternalTornOutTabsDropped(
-        TabView sender,
-        TabViewExternalTornOutTabsDroppedEventArgs args)
-    {
-        var tab = args.Tabs.OfType<TabViewItem>().FirstOrDefault();
-        if (tab is null ||
-            workspaceCoordinator.FindSessionByTab(tab) is not
-            {
-                Window: var source,
-                Session: var session,
-            } ||
-            ReferenceEquals(source, this))
-        {
-            return;
-        }
-
-        LogAction("Tab dropped into window", "drag", session);
-        workspaceCoordinator.MoveSession(source, session, this, args.DropIndex);
     }
 
     private void OnTabSelectionChanged(
@@ -436,6 +365,12 @@ public sealed partial class MainWindow
             session.IsResuming,
             session.IsUnloading,
             session.IsExporting));
+
+    /// <summary>Whether a tab dragged from another window may be dropped into this one.</summary>
+    private bool CanReceiveSession() =>
+        !CommandsBlocked &&
+        !WindowModalCoordinator.For(this).IsBusy &&
+        !documents.IsPickerActive;
 
     private void CloseSession(DocumentSession session, bool discardRecovery = true)
     {
