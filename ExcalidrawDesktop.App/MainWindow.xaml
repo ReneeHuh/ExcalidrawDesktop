@@ -3,7 +3,7 @@
     x:Class="ExcalidrawDesktop.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:pages="using:ExcalidrawDesktop.App.Pages">
+    xmlns:pages="using:ExcalidrawDesktop.App.Views.Settings">
     <Grid
         x:Name="MainLayout"
         Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
@@ -85,24 +85,28 @@
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem
                                 x:Name="SaveMenuItem"
+                                IsEnabled="{Binding CanSave, Mode=OneWay}"
                                 x:Uid="SaveMenuItem"
                                 Text="Save"
                                 KeyboardAcceleratorTextOverride="Ctrl+S"
                                 Click="OnFileSaveClick" />
                             <MenuFlyoutItem
                                 x:Name="SaveAsMenuItem"
+                                IsEnabled="{Binding CanSave, Mode=OneWay}"
                                 x:Uid="SaveAsMenuItem"
                                 Text="Save as…"
                                 KeyboardAcceleratorTextOverride="Ctrl+Shift+S"
                                 Click="OnFileSaveAsClick" />
                             <MenuFlyoutItem
                                 x:Name="SaveAllMenuItem"
+                                IsEnabled="{Binding CanSaveAll, Mode=OneWay}"
                                 x:Uid="SaveAllMenuItem"
                                 Text="Save all"
                                 KeyboardAcceleratorTextOverride="Ctrl+Alt+S"
                                 Click="OnFileSaveAllClick" />
                             <MenuFlyoutItem
                                 x:Name="ExportPngMenuItem"
+                                IsEnabled="{Binding CanExport, Mode=OneWay}"
                                 x:Uid="ExportPngMenuItem"
                                 Text="Export whole drawing as PNG…"
                                 AutomationProperties.AutomationId="ExportPngMenuItem"
@@ -110,6 +114,7 @@
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem
                                 x:Name="CloseTabMenuItem"
+                                IsEnabled="{Binding CanCloseTab, Mode=OneWay}"
                                 x:Uid="CloseTabMenuItem"
                                 Text="Close tab"
                                 KeyboardAcceleratorTextOverride="Ctrl+W"
@@ -222,6 +227,7 @@
 
         <Border
             x:Name="StatusBar"
+            Visibility="{Binding IsStatusBarVisible, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
             x:Uid="StatusBar"
             Grid.Row="2"
             Height="32"
@@ -240,27 +246,31 @@
 
                 <TextBlock
                     x:Name="StatusDocumentText"
-                    x:Uid="StatusDocumentText"
                     VerticalAlignment="Center"
                     FontSize="12"
-                    Text="Untitled"
+                    Text="{Binding ActiveTab.DocumentText, Mode=OneWay}"
+                    ToolTipService.ToolTip="{Binding ActiveTab.DocumentText, Mode=OneWay}"
+                    AutomationProperties.Name="{Binding ActiveTab.DocumentAutomationName, Mode=OneWay}"
                     TextTrimming="CharacterEllipsis"
                     AutomationProperties.AccessibilityView="Content"
                     AutomationProperties.AutomationId="StatusDocumentText" />
 
                 <TextBlock
                     x:Name="StatusStateText"
-                    x:Uid="StatusStateText"
                     Grid.Column="1"
                     VerticalAlignment="Center"
                     FontSize="12"
-                    Text="New drawing"
+                    Text="{Binding ActiveTab.StatusText, Mode=OneWay}"
+                    Visibility="{Binding ActiveTab.IsStatusAction, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}"
                     AutomationProperties.AccessibilityView="Content"
                     AutomationProperties.AutomationId="StatusStateText"
                     AutomationProperties.LiveSetting="Polite" />
 
                 <Button
                     x:Name="StatusActionButton"
+                    Content="{Binding ActiveTab.StatusText, Mode=OneWay}"
+                    AutomationProperties.Name="{Binding ActiveTab.StatusText, Mode=OneWay}"
+                    AutomationProperties.HelpText="{Binding ActiveTab.StatusActionHelpText, Mode=OneWay}"
                     Grid.Column="1"
                     MinHeight="24"
                     Padding="8,2"
@@ -268,7 +278,7 @@
                     Background="{ThemeResource AccentFillColorSecondaryBrush}"
                     BorderThickness="0"
                     FontSize="12"
-                    Visibility="Collapsed"
+                    Visibility="{Binding ActiveTab.IsStatusAction, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
                     AutomationProperties.AutomationId="StatusActionButton"
                     Click="OnStatusActionClick" />
             </Grid>

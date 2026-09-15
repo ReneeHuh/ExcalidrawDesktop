@@ -15,6 +15,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ExcalidrawDesktop.Core\ExcalidrawDesktop.Core.csproj" />
-    <Compile Include="..\ExcalidrawDesktop.App\Services\TransactedDocumentWriter.cs" Link="TransactedDocumentWriter.cs" />
+    <Compile Include="..\ExcalidrawDesktop.App\Services\Documents\TransactedDocumentWriter.cs" Link="TransactedDocumentWriter.cs" />
   </ItemGroup>
 </Project>

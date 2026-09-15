@@ -16,6 +16,8 @@ $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
 $startedProcess = $null
 $requestPath = $null
 $statePath = $null
+$passedPath = $null
+$errorPath = $null
 
 Add-Type @"
 using System;
@@ -71,6 +73,13 @@ try {
 
     $requestPath = Join-Path $package.InstallLocation "multi-window-smoke.request"
     $statePath = Join-Path $package.InstallLocation "multi-window-smoke-state.json"
+    $passedPath = Join-Path $package.InstallLocation "multi-window-smoke.passed"
+    $errorPath = Join-Path $package.InstallLocation "multi-window-smoke-error.txt"
+    foreach ($resultPath in @($passedPath, $errorPath)) {
+        if ([System.IO.File]::Exists($resultPath)) {
+            [System.IO.File]::Delete($resultPath)
+        }
+    }
     if ([System.IO.File]::Exists($statePath)) {
         [System.IO.File]::Delete($statePath)
     }
@@ -88,11 +97,15 @@ try {
         $failureTitle = $windowTitles |
             Where-Object { $_ -like "Excalidraw Desktop — Multi-window smoke failed:*" } |
             Select-Object -First 1
+        if ([System.IO.File]::Exists($errorPath)) {
+            throw [System.IO.File]::ReadAllText($errorPath)
+        }
         if ($failureTitle) {
             throw $failureTitle
         }
 
-        if ($windowTitles -contains "Excalidraw Desktop — Multi-window smoke passed") {
+        if ([System.IO.File]::Exists($passedPath) -or
+            $windowTitles -contains "Excalidraw Desktop — Multi-window smoke passed") {
             [pscustomobject]@{
                 Result = "Passed"
                 ProcessId = $startedProcess.Id
@@ -131,6 +144,11 @@ try {
     throw "Timed out waiting for multi-window validation. Last window titles: $lastTitles"
 }
 finally {
+    foreach ($resultPath in @($passedPath, $errorPath)) {
+        if ($resultPath -and [System.IO.File]::Exists($resultPath)) {
+            [System.IO.File]::Delete($resultPath)
+        }
+    }
     if ($requestPath -and [System.IO.File]::Exists($requestPath)) {
         [System.IO.File]::Delete($requestPath)
     }

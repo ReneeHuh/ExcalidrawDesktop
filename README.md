@@ -117,7 +117,15 @@ windows, tabs, file dialogs, persistence, recovery, and OS integration. A local
 React entry point hosts the public `@excalidraw/excalidraw` package inside
 WebView2 and communicates with the shell through a typed JSON bridge.
 
-`MainWindow` owns window and tab UI. `EditorSessionController` manages WebView
+Native UI files are grouped by feature under `Views/Settings` and
+`Views/Workspace`. Each window owns a `MainViewModel` and a long-lived
+`SettingsViewModel`; each live document session has a `DocumentTabViewModel`
+that projects its current state into tab and status-bar bindings. See
+[Code organization](docs/CODE_ORGANIZATION.md) for the folder map and ownership
+conventions.
+
+`MainWindow` owns window and tab UI, with feature-specific view wiring in
+partials under `Views/`. `EditorSessionController` manages WebView
 lifecycle, `DocumentLifecycleController` handles opening, recovery, and disk
 conflicts, and `WindowCloseController` coordinates saving and closing. The latter
 controllers and `ImageExportController`, which handles PNG exports, use small host
@@ -156,12 +164,20 @@ not committed.
 ExcalidrawDesktop.App/         WinUI shell, native file lifecycle, and WebView2 host
 ExcalidrawDesktop.Core/        Shared protocol, validation, recovery, and workspace logic
 ExcalidrawDesktop.Core.Tests/  C# protocol and domain tests
+ExcalidrawDesktop.Native.Tests/ Windows file-transaction tests
 ExcalidrawDesktop.Web/         React entry point and TypeScript bridge
 SmokeTests/                    Unpackaged desktop integration tests
 tools/                         Build and dependency-update scripts
 docs/                          Plans, backlog, and validation records
 ExcalidrawDesktop.sln          Visual Studio solution
 ```
+
+Inside the native app, `Services/Documents`, `Services/Editor`,
+`Services/Workspace`, and `Services/Platform` group workflows and Windows
+integration. `Sessions` owns live editor resources, while `Testing` contains
+Debug-only smoke scenarios. In the web project, `main.tsx` mounts the app;
+`DesktopApp.tsx` hosts the editor and uses feature hooks for library, export,
+and smoke-test subscriptions.
 
 ### Prerequisites
 
@@ -171,6 +187,7 @@ ExcalidrawDesktop.sln          Visual Studio solution
 - .NET 8 SDK or newer
 - Node.js 18 or newer with Corepack
 - Evergreen WebView2 Runtime
+- PowerShell 7 for local desktop smoke-test scripts
 
 ### Build and run
 

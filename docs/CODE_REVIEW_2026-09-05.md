@@ -2,6 +2,10 @@
 
 Implementation follow-up: [recommended fixes and validation results](validation/CODE_REVIEW_FIXES_2026-09-05.md). The findings and original check results below are retained as the review baseline.
 
+Source paths and line numbers below describe the September 5 layout. Files have
+since moved into feature folders; use the [current code organization guide](CODE_ORGANIZATION.md)
+to locate their implementations.
+
 The main priorities are document safety and dependency security. The current code compiles and its unit tests pass, but those checks do not exercise several consequential interactions between the editor, native file operations, recovery, and closing.
 
 This report contains **41 actionable items**, including defects, source-level reliability concerns, cleanup, and validation work. It reviews the **current working tree, including the existing modified and untracked implementation files**, rather than only the last commit. No application code was changed for this review.

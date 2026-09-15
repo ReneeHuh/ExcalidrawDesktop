@@ -16,6 +16,7 @@ $buildScript = Join-Path $repositoryRoot "tools\Build-Desktop.ps1"
 $startedProcess = $null
 $requestPath = $null
 $statePath = $null
+$passedPath = $null
 
 Add-Type -AssemblyName UIAutomationClient
 
@@ -60,6 +61,10 @@ try {
     $requestPath = Join-Path $package.InstallLocation "titlebar-smoke.request"
     $statePath = Join-Path $package.InstallLocation "titlebar-smoke-state.json"
     $errorPath = Join-Path $package.InstallLocation "titlebar-smoke-error.txt"
+    $passedPath = Join-Path $package.InstallLocation "titlebar-smoke.passed"
+    if ([System.IO.File]::Exists($passedPath)) {
+        [System.IO.File]::Delete($passedPath)
+    }
     if ([System.IO.File]::Exists($statePath)) {
         [System.IO.File]::Delete($statePath)
     }
@@ -76,7 +81,8 @@ try {
             throw "Excalidraw Desktop exited during the title-bar smoke test."
         }
 
-        if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Title bar smoke failed") {
+        if ([System.IO.File]::Exists($errorPath) -or
+            $startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Title bar smoke failed") {
             $details = if ([System.IO.File]::Exists($errorPath)) {
                 [System.IO.File]::ReadAllText($errorPath)
             } else {
@@ -85,7 +91,9 @@ try {
             throw "The unpackaged title-bar layout or tab interaction check failed. $details"
         }
 
-        if ($startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Title bar smoke passed") {
+        # Editor callbacks can change the title after the in-app assertions finish.
+        if ([System.IO.File]::Exists($passedPath) -or
+            $startedProcess.MainWindowTitle -eq "Excalidraw Desktop — Title bar smoke passed") {
             $root = [System.Windows.Automation.AutomationElement]::FromHandle(
                 $startedProcess.MainWindowHandle)
             $requiredAutomationIds = @(
@@ -135,6 +143,7 @@ try {
                 LightAndDarkThemes = "Passed"
                 AutomationNames = "Passed"
                 NativeStatusBar = "Passed"
+                SettingsBindings = "Passed"
                 CaptionButtonAutomation = "Passed"
                 FailureActions = "Passed"
                 FailureRetry = "Passed"
@@ -150,6 +159,9 @@ try {
     throw "Timed out waiting for the unpackaged title-bar check. Last title: $($startedProcess.MainWindowTitle)"
 }
 finally {
+    if ($passedPath -and [System.IO.File]::Exists($passedPath)) {
+        [System.IO.File]::Delete($passedPath)
+    }
     if ($requestPath -and [System.IO.File]::Exists($requestPath)) {
         [System.IO.File]::Delete($requestPath)
     }
